@@ -5,3 +5,11 @@ import tkinter.messagebox as messagebox
 import tkinter.scrolledtext as scrolledtext
 
 escrevei o codigo para o gui
+asdasd funcionou
+
+acreccentado masicois
+
+
+
+
+
