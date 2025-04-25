@@ -35,13 +35,14 @@ class AcquisitionThread(QThread):
     progress = pyqtSignal(str)   # Sinal para atualizar o status
     error = pyqtSignal(str)      # Sinal para reportar erros
 
-    def __init__(self, ip, duration, sample_rate, decimation, channels):
+    def __init__(self, ip, duration, sample_rate, decimation, channels, metadata=None):
         super().__init__()
         self.ip = ip
         self.duration = duration
         self.sample_rate = sample_rate
         self.decimation = decimation
         self.channels = channels
+        self.metadata = metadata or {}
 
     def run(self):
         """Executa a aquisição em thread separada"""
@@ -53,6 +54,12 @@ class AcquisitionThread(QThread):
                 decimation=self.decimation,
                 channels=self.channels
             )
+            
+            # Adicionar metadados ao dicionário de dados
+            if self.metadata:
+                data['metadata'] = self.metadata
+                self.progress.emit("Metadados adicionados aos dados")
+            
             self.progress.emit("Salvando dados...")
             filename = save_data(data)
             self.progress.emit(f"Dados salvos em {filename}")
@@ -115,7 +122,13 @@ class OASGui(QMainWindow):
         for i in range(0, 17):  # Potências de 2 de 1 a 2^16
             self.decimation_combo.addItem(f"{2**i}", 2**i)
         self.decimation_combo.setCurrentIndex(6)  # 2^6 = 64
+        self.decimation_combo.currentIndexChanged.connect(self.update_effective_rate)
         acquisition_form.addRow("Decimação:", self.decimation_combo)
+        
+        # Taxa de amostragem efetiva
+        self.effective_rate_label = QLabel()
+        acquisition_form.addRow("Taxa efetiva:", self.effective_rate_label)
+        self.update_effective_rate()  # Inicializa o rótulo
         
         # Canais
         self.ch1_check = QCheckBox("Canal 1")
@@ -139,7 +152,76 @@ class OASGui(QMainWindow):
         
         acquisition_layout.addLayout(acquisition_buttons)
         
-        # Aba de Análise
+        # NOVA ABA DE METADADOS - Completamente separada da aba de aquisição
+        metadata_tab = QWidget()
+        metadata_layout = QVBoxLayout(metadata_tab)
+        
+        # Grupo principal de metadados
+        metadata_group = QGroupBox("Informações para Treinamento de IA")
+        metadata_form = QFormLayout()
+        
+        # Número de série do sensor
+        self.sensor_sn_edit = QLineEdit()
+        metadata_form.addRow("SN do Sensor:", self.sensor_sn_edit)
+        
+        # Tipo de teste
+        self.test_type_combo = QComboBox()
+        self.test_type_combo.addItems(["Vazamento de Água", "Vazamento de Ar", 
+                                     "Vazamento de Gás", "Descarga Elétrica", 
+                                     "Ruído Mecânico", "Controle (Sem Vazamento)", "Outro"])
+        metadata_form.addRow("Tipo de Teste:", self.test_type_combo)
+        
+        # Material do sensor
+        self.material_combo = QComboBox()
+        self.material_combo.addItems(["PVC", "Aço", "Cobre", "Polietileno", 
+                                     "Polipropileno", "Ferro Fundido", "Outro"])
+        metadata_form.addRow("Material:", self.material_combo)
+        
+        # Posição do sensor
+        self.position_edit = QLineEdit()
+        metadata_form.addRow("Posição (cm):", self.position_edit)
+        
+        # Pressão do teste
+        self.pressure_spin = QDoubleSpinBox()
+        self.pressure_spin.setRange(0, 100.0)
+        self.pressure_spin.setValue(0.0)
+        self.pressure_spin.setSingleStep(0.5)
+        self.pressure_spin.setSuffix(" bar")
+        metadata_form.addRow("Pressão:", self.pressure_spin)
+        
+        # Fluxo do vazamento
+        self.flow_spin = QDoubleSpinBox()
+        self.flow_spin.setRange(0, 50.0)
+        self.flow_spin.setValue(0.0)
+        self.flow_spin.setSingleStep(0.1)
+        self.flow_spin.setSuffix(" L/min")
+        metadata_form.addRow("Fluxo:", self.flow_spin)
+        
+        # Distância do vazamento
+        self.distance_spin = QDoubleSpinBox()
+        self.distance_spin.setRange(0, 1000.0)
+        self.distance_spin.setValue(0.0)
+        self.distance_spin.setSingleStep(10.0)
+        self.distance_spin.setSuffix(" cm")
+        metadata_form.addRow("Distância:", self.distance_spin)
+        
+        # Comentários
+        self.comments_edit = QLineEdit()
+        metadata_form.addRow("Comentários:", self.comments_edit)
+        
+        metadata_group.setLayout(metadata_form)
+        metadata_layout.addWidget(metadata_group)
+        
+        # Informações adicionais
+        info_label = QLabel("Estes metadados serão salvos junto com os dados de aquisição e podem ser usados posteriormente para treinar modelos de IA.")
+        info_label.setWordWrap(True)
+        metadata_layout.addWidget(info_label)
+        
+        # Adicionar todas as abas
+        self.tabs.addTab(acquisition_tab, "Aquisição")
+        self.tabs.addTab(metadata_tab, "Metadados")
+        
+        # Adicionar resto das abas existentes
         analysis_tab = QWidget()
         analysis_layout = QVBoxLayout(analysis_tab)
         
@@ -209,8 +291,7 @@ class OASGui(QMainWindow):
         
         analysis_layout.addWidget(self.analysis_tabs)
         
-        # Adicionar as abas principais
-        self.tabs.addTab(acquisition_tab, "Aquisição")
+        # Adicionar a aba de análise
         self.tabs.addTab(analysis_tab, "Análise")
         
         # Barra de status
@@ -280,13 +361,26 @@ class OASGui(QMainWindow):
             QMessageBox.warning(self, "Erro", "Selecione pelo menos um canal")
             return
         
+        # Coletar metadados para IA da aba de metadados
+        metadata = {
+            "sensor_sn": self.sensor_sn_edit.text(),
+            "test_type": self.test_type_combo.currentText(),
+            "material": self.material_combo.currentText(),
+            "position": self.position_edit.text(),
+            "pressure": self.pressure_spin.value(),
+            "flow": self.flow_spin.value(),
+            "distance": self.distance_spin.value(),
+            "comments": self.comments_edit.text(),
+            "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        }
+        
         # Desabilitar interface durante a aquisição
         self.acquire_button.setEnabled(False)
         self.statusBar.showMessage("Aguarde, adquirindo dados...")
         
         # Criar e iniciar thread de aquisição
         self.acquisition_thread = AcquisitionThread(
-            ip, duration, 125e6, decimation, channels
+            ip, duration, 125e6, decimation, channels, metadata
         )
         self.acquisition_thread.progress.connect(self.update_status)
         self.acquisition_thread.error.connect(self.show_error)
@@ -935,6 +1029,34 @@ class OASGui(QMainWindow):
             ax.clear()
             ax.text(0.5, 0.5, f"Erro ao plotar espectro: {str(e)}", ha='center', va='center')
             self.spectrum_canvas.draw()
+
+    def update_effective_rate(self):
+        """Atualiza o rótulo da taxa de amostragem efetiva"""
+        base_rate = 125e6  # Taxa base do Red Pitaya em Hz
+        decimation = self.decimation_combo.currentData()
+        effective_rate = base_rate / decimation
+        
+        # Formatação inteligente baseada no valor
+        if effective_rate >= 1e6:
+            formatted = f"{effective_rate/1e6:.2f} MHz"
+        elif effective_rate >= 1e3:
+            formatted = f"{effective_rate/1e3:.2f} kHz"
+        else:
+            formatted = f"{effective_rate:.2f} Hz"
+        
+        # Exibir e calcular Nyquist
+        nyquist = effective_rate / 2
+        nyquist_formatted = f"{nyquist/1e3:.1f} kHz" if nyquist >= 1e3 else f"{nyquist:.1f} Hz"
+        
+        self.effective_rate_label.setText(f"{formatted} (Nyquist: {nyquist_formatted})")
+        
+        # Mudar cor se a taxa for muito baixa
+        if effective_rate < 100e3:  # Abaixo de 100 kHz
+            self.effective_rate_label.setStyleSheet("color: orange;")
+        elif effective_rate < 20e3:  # Abaixo de 20 kHz
+            self.effective_rate_label.setStyleSheet("color: red;")
+        else:
+            self.effective_rate_label.setStyleSheet("")
 
 if __name__ == '__main__':
     app = QApplication(sys.argv)

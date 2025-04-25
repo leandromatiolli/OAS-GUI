@@ -175,12 +175,33 @@ def acquire_continuous_data(ip_address, duration=5, sample_rate=125e6, decimatio
     
     return data
 
-def save_data(data, filename=None):
-    """Salva os dados em um arquivo pickle"""
-    if filename is None:
-        # Criar nome de arquivo com timestamp
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        filename = f"vazamento_continuo_{timestamp}.pkl"
+def save_data(data):
+    """Salva os dados da aquisição em um arquivo pickle"""
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    
+    # Extrair metadados se disponíveis
+    metadata_str = ""
+    if 'metadata' in data and isinstance(data['metadata'], dict):
+        metadata = data['metadata']
+        # Adicionar informações relevantes ao nome do arquivo
+        if metadata.get('test_type'):
+            metadata_str += f" {metadata['test_type']}"
+        if metadata.get('sensor_sn'):
+            metadata_str += f" SN{metadata['sensor_sn']}"
+        if metadata.get('flow') and float(metadata.get('flow', 0)) > 0:
+            metadata_str += f" Fluxo-{float(metadata['flow']):.1f}L-min"
+        if metadata.get('pressure') and float(metadata.get('pressure', 0)) > 0:
+            metadata_str += f" Pressão{float(metadata['pressure']):.1f}Bar"
+        if metadata.get('material'):
+            metadata_str += f" Material-{metadata['material']}"
+        if metadata.get('distance') and float(metadata.get('distance', 0)) > 0:
+            metadata_str += f" Distância-{float(metadata['distance']):.1f}cm"
+    
+    # Criar nome do arquivo com timestamp e metadados
+    filename = f"vazamento_continuo_{timestamp}{metadata_str}.pkl"
+    
+    # Limpar caracteres inválidos no nome do arquivo
+    filename = filename.replace(" ", "_").replace("/", "-").replace(":", "-")
     
     with open(filename, 'wb') as f:
         pickle.dump(data, f)
