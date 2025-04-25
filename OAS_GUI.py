@@ -785,127 +785,153 @@ class OASGui(QMainWindow):
             self.demod_canvas.draw()
     
     def plot_spectrum(self):
-        """Plota o espectro de frequência do sinal demodulado"""
+        """Plota o espectro de frequência do sinal demodulado usando FFT direta"""
         ax = self.spectrum_canvas.axes
         ax.clear()
         
-        # Verificar se temos dados para plotar
-        if not self.demodulated_data:
-            print("Sem dados demodulados disponíveis para espectro - demodulated_data é None")
-            ax.text(0.5, 0.5, "Sem dados demodulados disponíveis.\nPrimeiro demodule os dados na aba 'Fit da Elipse'.", 
-                   ha='center', va='center', fontsize=12)
-            self.spectrum_canvas.draw()
-            return
-        
-        if 'demodulated' not in self.demodulated_data:
-            print(f"Chave 'demodulated' não encontrada para espectro")
-            ax.text(0.5, 0.5, "Dados demodulados não encontrados.\nTente demodular novamente.", 
-                   ha='center', va='center', fontsize=12)
+        # Verificações iniciais (mantido como está)
+        if not self.demodulated_data or 'demodulated' not in self.demodulated_data:
+            print("Sem dados demodulados disponíveis")
+            ax.text(0.5, 0.5, "Sem dados demodulados disponíveis", ha='center', va='center')
             self.spectrum_canvas.draw()
             return
         
         try:
-            # Obter dados
+            # Obter o sinal demodulado
             demodulated = self.demodulated_data['demodulated']
             
-            if not isinstance(demodulated, np.ndarray):
-                print(f"Dados demodulados não são um array numpy para espectro: {type(demodulated)}")
-                ax.text(0.5, 0.5, f"Formato de dados inválido: {type(demodulated)}", 
-                       ha='center', va='center', fontsize=12)
-                self.spectrum_canvas.draw()
-                return
-            
-            # Verificar se temos taxa de amostragem efetiva
-            if 'sample_frequency_effective' in self.demodulated_data:
+            # Determinar corretamente a taxa de amostragem
+            if 'sample_frequency' in self.demodulated_data and 'decimation' in self.demodulated_data:
+                # Método 1: Calcular a partir dos valores originais (mais confiável)
+                original_fs = self.demodulated_data['sample_frequency']
+                decimation = self.demodulated_data['decimation']
+                fs = original_fs / decimation
+                print(f"DIAGNÓSTICO: Fs calculada = {original_fs} / {decimation} = {fs} Hz")
+            elif 'sample_frequency_effective' in self.demodulated_data:
+                # Método 2: Usar valor armazenado
                 fs = self.demodulated_data['sample_frequency_effective']
-                print(f"Usando sample_frequency_effective: {fs} Hz")
-            elif 'sample_frequency' in self.demodulated_data and 'decimation' in self.demodulated_data:
-                fs = self.demodulated_data['sample_frequency'] / self.demodulated_data['decimation']
-                print(f"Calculando fs a partir de sample_frequency e decimation: {fs} Hz")
+                print(f"DIAGNÓSTICO: Fs efetiva armazenada = {fs} Hz")
+            elif 't' in self.demodulated_data and len(self.demodulated_data['t']) >= 2:
+                # Método 3: Calcular a partir do vetor de tempo
+                t = self.demodulated_data['t']
+                dt = t[1] - t[0]
+                fs = 1 / dt
+                print(f"DIAGNÓSTICO: Fs calculada do vetor de tempo = {fs} Hz (dt={dt}s)")
             else:
-                # Tentar estimar a taxa de amostragem a partir do vetor de tempo
-                if 't' in self.demodulated_data and len(self.demodulated_data['t']) >= 2:
-                    t = self.demodulated_data['t']
-                    dt = t[1] - t[0]
-                    fs = 1 / dt
-                    print(f"Estimando fs a partir do vetor de tempo: {fs} Hz (dt={dt}s)")
-                else:
-                    fs = 1e6  # Valor padrão
-                    print(f"AVISO: Usando taxa de amostragem padrão: {fs} Hz")
+                # Valor padrão (não deve ser usado)
+                fs = 1.953125e6  # 125MHz/64 (valor típico)
+                print(f"AVISO: Usando taxa de amostragem padrão: {fs} Hz")
             
-            # Verificar se fs é válido
-            if fs <= 0 or np.isnan(fs) or np.isinf(fs):
-                print(f"Taxa de amostragem inválida: {fs}")
-                fs = 1e6  # Valor seguro
-                print(f"Usando valor padrão: {fs} Hz")
+            # Não decimamos para o cálculo do espectro
+            print(f"DIAGNÓSTICO: Comprimento do sinal = {len(demodulated)} pontos")
             
-            # Calcular o espectro
-            # Limitar o número de pontos para o cálculo do espectro
-            max_points = 2**18  # ~250k pontos
-            if len(demodulated) > max_points:
-                step = len(demodulated) // max_points
-                demod_decimated = demodulated[::step]
-                fs_decimated = fs / step
-                print(f"Decimando para espectro: {len(demod_decimated)} pontos (1:{step})")
-            else:
-                demod_decimated = demodulated
-                fs_decimated = fs
-                print(f"Usando todos os {len(demod_decimated)} pontos para espectro")
+            # Aplicar janela diretamente
+            from scipy.signal import get_window
+            window = get_window('blackman', len(demodulated))
+            signal_windowed = demodulated * window
             
-            # Parâmetros do espectro de potência
-            nperseg = min(8192, len(demod_decimated)//4)
-            if nperseg < 10:
-                print("AVISO: Poucos pontos para cálculo de espectro")
-                ax.text(0.5, 0.5, "Poucos pontos para calcular espectro", 
-                       ha='center', va='center', fontsize=12)
-                self.spectrum_canvas.draw()
-                return
+            # Calcular a FFT manualmente
+            N = len(signal_windowed)
+            fft_result = np.fft.fft(signal_windowed)
+            # Normalizar
+            fft_result = fft_result / N
             
-            print(f"Calculando espectro: fs={fs_decimated:.2f} Hz, nperseg={nperseg}, len={len(demod_decimated)}")
+            # Calcular magnitudes apenas para a primeira metade
+            magnitudes = np.abs(fft_result[:N//2])
             
-            # Verificar se os dados contêm NaN ou infinitos
-            if np.isnan(demod_decimated).any() or np.isinf(demod_decimated).any():
-                print("AVISO: Dados demodulados contêm NaN ou infinitos")
-                # Substituir valores problemáticos
-                demod_clean = np.copy(demod_decimated)
-                demod_clean[np.isnan(demod_clean)] = 0
-                demod_clean[np.isinf(demod_clean)] = 0
-                print(f"Valores problemáticos substituídos: {np.sum(np.isnan(demod_decimated)) + np.sum(np.isinf(demod_decimated))}")
-            else:
-                demod_clean = demod_decimated
-            
-            # Calcular espectro
-            f, Pxx = signal.welch(demod_clean, fs_decimated, nperseg=nperseg)
-            
-            # Verificar se o resultado é válido
-            if np.isnan(Pxx).any() or np.isinf(Pxx).any() or (Pxx <= 0).any():
-                print("AVISO: Espectro contém valores inválidos")
-                # Filtrar valores inválidos
-                mask = ~(np.isnan(Pxx) | np.isinf(Pxx) | (Pxx <= 0))
-                f = f[mask]
-                Pxx = Pxx[mask]
-                if len(Pxx) == 0:
-                    raise ValueError("Todos os valores do espectro são inválidos")
+            # Calcular o eixo de frequência corretamente
+            freq_axis = np.arange(N//2) * fs / N
             
             # Converter para dB
-            print(f"Convertendo para dB: min={np.min(Pxx)}, max={np.max(Pxx)}")
-            Pxx_db = 10 * np.log10(Pxx)
+            magnitudes_db = 20 * np.log10(magnitudes + 1e-10)  # Evitar log(0)
             
-            # Plotar
-            ax.semilogx(f, Pxx_db)
+            # Informações de diagnóstico
+            print(f"DIAGNÓSTICO: Frequência máxima: {freq_axis[-1]} Hz")
+            print(f"DIAGNÓSTICO: Resolução de frequência: {fs/N} Hz")
+            
+            # Plotar o espectro
+            ax.plot(freq_axis, magnitudes_db)
             ax.set_xlabel('Frequência (Hz)')
-            ax.set_ylabel('Densidade Espectral (dB)')
-            ax.set_title(f'Espectro do Sinal Demodulado (Fs={fs_decimated/1e6:.2f} MHz)')
-            ax.grid(True)
+            ax.set_ylabel('Amplitude (dB)')
+            ax.set_title(f'Espectro FFT (Fs={fs/1e3:.1f} kHz, N={N})')
+            
+            # Adicionar grade
+            ax.grid(True, which='both', linestyle='--', alpha=0.7)
+            
+            # Encontrar e destacar os picos principais acima de 10kHz
+            try:
+                from scipy.signal import find_peaks
+                
+                # Definir limite de frequência mínima (10 kHz)
+                min_freq = 10000  # 10 kHz em Hz
+                
+                # Encontrar o índice no eixo de frequência que corresponde a 10 kHz
+                min_freq_idx = np.argmin(np.abs(freq_axis - min_freq))
+                
+                # Procurar picos apenas na região acima de 10 kHz
+                high_freq_indices = np.arange(min_freq_idx, len(magnitudes_db))
+                high_freq_spectrum = magnitudes_db[high_freq_indices]
+                high_freq_axis = freq_axis[high_freq_indices]
+                
+                # Encontrar picos na região de alta frequência
+                # Ajustar prominence para evitar picos insignificantes
+                rel_peaks, properties = find_peaks(high_freq_spectrum, 
+                                                  prominence=5,  # Picos pelo menos 5dB acima do entorno
+                                                  distance=20)   # Pelo menos 20 pontos entre picos
+                
+                # Converter índices relativos para índices absolutos
+                peaks = high_freq_indices[rel_peaks]
+                
+                # Ordenar picos por amplitude (do maior para o menor)
+                peak_heights = magnitudes_db[peaks]
+                sorted_indices = np.argsort(peak_heights)[::-1]  # Inverter para ter maior primeiro
+                sorted_peaks = peaks[sorted_indices]
+                
+                # Pegar os 5 maiores picos
+                top_peaks = sorted_peaks[:5]
+                
+                print(f"DIAGNÓSTICO: Encontrados {len(top_peaks)} picos acima de 10 kHz")
+                
+                # Destacar cada pico encontrado com linhas verticais e rótulos
+                for i, peak in enumerate(top_peaks):
+                    freq = freq_axis[peak]
+                    amp = magnitudes_db[peak]
+                    print(f"DIAGNÓSTICO: Pico #{i+1}: {freq/1000:.2f} kHz, {amp:.2f} dB")
+                    
+                    # Adicionar linha vertical no pico
+                    ax.axvline(x=freq, color='r', linestyle='--', alpha=0.7)
+                    
+                    # Adicionar rótulo do pico com frequência em kHz para melhor legibilidade
+                    ax.text(freq, amp+3, f"{freq/1000:.1f} kHz", 
+                           fontsize=8, ha='center', va='bottom',
+                           bbox=dict(facecolor='white', alpha=0.7, pad=1))
+                    
+                    # Marcar o ponto do pico
+                    ax.plot(freq, amp, 'ro', markersize=5)
+            except Exception as e:
+                print(f"Erro ao localizar picos: {e}")
+                import traceback
+                traceback.print_exc()
+            
+            # Adicionar segunda visualização com escala logarítmica
+            inset_ax = ax.inset_axes([0.65, 0.65, 0.3, 0.3])
+            inset_ax.semilogx(freq_axis, magnitudes_db)
+            inset_ax.set_title("Escala log", fontsize=8)
+            inset_ax.grid(True, which='both', linestyle='--', alpha=0.6)
+            
+            # Marcar os mesmos picos na visualização em escala logarítmica
+            for peak in top_peaks:
+                freq = freq_axis[peak]
+                amp = magnitudes_db[peak]
+                inset_ax.plot(freq, amp, 'ro', markersize=4)
             
             self.spectrum_canvas.draw()
-            print("Espectro plotado com sucesso")
+            print("Espectro plotado com sucesso usando método direto")
             
         except Exception as e:
             import traceback
             traceback.print_exc()
             print(f"Erro ao plotar espectro: {str(e)}")
-            # Limpar o gráfico e mostrar mensagem de erro
             ax.clear()
             ax.text(0.5, 0.5, f"Erro ao plotar espectro: {str(e)}", ha='center', va='center')
             self.spectrum_canvas.draw()
