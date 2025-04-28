@@ -18,6 +18,7 @@ class ProcessingController(QObject):
     demodulationError = pyqtSignal(str)
     processingProgress = pyqtSignal(str)
     movingAverageApplied = pyqtSignal(dict)  # Novo sinal específico para média móvel
+    bandpassFilterApplied = pyqtSignal(dict)  # Novo sinal para filtro passa-banda
     
     def __init__(self, parent=None):
         """
@@ -29,9 +30,19 @@ class ProcessingController(QObject):
         super().__init__(parent)
         self.data = None
         self.demodulated_data = None
+        self.filtered_data = None
+        
+        # Configuração da média móvel
         self.use_moving_average = False
         self.moving_average_window = 11
         self.processed_waveforms = None
+        
+        # Configuração do filtro passa-banda
+        self.use_bandpass_filter = False
+        self.bandpass_low_freq = 50.0    # Hz
+        self.bandpass_high_freq = 5000.0  # Hz
+        self.bandpass_order = 4
+        self.filtered_demodulated = None
         
     def set_data(self, data: Dict[str, Any]):
         """
@@ -40,18 +51,38 @@ class ProcessingController(QObject):
         Args:
             data: Dicionário com os dados a processar
         """
+        log_debug(f"set_data: Recebendo novos dados para processamento")
         self.data = data
         self.processed_waveforms = None
+        self.filtered_demodulated = None
         
+        # Resetar configurações de filtro para novos dados
+        if not data.get('bandpass_params', {}).get('enabled', False):
+            log_debug("set_data: Resetando configurações de filtro passa-banda para novos dados")
+            self.use_bandpass_filter = False
+            
         # Se já existirem dados demodulados, usar eles
         if 'demodulated' in data:
             self.demodulated_data = data
+            
+            # Se o arquivo carregado contém parâmetros de filtro, usar eles
+            if 'bandpass_params' in data and isinstance(data['bandpass_params'], dict):
+                log_debug(f"set_data: Usando parâmetros de filtro do arquivo: {data['bandpass_params']}")
+                params = data['bandpass_params']
+                self.use_bandpass_filter = params.get('enabled', False)
+                self.bandpass_low_freq = params.get('low_freq', self.bandpass_low_freq)
+                self.bandpass_high_freq = params.get('high_freq', self.bandpass_high_freq)
+                self.bandpass_order = params.get('order', self.bandpass_order)
         else:
             self.demodulated_data = None
         
         # Processar os dados de acordo com as configurações atuais
         if self.use_moving_average and 'waveforms' in self.data:
             self.apply_moving_average()
+            
+        # Aplicar filtro passa-banda se os dados demodulados existirem
+        if self.use_bandpass_filter and self.demodulated_data is not None and 'demodulated' in self.demodulated_data:
+            self.apply_bandpass_filter()
     
     def set_moving_average(self, enabled: bool, window_size: int):
         """
@@ -93,6 +124,49 @@ class ProcessingController(QObject):
                     log_debug("Reprocessando dados demodulados com a nova média móvel")
                     self.demodulate_data()
     
+    def set_bandpass_filter(self, enabled: bool, low_freq: float, high_freq: float, order: int):
+        """
+        Define as configurações do filtro passa-banda
+        
+        Args:
+            enabled: Se o filtro deve ser aplicado
+            low_freq: Frequência de corte inferior em Hz
+            high_freq: Frequência de corte superior em Hz
+            order: Ordem do filtro
+        """
+        log_debug(f"set_bandpass_filter: enabled={enabled}, low_freq={low_freq}, high_freq={high_freq}, order={order}")
+        
+        # Força aplicação mesmo sem mudanças nos parâmetros se estamos desabilitando o filtro
+        force_update = (self.use_bandpass_filter == True and enabled == False)
+        
+        # Verificar se houve alteração na configuração
+        if not force_update and (self.use_bandpass_filter == enabled and 
+            self.bandpass_low_freq == low_freq and 
+            self.bandpass_high_freq == high_freq and 
+            self.bandpass_order == order):
+            log_debug("set_bandpass_filter: Configuração não alterada, ignorando...")
+            return
+            
+        log_info(f"set_bandpass_filter: {'Aplicando' if enabled else 'Desativando'} filtro passa-banda "
+                f"({low_freq:.1f}Hz-{high_freq:.1f}Hz, ordem {order})")
+        
+        self.processingProgress.emit(f"{'Aplicando' if enabled else 'Desativando'} filtro passa-banda...")
+        
+        # Atualizar configurações
+        self.use_bandpass_filter = enabled
+        self.bandpass_low_freq = low_freq
+        self.bandpass_high_freq = high_freq
+        self.bandpass_order = order
+        
+        # Aplicar filtro se temos dados demodulados
+        if self.demodulated_data is not None and 'demodulated' in self.demodulated_data:
+            log_debug("set_bandpass_filter: Aplicando filtro aos dados demodulados")
+            self.apply_bandpass_filter()
+        else:
+            log_warning("set_bandpass_filter: Sem dados demodulados para aplicar o filtro")
+            self.filtered_demodulated = None
+            self.processingProgress.emit("Demodule os dados primeiro antes de aplicar o filtro passa-banda")
+    
     def apply_moving_average(self):
         """
         Aplica média móvel nos dados brutos
@@ -127,6 +201,102 @@ class ProcessingController(QObject):
         
         return self.processed_waveforms
     
+    def apply_bandpass_filter(self):
+        """
+        Aplica o filtro passa-banda ao sinal demodulado
+        
+        Returns:
+            Array com o sinal demodulado filtrado
+        """
+        if not self.demodulated_data or 'demodulated' not in self.demodulated_data:
+            log_warning("apply_bandpass_filter: Sem dados demodulados para filtrar")
+            self.processingProgress.emit("Sem dados demodulados para filtrar")
+            return None
+            
+        demodulated = self.demodulated_data['demodulated']
+        log_debug(f"apply_bandpass_filter: Processando sinal demodulado com {len(demodulated)} pontos (enabled={self.use_bandpass_filter})")
+        
+        # Determinar taxa de amostragem
+        if 'sample_frequency' in self.demodulated_data and 'decimation' in self.demodulated_data:
+            fs = self.demodulated_data['sample_frequency'] / self.demodulated_data['decimation']
+        elif 'sample_frequency_effective' in self.demodulated_data:
+            fs = self.demodulated_data['sample_frequency_effective']
+        elif 't' in self.demodulated_data and len(self.demodulated_data['t']) >= 2:
+            t = self.demodulated_data['t']
+            fs = 1 / (t[1] - t[0])
+        else:
+            fs = 1.953125e6  # valor padrão (125MHz/64)
+            
+        log_debug(f"apply_bandpass_filter: Taxa de amostragem calculada: {fs} Hz")
+        
+        if self.use_bandpass_filter:
+            log_info(f"Aplicando filtro passa-banda ({self.bandpass_low_freq:.1f}Hz-{self.bandpass_high_freq:.1f}Hz, ordem {self.bandpass_order})...")
+            self.processingProgress.emit(f"Aplicando filtro passa-banda...")
+            
+            try:
+                self.filtered_demodulated = SignalProcessor.apply_bandpass_filter(
+                    demodulated,
+                    fs,
+                    self.bandpass_low_freq,
+                    self.bandpass_high_freq,
+                    self.bandpass_order
+                )
+                
+                # Verificar se o filtro fez alguma diferença
+                diff = np.abs(demodulated - self.filtered_demodulated).mean()
+                log_debug(f"apply_bandpass_filter: Diferença média após filtragem: {diff}")
+                
+                log_info("Filtro passa-banda aplicado com sucesso")
+                self.processingProgress.emit("Filtro passa-banda aplicado com sucesso")
+                
+                # Emitir sinal com os dados filtrados
+                filtered_data = self.demodulated_data.copy()
+                filtered_data['filtered_demodulated'] = self.filtered_demodulated
+                filtered_data['bandpass_params'] = {
+                    'low_freq': self.bandpass_low_freq,
+                    'high_freq': self.bandpass_high_freq,
+                    'order': self.bandpass_order,
+                    'enabled': self.use_bandpass_filter
+                }
+                log_debug(f"apply_bandpass_filter: Emitindo sinal bandpassFilterApplied com dados filtrados")
+                self.bandpassFilterApplied.emit(filtered_data)
+                
+            except Exception as e:
+                log_error(f"Erro ao aplicar filtro passa-banda: {str(e)}")
+                self.processingProgress.emit(f"Erro ao aplicar filtro passa-banda: {str(e)}")
+                self.filtered_demodulated = demodulated
+                
+                # Mesmo com erro, emitir sinal com os dados originais
+                filtered_data = self.demodulated_data.copy()
+                filtered_data['filtered_demodulated'] = self.filtered_demodulated
+                filtered_data['bandpass_params'] = {
+                    'low_freq': self.bandpass_low_freq,
+                    'high_freq': self.bandpass_high_freq,
+                    'order': self.bandpass_order,
+                    'enabled': False  # Desativar devido ao erro
+                }
+                log_debug(f"apply_bandpass_filter: Emitindo sinal com dados originais devido a erro")
+                self.bandpassFilterApplied.emit(filtered_data)
+        else:
+            # Se o filtro não está ativado, usar o sinal original
+            log_debug("Usando sinal demodulado original (filtro passa-banda desativado)")
+            self.filtered_demodulated = demodulated
+            
+            # Emitir sinal mesmo quando o filtro está desativado, para atualizar a interface
+            if 't' in self.demodulated_data:
+                filtered_data = self.demodulated_data.copy()
+                filtered_data['filtered_demodulated'] = self.filtered_demodulated
+                filtered_data['bandpass_params'] = {
+                    'low_freq': self.bandpass_low_freq,
+                    'high_freq': self.bandpass_high_freq,
+                    'order': self.bandpass_order,
+                    'enabled': False
+                }
+                log_debug(f"apply_bandpass_filter: Emitindo sinal com filtro desativado")
+                self.bandpassFilterApplied.emit(filtered_data)
+            
+        return self.filtered_demodulated
+    
     def get_waveforms_for_processing(self):
         """
         Retorna as formas de onda a serem usadas para processamento
@@ -146,6 +316,25 @@ class ProcessingController(QObject):
         
         return self.data['waveforms']
     
+    def get_demodulated_for_processing(self):
+        """
+        Retorna o sinal demodulado a ser usado para processamento
+        
+        Returns:
+            Array com o sinal demodulado (filtrado ou original)
+        """
+        if self.filtered_demodulated is not None:
+            return self.filtered_demodulated
+            
+        if not self.demodulated_data or 'demodulated' not in self.demodulated_data:
+            log_warning("get_demodulated_for_processing: Sem dados demodulados disponíveis")
+            return None
+            
+        if self.use_bandpass_filter:
+            return self.apply_bandpass_filter()
+            
+        return self.demodulated_data['demodulated']
+        
     @pyqtSlot()
     def demodulate_data(self):
         """Demodula os dados carregados"""
@@ -193,6 +382,17 @@ class ProcessingController(QObject):
             self.demodulated_data['demodulated'] = demodulated
             self.demodulated_data['ellipse_params'] = ellipse_params
             
+            # Aplicar o filtro passa-banda nos dados demodulados, se ativado
+            if self.use_bandpass_filter:
+                self.apply_bandpass_filter()
+                self.demodulated_data['filtered_demodulated'] = self.filtered_demodulated
+                self.demodulated_data['bandpass_params'] = {
+                    'low_freq': self.bandpass_low_freq,
+                    'high_freq': self.bandpass_high_freq,
+                    'order': self.bandpass_order,
+                    'enabled': self.use_bandpass_filter
+                }
+            
             log_info("Demodulação concluída")
             self.processingProgress.emit("Demodulação concluída")
             self.demodulationFinished.emit(self.demodulated_data)
@@ -217,20 +417,28 @@ class ProcessingController(QObject):
         log_info(f"Dados demodulados salvos em: {filename}")
         return filename
     
-    def calculate_spectrum(self) -> Tuple[np.ndarray, np.ndarray, List[Tuple[float, float]]]:
+    def calculate_spectrum(self, use_filtered: bool = False) -> Tuple[np.ndarray, np.ndarray, List[Tuple[float, float]]]:
         """
         Calcula o espectro do sinal demodulado
         
+        Args:
+            use_filtered: Se True, usa o sinal filtrado (se disponível)
+            
         Returns:
             Tupla (frequências, magnitudes_dB, picos detectados)
         """
         if not self.demodulated_data or 'demodulated' not in self.demodulated_data:
             log_error("calculate_spectrum: Nenhum dado demodulado disponível para análise espectral")
             raise ValueError("Nenhum dado demodulado disponível para análise espectral")
-            
-        # Obter sinal demodulado e taxa de amostragem
-        demodulated = self.demodulated_data['demodulated']
         
+        # Determinar qual sinal usar (filtrado ou original)
+        if use_filtered and self.use_bandpass_filter and self.filtered_demodulated is not None:
+            log_debug("Calculando espectro do sinal filtrado")
+            demodulated = self.filtered_demodulated
+        else:
+            log_debug("Calculando espectro do sinal demodulado original")
+            demodulated = self.demodulated_data['demodulated']
+            
         # Determinar taxa de amostragem
         if 'sample_frequency' in self.demodulated_data and 'decimation' in self.demodulated_data:
             fs = self.demodulated_data['sample_frequency'] / self.demodulated_data['decimation']
@@ -264,6 +472,12 @@ class ProcessingController(QObject):
             True se a demodulação foi bem-sucedida, False caso contrário
         """
         log_info("Iniciando demodulação automática")
+        
+        # Resetar configuração de filtro para demodulação automática
+        log_debug("auto_demodulate: Resetando configurações de filtro para demodulação automática")
+        self.use_bandpass_filter = False
+        
+        # Definir os dados a processar
         self.set_data(data)
         
         try:

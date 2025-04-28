@@ -2,7 +2,7 @@
 Módulo para processamento de sinais e transformações
 """
 import numpy as np
-from scipy import signal
+from scipy import signal, optimize
 from app.utils.debug_log import log_debug, log_info, log_warning, log_error
 from typing import Dict, List, Tuple, Optional, Union, Any
 
@@ -21,6 +21,58 @@ class SignalProcessor:
     def is_available() -> bool:
         """Verifica se o processamento avançado está disponível"""
         return PROCESSING_AVAILABLE
+    
+    @staticmethod
+    def apply_bandpass_filter(signal_data: np.ndarray, fs: float, low_freq: float, high_freq: float, order: int) -> np.ndarray:
+        """
+        Aplica um filtro passa-banda ao sinal
+        
+        Args:
+            signal_data: Sinal a ser filtrado
+            fs: Frequência de amostragem em Hz
+            low_freq: Frequência de corte inferior em Hz
+            high_freq: Frequência de corte superior em Hz
+            order: Ordem do filtro
+            
+        Returns:
+            Sinal filtrado
+        """
+        # Converter frequências para valores normalizados (0 a 1, onde 1 é Nyquist, fs/2)
+        nyquist = 0.5 * fs
+        low = low_freq / nyquist
+        high = high_freq / nyquist
+        
+        # Limitar frequências ao intervalo válido (0, 1)
+        low = max(0.001, min(0.999, low))
+        high = max(0.001, min(0.999, high))
+        
+        # Verificar se frequências são válidas
+        if low >= high:
+            log_warning(f"Frequências de corte inválidas: low={low_freq} Hz, high={high_freq} Hz. Usando valores padrão.")
+            low = 0.1
+            high = 0.4
+            
+        # Limitar ordem do filtro (valores muito altos podem causar instabilidade)
+        order = max(1, min(10, order))
+        
+        log_debug(f"Aplicando filtro passa-banda: {low_freq:.1f} Hz - {high_freq:.1f} Hz, ordem {order}, fs={fs:.1f} Hz")
+        
+        try:
+            # Projetar o filtro Butterworth passa-banda
+            b, a = signal.butter(order, [low, high], btype='band')
+            
+            # Aplicar o filtro usando filtfilt (filtro de fase zero)
+            filtered_signal = signal.filtfilt(b, a, signal_data)
+            
+            # Calcular a diferença média após a filtragem
+            diff = np.abs(signal_data - filtered_signal).mean()
+            log_debug(f"Diferença média após aplicação do filtro: {diff}")
+            
+            return filtered_signal
+            
+        except Exception as e:
+            log_error(f"Erro ao aplicar filtro passa-banda: {str(e)}")
+            return signal_data  # Retornar sinal original em caso de erro
     
     @staticmethod
     def apply_moving_average(signal_data: np.ndarray, window_size: int) -> np.ndarray:

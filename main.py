@@ -7,6 +7,7 @@ import sys
 import os
 import traceback
 from PyQt5.QtWidgets import QApplication, QMessageBox
+import numpy as np
 
 # Certificar-se de que os pacotes estão no path
 if os.path.dirname(os.path.abspath(__file__)) not in sys.path:
@@ -118,6 +119,10 @@ class Application:
         # Conexão para configuração de média móvel
         self.window.analysis_panel.movingAverageChanged.connect(self.processing_controller.set_moving_average)
         self.processing_controller.movingAverageApplied.connect(self.on_moving_average_applied)
+        
+        # Conexão para configuração do filtro passa-banda
+        self.window.analysis_panel.bandpassFilterChanged.connect(self.processing_controller.set_bandpass_filter)
+        self.processing_controller.bandpassFilterApplied.connect(self.on_bandpass_filter_applied)
     
     def initialize_state(self):
         """Inicializa o estado da aplicação"""
@@ -140,6 +145,10 @@ class Application:
             params: Parâmetros da aquisição
         """
         log_info(f"Solicitação de aquisição recebida: {params}")
+        
+        # Resetar as configurações de filtro na interface
+        self.window.analysis_panel.reset_bandpass_filter()
+        
         # Obter metadados
         metadata = self.window.metadata_panel.get_metadata()
         
@@ -285,11 +294,37 @@ class Application:
                 log_debug("Exibindo dados demodulados do arquivo")
                 self.window.analysis_panel.show_demodulated(data['t'], data['demodulated'])
                 
+                # Verificar se temos dados filtrados
+                if 'filtered_demodulated' in data and 'bandpass_params' in data:
+                    log_debug("Exibindo dados filtrados do arquivo")
+                    self.window.analysis_panel.show_filtered(
+                        data['t'], 
+                        data['filtered_demodulated'],
+                        data['bandpass_params']
+                    )
+                    
+                    # Atualizar a interface de filtro passa-banda com os parâmetros salvos no arquivo
+                    params = data['bandpass_params']
+                    if 'enabled' in params and 'low_freq' in params and 'high_freq' in params and 'order' in params:
+                        # Atualizar a interface sem emitir sinais (será feito manualmente)
+                        self.window.analysis_panel.bandpass_checkbox.setChecked(params['enabled'])
+                        self.window.analysis_panel.low_freq_spinbox.setValue(params['low_freq'])
+                        self.window.analysis_panel.high_freq_spinbox.setValue(params['high_freq'])
+                        self.window.analysis_panel.order_spinbox.setValue(params['order'])
+                        
+                        # Habilitar/desabilitar os spinboxes conforme necessário
+                        self.window.analysis_panel.low_freq_spinbox.setEnabled(params['enabled'])
+                        self.window.analysis_panel.high_freq_spinbox.setEnabled(params['enabled'])
+                        self.window.analysis_panel.order_spinbox.setEnabled(params['enabled'])
+                        self.window.analysis_panel.apply_filter_button.setEnabled(params['enabled'])
+                
                 # Calcular e mostrar espectro
                 try:
-                    log_debug("Calculando espectro dos dados carregados")
-                    freq_axis, magnitudes, peaks = self.processing_controller.calculate_spectrum()
-                    self.window.analysis_panel.show_spectrum(freq_axis, magnitudes, peaks)
+                    # Verificar se devemos usar o sinal filtrado para o espectro
+                    use_filtered = 'filtered_demodulated' in data and data.get('bandpass_params', {}).get('enabled', False)
+                    log_debug(f"Calculando espectro dos dados carregados (use_filtered={use_filtered})")
+                    freq_axis, magnitudes, peaks = self.processing_controller.calculate_spectrum(use_filtered=use_filtered)
+                    self.window.analysis_panel.show_spectrum(freq_axis, magnitudes, peaks, use_filtered=use_filtered)
                 except Exception as e:
                     log_error(f"Erro ao calcular espectro: {str(e)}")
                     
@@ -322,6 +357,9 @@ class Application:
         log_info("Demodulação concluída com sucesso")
         self.window.show_status_message("Demodulação concluída")
         
+        # Verificar se o filtro deve ser aplicado automaticamente
+        apply_filter = data.get('bandpass_params', {}).get('enabled', False)
+        
         # Atualizar visualizações com os dados demodulados
         try:
             # Certificar-se que temos formas de onda e elipse para mostrar
@@ -339,16 +377,30 @@ class Application:
                 log_debug("Atualizando gráfico de sinal demodulado")
                 self.window.analysis_panel.show_demodulated(data['t'], data['demodulated'])
                 
+                # Mostrar sinal filtrado, se disponível e se o filtro estiver ativado
+                if apply_filter and 'filtered_demodulated' in data and 'bandpass_params' in data:
+                    log_debug("Atualizando gráfico de sinal filtrado")
+                    self.window.analysis_panel.show_filtered(
+                        data['t'], 
+                        data['filtered_demodulated'],
+                        data['bandpass_params']
+                    )
+                
                 # Calcular e mostrar espectro
                 try:
-                    log_debug("Calculando e atualizando espectro após demodulação")
-                    freq_axis, magnitudes, peaks = self.processing_controller.calculate_spectrum()
-                    self.window.analysis_panel.show_spectrum(freq_axis, magnitudes, peaks)
+                    # Se o filtro estiver ativado, mostrar o espectro do sinal filtrado
+                    use_filtered = apply_filter and 'filtered_demodulated' in data
+                    log_debug(f"Calculando e atualizando espectro após demodulação (use_filtered={use_filtered})")
+                    freq_axis, magnitudes, peaks = self.processing_controller.calculate_spectrum(use_filtered=use_filtered)
+                    self.window.analysis_panel.show_spectrum(freq_axis, magnitudes, peaks, use_filtered=use_filtered)
                 except Exception as e:
                     log_error(f"Erro ao calcular espectro: {str(e)}")
                 
-                # Ir para a aba de sinal demodulado
-                self.window.analysis_panel.analysis_tabs.setCurrentIndex(2)
+                # Ir para a aba de sinal demodulado ou filtrado conforme apropriado
+                if apply_filter and 'filtered_demodulated' in data:
+                    self.window.analysis_panel.analysis_tabs.setCurrentIndex(3)  # Aba de sinal filtrado
+                else:
+                    self.window.analysis_panel.analysis_tabs.setCurrentIndex(2)  # Aba de sinal demodulado
                 
         except Exception as e:
             log_error(f"Erro ao exibir dados demodulados: {str(e)}")
@@ -384,12 +436,117 @@ class Application:
                     ellipse_params = data.get('ellipse_params', None)
                     log_debug("Atualizando gráfico de elipse após aplicação de média")
                     self.window.analysis_panel.show_ellipse(data['waveforms'], ellipse_params)
+                
+                # Se temos dados demodulados, atualizar o espectro
+                if 'demodulated' in data:
+                    try:
+                        # Calcular e mostrar espectro
+                        use_filtered = 'filtered_demodulated' in data and data.get('bandpass_params', {}).get('enabled', False)
+                        log_debug(f"Atualizando espectro após aplicação de média (use_filtered={use_filtered})")
+                        freq_axis, magnitudes, peaks = self.processing_controller.calculate_spectrum(use_filtered=use_filtered)
+                        self.window.analysis_panel.show_spectrum(freq_axis, magnitudes, peaks, use_filtered=use_filtered)
+                    except Exception as e:
+                        log_error(f"Erro ao atualizar espectro: {str(e)}")
             
             self.window.show_status_message("Média móvel aplicada aos dados")
                 
         except Exception as e:
             log_error(f"Erro ao aplicar média móvel: {str(e)}")
             self.window.show_status_message(f"Erro ao aplicar média móvel: {str(e)}")
+    
+    def on_bandpass_filter_applied(self, data):
+        """
+        Manipula o evento de aplicação do filtro passa-banda
+        
+        Args:
+            data: Dados com filtro passa-banda aplicado
+        """
+        log_info("Filtro passa-banda aplicado aos dados")
+        log_debug(f"on_bandpass_filter_applied: Chaves disponíveis nos dados: {list(data.keys())}")
+        
+        # Função de diagnóstico - verificar todos os dados recebidos
+        self.diagnose_filtered_data(data)
+        
+        try:
+            # Mostrar sinal filtrado na aba correspondente
+            if 't' in data and 'filtered_demodulated' in data and 'bandpass_params' in data:
+                log_debug(f"on_bandpass_filter_applied: Tamanho do sinal filtrado: {len(data['filtered_demodulated'])}")
+                self.window.analysis_panel.show_filtered(
+                    data['t'], 
+                    data['filtered_demodulated'],
+                    data['bandpass_params']
+                )
+                
+                # Calcular e mostrar espectro do sinal filtrado
+                try:
+                    log_debug("Calculando espectro do sinal filtrado")
+                    freq_axis, magnitudes, peaks = self.processing_controller.calculate_spectrum(use_filtered=True)
+                    self.window.analysis_panel.show_spectrum(freq_axis, magnitudes, peaks, use_filtered=True)
+                except Exception as e:
+                    log_error(f"Erro ao calcular espectro do sinal filtrado: {str(e)}")
+            else:
+                log_warning(f"on_bandpass_filter_applied: Dados incompletos para exibir sinal filtrado")
+                if 't' not in data:
+                    log_warning("  - Vetor de tempo não encontrado")
+                if 'filtered_demodulated' not in data:
+                    log_warning("  - Sinal filtrado não encontrado")
+                if 'bandpass_params' not in data:
+                    log_warning("  - Parâmetros do filtro não encontrados")
+            
+            self.window.show_status_message("Filtro passa-banda aplicado aos dados")
+                
+        except Exception as e:
+            log_error(f"Erro ao aplicar filtro passa-banda: {str(e)}")
+            self.window.show_status_message(f"Erro ao aplicar filtro passa-banda: {str(e)}")
+            
+    def diagnose_filtered_data(self, data):
+        """
+        Diagnóstico detalhado dos dados de filtro passa-banda
+        
+        Args:
+            data: Dados a serem diagnosticados
+        """
+        log_debug("DIAGNÓSTICO DE DADOS FILTRADOS:")
+        log_debug(f"- Chaves disponíveis: {list(data.keys())}")
+        
+        # Verificar vetor de tempo
+        if 't' in data:
+            t = data['t']
+            log_debug(f"- Vetor de tempo: tamanho={len(t)}, min={min(t)}, max={max(t)}")
+        else:
+            log_warning("- Vetor de tempo não encontrado")
+            
+        # Verificar sinal demodulado original
+        if 'demodulated' in data:
+            demod = data['demodulated']
+            log_debug(f"- Sinal demodulado: tamanho={len(demod)}, min={min(demod)}, max={max(demod)}")
+        else:
+            log_warning("- Sinal demodulado não encontrado")
+            
+        # Verificar sinal filtrado
+        if 'filtered_demodulated' in data:
+            filtered = data['filtered_demodulated']
+            log_debug(f"- Sinal filtrado: tamanho={len(filtered)}, min={min(filtered)}, max={max(filtered)}")
+            
+            # Verificar se o sinal filtrado é NaN ou infinito
+            if np.isnan(filtered).any():
+                log_warning("  -> ALERTA: Sinal filtrado contém valores NaN")
+            if np.isinf(filtered).any():
+                log_warning("  -> ALERTA: Sinal filtrado contém valores infinitos")
+                
+            # Verificar diferença entre original e filtrado
+            if 'demodulated' in data:
+                diff = np.abs(data['demodulated'] - filtered).mean()
+                log_debug(f"- Diferença média entre original e filtrado: {diff}")
+        else:
+            log_warning("- Sinal filtrado não encontrado")
+            
+        # Verificar parâmetros do filtro
+        if 'bandpass_params' in data:
+            params = data['bandpass_params']
+            log_debug(f"- Parâmetros do filtro: {params}")
+        else:
+            log_warning("- Parâmetros do filtro não encontrados")
     
     def run(self):
         """
