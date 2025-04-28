@@ -22,6 +22,60 @@ class SignalProcessor:
         return PROCESSING_AVAILABLE
     
     @staticmethod
+    def apply_moving_average(signal_data: np.ndarray, window_size: int) -> np.ndarray:
+        """
+        Aplica média móvel no sinal para remover ruídos de alta frequência
+        
+        Args:
+            signal_data: Sinal a ser filtrado. Pode ser um array 1D ou 2D [canais, amostras]
+            window_size: Tamanho da janela de média móvel (deve ser ímpar)
+            
+        Returns:
+            Sinal filtrado com a mesma forma do sinal original
+        """
+        # Garantir que o tamanho da janela seja ímpar
+        if window_size % 2 == 0:
+            window_size += 1
+            print(f"apply_moving_average: Ajustando janela para {window_size} (valor ímpar)")
+        else:
+            print(f"apply_moving_average: Usando janela de tamanho {window_size}")
+            
+        # Verificar formato do array de entrada
+        if signal_data.ndim == 1:
+            print(f"Aplicando média móvel em array 1D (length={len(signal_data)})")
+            # Criar kernel da média móvel
+            kernel = np.ones(window_size) / window_size
+            # Aplicar a convolução para calcular a média móvel
+            smoothed = signal.convolve(signal_data, kernel, mode='same')
+            return smoothed
+        elif signal_data.ndim == 2:
+            # Array 2D [canais, amostras]
+            num_channels, num_samples = signal_data.shape
+            print(f"Aplicando média móvel em array 2D ({num_channels} canais, {num_samples} amostras)")
+            
+            smoothed = np.zeros_like(signal_data)
+            for i in range(signal_data.shape[0]):
+                kernel = np.ones(window_size) / window_size
+                # Verificar por valores NaN ou infinitos
+                if np.isnan(signal_data[i]).any() or np.isinf(signal_data[i]).any():
+                    print(f"AVISO: Canal {i} contém valores NaN ou infinitos")
+                    # Substituir valores problemáticos
+                    channel_data = np.copy(signal_data[i])
+                    channel_data[np.isnan(channel_data)] = 0
+                    channel_data[np.isinf(channel_data)] = 0
+                    smoothed[i] = signal.convolve(channel_data, kernel, mode='same')
+                else:
+                    smoothed[i] = signal.convolve(signal_data[i], kernel, mode='same')
+                
+                # Verificar diferença para confirmar que a média foi aplicada
+                diff = np.abs(signal_data[i] - smoothed[i]).mean()
+                print(f"Canal {i}: Diferença média após aplicação da média: {diff}")
+                
+            return smoothed
+        else:
+            raise ValueError(f"Formato de sinal não suportado para média móvel: {signal_data.ndim}D")
+    
+    @staticmethod
     def fit_ellipse(waveforms: np.ndarray, max_points: int = 100000) -> np.ndarray:
         """
         Realiza o ajuste de elipse para os dados

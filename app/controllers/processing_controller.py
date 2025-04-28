@@ -16,6 +16,7 @@ class ProcessingController(QObject):
     demodulationFinished = pyqtSignal(dict)
     demodulationError = pyqtSignal(str)
     processingProgress = pyqtSignal(str)
+    movingAverageApplied = pyqtSignal(dict)  # Novo sinal específico para média móvel
     
     def __init__(self, parent=None):
         """
@@ -27,6 +28,9 @@ class ProcessingController(QObject):
         super().__init__(parent)
         self.data = None
         self.demodulated_data = None
+        self.use_moving_average = False
+        self.moving_average_window = 11
+        self.processed_waveforms = None
         
     def set_data(self, data: Dict[str, Any]):
         """
@@ -36,12 +40,104 @@ class ProcessingController(QObject):
             data: Dicionário com os dados a processar
         """
         self.data = data
+        self.processed_waveforms = None
         
         # Se já existirem dados demodulados, usar eles
         if 'demodulated' in data:
             self.demodulated_data = data
         else:
             self.demodulated_data = None
+        
+        # Processar os dados de acordo com as configurações atuais
+        if self.use_moving_average and 'waveforms' in self.data:
+            self.apply_moving_average()
+    
+    def set_moving_average(self, enabled: bool, window_size: int):
+        """
+        Define as configurações de média móvel
+        
+        Args:
+            enabled: Se a média móvel deve ser aplicada
+            window_size: Tamanho da janela de média móvel
+        """
+        # Verificar se houve alteração na configuração
+        if self.use_moving_average == enabled and self.moving_average_window == window_size:
+            print(f"set_moving_average: Configuração não alterada, ignorando...")
+            return
+            
+        print(f"set_moving_average: {'Aplicando' if enabled else 'Desativando'} média móvel (janela={window_size})")
+        self.processingProgress.emit(f"{'Aplicando' if enabled else 'Desativando'} média móvel...")
+        
+        # Atualizar configurações
+        self.use_moving_average = enabled
+        self.moving_average_window = window_size
+        
+        # Processar os dados de acordo com as novas configurações
+        if self.data is not None and 'waveforms' in self.data:
+            print(f"Aplicando média móvel aos dados (shape={self.data['waveforms'].shape})")
+            self.apply_moving_average()
+            
+            # Emitir sinal com os dados atualizados
+            if self.processed_waveforms is not None:
+                # Criar um dicionário com os dados processados
+                processed_data = self.data.copy()
+                processed_data['waveforms'] = self.processed_waveforms
+                
+                # Emitir o sinal específico para média móvel
+                print(f"Emitindo sinal movingAverageApplied (shape={processed_data['waveforms'].shape})")
+                self.movingAverageApplied.emit(processed_data)
+                
+                # Se também temos dados demodulados, precisamos reprocessar
+                if self.demodulated_data is not None:
+                    print("Reprocessando dados demodulados com a nova média móvel")
+                    self.demodulate_data()
+    
+    def apply_moving_average(self):
+        """
+        Aplica média móvel nos dados brutos
+        
+        Returns:
+            Array com as formas de onda processadas
+        """
+        if not self.data or 'waveforms' not in self.data:
+            return None
+            
+        waveforms = self.data['waveforms']
+        
+        if self.use_moving_average:
+            self.processingProgress.emit(f"Aplicando média móvel (janela={self.moving_average_window})...")
+            try:
+                self.processed_waveforms = SignalProcessor.apply_moving_average(
+                    waveforms, 
+                    self.moving_average_window
+                )
+                self.processingProgress.emit("Média móvel aplicada com sucesso")
+            except Exception as e:
+                self.processingProgress.emit(f"Erro ao aplicar média móvel: {str(e)}")
+                self.processed_waveforms = waveforms
+        else:
+            # Se a média móvel não está ativada, usar os dados originais
+            self.processed_waveforms = waveforms
+        
+        return self.processed_waveforms
+    
+    def get_waveforms_for_processing(self):
+        """
+        Retorna as formas de onda a serem usadas para processamento
+        
+        Returns:
+            Array de formas de onda processadas ou originais
+        """
+        if self.processed_waveforms is not None:
+            return self.processed_waveforms
+            
+        if not self.data or 'waveforms' not in self.data:
+            return None
+            
+        if self.use_moving_average:
+            return self.apply_moving_average()
+        
+        return self.data['waveforms']
     
     @pyqtSlot()
     def demodulate_data(self):
@@ -59,8 +155,10 @@ class ProcessingController(QObject):
             self.demodulationStarted.emit()
             self.processingProgress.emit("Iniciando demodulação...")
             
+            # Obter as formas de onda processadas
+            waveforms = self.get_waveforms_for_processing()
+            
             # Verificar se temos dois canais
-            waveforms = self.data['waveforms']
             if waveforms.shape[0] < 2:
                 self.demodulationError.emit("Necessários dois canais para demodulação")
                 return
@@ -75,6 +173,7 @@ class ProcessingController(QObject):
             
             # Adicionar dados demodulados aos dados existentes
             self.demodulated_data = self.data.copy()
+            self.demodulated_data['waveforms'] = waveforms  # Usar as formas de onda processadas
             self.demodulated_data['demodulated'] = demodulated
             self.demodulated_data['ellipse_params'] = ellipse_params
             

@@ -103,6 +103,10 @@ class Application:
         self.processing_controller.demodulationFinished.connect(self.on_demodulation_finished)
         self.processing_controller.demodulationError.connect(self.on_demodulation_error)
         self.processing_controller.processingProgress.connect(self.window.show_status_message)
+        
+        # Conexão para configuração de média móvel
+        self.window.analysis_panel.movingAverageChanged.connect(self.processing_controller.set_moving_average)
+        self.processing_controller.movingAverageApplied.connect(self.on_moving_average_applied)
     
     def initialize_state(self):
         """Inicializa o estado da aplicação"""
@@ -172,13 +176,16 @@ class Application:
             if 'waveforms' in data and 't' in data:
                 channels = data.get('channels', [1, 2])
                 print(f"Exibindo dados brutos: canais {channels}")
-                self.window.analysis_panel.show_raw_data(data['t'], data['waveforms'], channels)
+                
+                # Obter formas de onda processadas (com ou sem média móvel)
+                waveforms = self.processing_controller.get_waveforms_for_processing()
+                self.window.analysis_panel.show_raw_data(data['t'], waveforms, channels)
                 
                 # Verificar se temos dois canais para a elipse
-                if data['waveforms'].shape[0] >= 2:
+                if waveforms.shape[0] >= 2:
                     ellipse_params = data.get('ellipse_params', None)
                     print("Exibindo elipse")
-                    self.window.analysis_panel.show_ellipse(data['waveforms'], ellipse_params)
+                    self.window.analysis_panel.show_ellipse(waveforms, ellipse_params)
             else:
                 print("Não foi possível exibir dados brutos: waveforms ou vetor de tempo ausentes")
                 
@@ -239,12 +246,15 @@ class Application:
             # Verificar se temos dados de formas de onda
             if 'waveforms' in data and 't' in data:
                 channels = data.get('channels', [1, 2])
-                self.window.analysis_panel.show_raw_data(data['t'], data['waveforms'], channels)
+                
+                # Obter formas de onda processadas (com ou sem média móvel)
+                waveforms = self.processing_controller.get_waveforms_for_processing()
+                self.window.analysis_panel.show_raw_data(data['t'], waveforms, channels)
                 
                 # Verificar se temos dois canais para a elipse
-                if data['waveforms'].shape[0] >= 2:
+                if waveforms.shape[0] >= 2:
                     ellipse_params = data.get('ellipse_params', None)
-                    self.window.analysis_panel.show_ellipse(data['waveforms'], ellipse_params)
+                    self.window.analysis_panel.show_ellipse(waveforms, ellipse_params)
                 
             # Verificar se temos dados demodulados
             if 'demodulated' in data and 't' in data:
@@ -255,10 +265,11 @@ class Application:
                     freq_axis, magnitudes, peaks = self.processing_controller.calculate_spectrum()
                     self.window.analysis_panel.show_spectrum(freq_axis, magnitudes, peaks)
                 except Exception as e:
-                    self.window.show_status_message(f"Erro ao calcular espectro: {str(e)}")
+                    print(f"Erro ao calcular espectro: {str(e)}")
                     
         except Exception as e:
-            self.window.show_error_message("Erro ao Visualizar Dados", str(e))
+            print(f"Erro ao exibir dados carregados: {str(e)}")
+            self.window.show_status_message(f"Erro ao exibir dados: {str(e)}")
     
     def on_file_error(self, message):
         """
@@ -275,32 +286,40 @@ class Application:
     
     def on_demodulation_finished(self, data):
         """
-        Manipula o evento de conclusão de demodulação
+        Manipula o evento de conclusão da demodulação
         
         Args:
             data: Dados demodulados
         """
         self.window.show_status_message("Demodulação concluída")
         
-        # Atualizar visualizações
+        # Atualizar visualizações com os dados demodulados
         try:
-            if 'waveforms' in data and data['waveforms'].shape[0] >= 2:
-                self.window.analysis_panel.show_ellipse(data['waveforms'], data.get('ellipse_params'))
+            # Certificar-se que temos formas de onda e elipse para mostrar
+            if 'waveforms' in data and 't' in data:
+                channels = data.get('channels', [1, 2])
+                self.window.analysis_panel.show_raw_data(data['t'], data['waveforms'], channels)
                 
+                if 'ellipse_params' in data and data['waveforms'].shape[0] >= 2:
+                    self.window.analysis_panel.show_ellipse(data['waveforms'], data['ellipse_params'])
+                    
+            # Mostrar dados demodulados
             if 'demodulated' in data and 't' in data:
                 self.window.analysis_panel.show_demodulated(data['t'], data['demodulated'])
                 
                 # Calcular e mostrar espectro
-                freq_axis, magnitudes, peaks = self.processing_controller.calculate_spectrum()
-                self.window.analysis_panel.show_spectrum(freq_axis, magnitudes, peaks)
+                try:
+                    freq_axis, magnitudes, peaks = self.processing_controller.calculate_spectrum()
+                    self.window.analysis_panel.show_spectrum(freq_axis, magnitudes, peaks)
+                except Exception as e:
+                    print(f"Erro ao calcular espectro: {str(e)}")
                 
-            # Perguntar se deseja salvar
-            if self.window.show_question_message('Salvar Dados', 'Deseja salvar os dados demodulados?'):
-                filename = self.processing_controller.save_demodulated_data()
-                self.window.show_status_message(f"Dados demodulados salvos em {filename}")
+                # Ir para a aba de sinal demodulado
+                self.window.analysis_panel.analysis_tabs.setCurrentIndex(2)
                 
         except Exception as e:
-            self.window.show_error_message("Erro ao Visualizar Dados Demodulados", str(e))
+            print(f"Erro ao exibir dados demodulados: {str(e)}")
+            self.window.show_status_message(f"Erro ao exibir dados demodulados: {str(e)}")
     
     def on_demodulation_error(self, message):
         """
@@ -310,6 +329,33 @@ class Application:
             message: Mensagem de erro
         """
         self.window.show_error_message("Erro na Demodulação", message)
+    
+    def on_moving_average_applied(self, data):
+        """
+        Manipula o evento de aplicação de média móvel
+        
+        Args:
+            data: Dados com média móvel aplicada
+        """
+        print("on_moving_average_applied: Recebido sinal de média móvel aplicada")
+        try:
+            # Atualizar visualizações com os dados processados com média móvel
+            if 'waveforms' in data and 't' in data:
+                channels = data.get('channels', [1, 2])
+                print(f"Atualizando gráfico de dados brutos (shape={data['waveforms'].shape})")
+                self.window.analysis_panel.show_raw_data(data['t'], data['waveforms'], channels)
+                
+                # Verificar se temos dois canais para a elipse
+                if data['waveforms'].shape[0] >= 2:
+                    ellipse_params = data.get('ellipse_params', None)
+                    print(f"Atualizando gráfico de elipse")
+                    self.window.analysis_panel.show_ellipse(data['waveforms'], ellipse_params)
+            
+            self.window.show_status_message("Média móvel aplicada aos dados")
+                
+        except Exception as e:
+            print(f"Erro ao aplicar média móvel: {str(e)}")
+            self.window.show_status_message(f"Erro ao aplicar média móvel: {str(e)}")
     
     def run(self):
         """

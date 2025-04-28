@@ -2,7 +2,8 @@
 Módulo com o painel de análise e visualização de dados
 """
 from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QTabWidget, QPushButton,
-                           QComboBox, QLabel, QFileDialog, QMessageBox, QSplitter)
+                           QComboBox, QLabel, QFileDialog, QMessageBox, QSplitter,
+                           QCheckBox, QSpinBox)
 from PyQt5.QtCore import Qt, pyqtSignal
 
 from app.views.widgets.canvas import MplCanvas, NavigationToolbarCustom
@@ -15,6 +16,7 @@ class AnalysisPanel(QWidget):
     demodulateRequested = pyqtSignal()  # Emitido quando o usuário solicita demodulação
     saveDemodulatedRequested = pyqtSignal()  # Emitido quando o usuário solicita salvar dados demodulados
     refreshFilesRequested = pyqtSignal()  # Emitido quando o usuário solicita atualização da lista de arquivos
+    movingAverageChanged = pyqtSignal(bool, int)  # Emitido quando a configuração de média móvel é alterada
     
     def __init__(self, parent=None):
         """
@@ -49,6 +51,26 @@ class AnalysisPanel(QWidget):
         file_selection.addWidget(self.load_button)
         
         layout.addLayout(file_selection)
+
+        # Configurações de processamento de sinal
+        signal_processing = QHBoxLayout()
+        self.moving_avg_checkbox = QCheckBox("Aplicar Média Móvel")
+        self.window_size_spinbox = QSpinBox()
+        self.window_size_spinbox.setRange(3, 101)
+        self.window_size_spinbox.setSingleStep(2)
+        self.window_size_spinbox.setValue(11)
+        self.window_size_spinbox.setEnabled(False)
+        
+        signal_processing.addWidget(self.moving_avg_checkbox)
+        signal_processing.addWidget(QLabel("Tamanho da Janela:"))
+        signal_processing.addWidget(self.window_size_spinbox)
+        signal_processing.addStretch()
+        
+        # Conectar sinais
+        self.moving_avg_checkbox.stateChanged.connect(self.on_moving_average_changed)
+        self.window_size_spinbox.valueChanged.connect(self.on_window_size_changed)
+        
+        layout.addLayout(signal_processing)
         
         # TabWidget para diferentes visualizações
         self.analysis_tabs = QTabWidget()
@@ -97,6 +119,36 @@ class AnalysisPanel(QWidget):
         
         layout.addWidget(self.analysis_tabs)
         
+    def on_moving_average_changed(self, state):
+        """
+        Manipula a mudança no estado da caixa de seleção de média móvel
+        
+        Args:
+            state: Estado da caixa de seleção
+        """
+        is_checked = state == Qt.Checked
+        # Atualizar a interface
+        self.window_size_spinbox.setEnabled(is_checked)
+        
+        # Mostrar mensagem na barra de status
+        if is_checked:
+            print(f"Média móvel ativada com janela de {self.window_size_spinbox.value()}")
+        else:
+            print("Média móvel desativada")
+        
+        # Emitir sinal para aplicar ou remover a média móvel
+        self.movingAverageChanged.emit(is_checked, self.window_size_spinbox.value())
+        
+    def on_window_size_changed(self, value):
+        """
+        Manipula a mudança no tamanho da janela de média móvel
+        
+        Args:
+            value: Novo valor da janela
+        """
+        if self.moving_avg_checkbox.isChecked():
+            self.movingAverageChanged.emit(True, value)
+            
     def update_file_list(self, files):
         """
         Atualiza a lista de arquivos disponíveis
@@ -186,9 +238,14 @@ class AnalysisPanel(QWidget):
         """
         print(f"show_raw_data: t={len(t)}, waveforms={waveforms.shape}, channels={channels}")
         try:
+            # Verificar se a média móvel está ativada para adicionar ao título
+            titulo = 'Dados Brutos'
+            if self.moving_avg_checkbox.isChecked():
+                titulo += f' (com Média Móvel: {self.window_size_spinbox.value()})'
+                
             self.raw_canvas.plot_timeseries(
                 t, waveforms, channels=channels,
-                title='Dados Brutos'
+                title=titulo
             )
             # Garantir que o gráfico seja atualizado
             self.raw_canvas.draw()
@@ -214,11 +271,16 @@ class AnalysisPanel(QWidget):
         else:
             waveforms_plot = waveforms
             
+        # Preparar título
+        titulo = 'Figura de Lissajous'
+        if self.moving_avg_checkbox.isChecked():
+            titulo += f' (com Média Móvel: {self.window_size_spinbox.value()})'
+            
         # Mostrar gráfico Lissajous
         self.ellipse_canvas.plot_scatter(
             waveforms_plot[0], waveforms_plot[1],
             xlabel='Canal 1', ylabel='Canal 2', 
-            title='Figura de Lissajous'
+            title=titulo
         )
         
         # Se temos parâmetros da elipse, plotar a elipse ajustada
