@@ -3,6 +3,7 @@ Módulo para processamento de sinais e transformações
 """
 import numpy as np
 from scipy import signal
+from app.utils.debug_log import log_debug, log_info, log_warning, log_error
 from typing import Dict, List, Tuple, Optional, Union, Any
 
 # Importar funções para processamento
@@ -11,7 +12,7 @@ try:
     PROCESSING_AVAILABLE = True
 except ImportError:
     PROCESSING_AVAILABLE = False
-    print("Módulo de processamento MKF não encontrado. Funcionalidade de demodulação avançada indisponível.")
+    log_warning("Módulo de processamento MKF não encontrado. Funcionalidade de demodulação avançada indisponível.")
 
 class SignalProcessor:
     """Classe para processamento de sinais"""
@@ -36,13 +37,13 @@ class SignalProcessor:
         # Garantir que o tamanho da janela seja ímpar
         if window_size % 2 == 0:
             window_size += 1
-            print(f"apply_moving_average: Ajustando janela para {window_size} (valor ímpar)")
+            log_debug(f"apply_moving_average: Ajustando janela para {window_size} (valor ímpar)")
         else:
-            print(f"apply_moving_average: Usando janela de tamanho {window_size}")
+            log_debug(f"apply_moving_average: Usando janela de tamanho {window_size}")
             
         # Verificar formato do array de entrada
         if signal_data.ndim == 1:
-            print(f"Aplicando média móvel em array 1D (length={len(signal_data)})")
+            log_debug(f"Aplicando média móvel em array 1D (length={len(signal_data)})")
             # Criar kernel da média móvel
             kernel = np.ones(window_size) / window_size
             # Aplicar a convolução para calcular a média móvel
@@ -51,14 +52,14 @@ class SignalProcessor:
         elif signal_data.ndim == 2:
             # Array 2D [canais, amostras]
             num_channels, num_samples = signal_data.shape
-            print(f"Aplicando média móvel em array 2D ({num_channels} canais, {num_samples} amostras)")
+            log_debug(f"Aplicando média móvel em array 2D ({num_channels} canais, {num_samples} amostras)")
             
             smoothed = np.zeros_like(signal_data)
             for i in range(signal_data.shape[0]):
                 kernel = np.ones(window_size) / window_size
                 # Verificar por valores NaN ou infinitos
                 if np.isnan(signal_data[i]).any() or np.isinf(signal_data[i]).any():
-                    print(f"AVISO: Canal {i} contém valores NaN ou infinitos")
+                    log_warning(f"AVISO: Canal {i} contém valores NaN ou infinitos")
                     # Substituir valores problemáticos
                     channel_data = np.copy(signal_data[i])
                     channel_data[np.isnan(channel_data)] = 0
@@ -69,11 +70,13 @@ class SignalProcessor:
                 
                 # Verificar diferença para confirmar que a média foi aplicada
                 diff = np.abs(signal_data[i] - smoothed[i]).mean()
-                print(f"Canal {i}: Diferença média após aplicação da média: {diff}")
+                log_debug(f"Canal {i}: Diferença média após aplicação da média: {diff}")
                 
             return smoothed
         else:
-            raise ValueError(f"Formato de sinal não suportado para média móvel: {signal_data.ndim}D")
+            error_msg = f"Formato de sinal não suportado para média móvel: {signal_data.ndim}D"
+            log_error(error_msg)
+            raise ValueError(error_msg)
     
     @staticmethod
     def fit_ellipse(waveforms: np.ndarray, max_points: int = 100000) -> np.ndarray:
@@ -88,21 +91,28 @@ class SignalProcessor:
             Parâmetros da elipse ajustada
         """
         if not PROCESSING_AVAILABLE:
-            raise RuntimeError("Processamento avançado não disponível")
+            error_msg = "Processamento avançado não disponível"
+            log_error(error_msg)
+            raise RuntimeError(error_msg)
             
         # Verificar se temos dois canais
         if waveforms.shape[0] < 2:
-            raise ValueError("Necessários dois canais para fit da elipse")
+            error_msg = "Necessários dois canais para fit da elipse"
+            log_error(error_msg)
+            raise ValueError(error_msg)
             
         # Limitar o número de pontos para o fit, se necessário
         if waveforms.shape[1] > max_points:
             step = waveforms.shape[1] // max_points
             waveforms_fit = waveforms[:, ::step]
+            log_debug(f"Reduzindo pontos para fit de elipse: {waveforms.shape[1]} -> {waveforms_fit.shape[1]}")
         else:
             waveforms_fit = waveforms
             
         # Realizar o fit
+        log_debug(f"Iniciando fit de elipse com {waveforms_fit.shape[1]} pontos")
         ellipse_params = mkf.fit_ellipse(*waveforms_fit)
+        log_debug(f"Fit de elipse concluído: {ellipse_params}")
         return ellipse_params
     
     @staticmethod
@@ -118,16 +128,22 @@ class SignalProcessor:
             Sinal demodulado
         """
         if not PROCESSING_AVAILABLE:
-            raise RuntimeError("Processamento avançado não disponível")
+            error_msg = "Processamento avançado não disponível"
+            log_error(error_msg)
+            raise RuntimeError(error_msg)
             
         try:
             # Tentar demodulação direta
+            log_debug("Tentando demodulação direta com mkf.demodulate")
             demodulated = mkf.demodulate(waveforms, ellipse_params)
-        except (AttributeError, Exception):
+        except (AttributeError, Exception) as e:
             # Implementação manual alternativa
+            log_warning(f"Erro na demodulação direta: {str(e)}. Tentando implementação alternativa.")
+            log_debug("Usando implementação alternativa com rescale + arctan2")
             x, y = mkf.rescale(*waveforms, ellipse_params)
             demodulated = np.unwrap(np.arctan2(y, x))
             
+        log_debug(f"Demodulação concluída: resultado com {len(demodulated)} pontos")
         return demodulated
     
     @staticmethod
@@ -143,6 +159,8 @@ class SignalProcessor:
         Returns:
             Tupla (frequências, magnitudes_dB)
         """
+        log_debug(f"Calculando espectro: fs={fs} Hz, {len(signal_data)} pontos, janela={window_type}")
+        
         # Aplicar janela
         from scipy.signal import get_window
         window = get_window(window_type, len(signal_data))
@@ -162,6 +180,7 @@ class SignalProcessor:
         # Converter para dB
         magnitudes_db = 20 * np.log10(magnitudes + 1e-10)  # Evitar log(0)
         
+        log_debug(f"Espectro calculado: {len(freq_axis)} pontos, freq_max={freq_axis[-1]:.1f} Hz")
         return freq_axis, magnitudes_db
     
     @staticmethod
@@ -182,6 +201,8 @@ class SignalProcessor:
             Lista de tuplas (frequência, amplitude) dos picos encontrados
         """
         from scipy.signal import find_peaks
+        
+        log_debug(f"Procurando picos: min_freq={min_freq} Hz, prominence={prominence}, distance={distance}")
         
         # Encontrar o índice no eixo de frequência que corresponde à frequência mínima
         min_freq_idx = np.argmin(np.abs(frequencies - min_freq))
@@ -207,5 +228,6 @@ class SignalProcessor:
         
         # Criar lista de tuplas (frequência, amplitude)
         result = [(frequencies[peak], spectrum[peak]) for peak in top_peaks]
+        log_debug(f"Encontrados {len(result)} picos: {result}")
         
         return result 

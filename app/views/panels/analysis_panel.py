@@ -7,6 +7,7 @@ from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QTabWidget, QPus
 from PyQt5.QtCore import Qt, pyqtSignal
 
 from app.views.widgets.canvas import MplCanvas, NavigationToolbarCustom
+from app.utils.debug_log import log_debug, log_info, log_warning, log_error
 
 class AnalysisPanel(QWidget):
     """Painel para análise e visualização de dados"""
@@ -132,9 +133,9 @@ class AnalysisPanel(QWidget):
         
         # Mostrar mensagem na barra de status
         if is_checked:
-            print(f"Média móvel ativada com janela de {self.window_size_spinbox.value()}")
+            log_info(f"Média móvel ativada com janela de {self.window_size_spinbox.value()}")
         else:
-            print("Média móvel desativada")
+            log_info("Média móvel desativada")
         
         # Emitir sinal para aplicar ou remover a média móvel
         self.movingAverageChanged.emit(is_checked, self.window_size_spinbox.value())
@@ -147,6 +148,7 @@ class AnalysisPanel(QWidget):
             value: Novo valor da janela
         """
         if self.moving_avg_checkbox.isChecked():
+            log_info(f"Tamanho da janela de média móvel alterado para {value}")
             self.movingAverageChanged.emit(True, value)
             
     def update_file_list(self, files):
@@ -162,6 +164,7 @@ class AnalysisPanel(QWidget):
             
     def on_refresh_clicked(self):
         """Solicita atualização da lista de arquivos"""
+        log_debug("Solicitando atualização da lista de arquivos")
         self.refreshFilesRequested.emit()
         
     def on_browse_clicked(self):
@@ -174,6 +177,7 @@ class AnalysisPanel(QWidget):
         )
         
         if file_path:
+            log_info(f"Arquivo selecionado: {file_path}")
             # Adicionar o arquivo ao combo box, se já não estiver lá
             index = self.file_combo.findText(file_path)
             if index == -1:
@@ -191,10 +195,12 @@ class AnalysisPanel(QWidget):
             return
         
         filename = self.file_combo.currentText()
+        log_info(f"Carregando arquivo: {filename}")
         self.fileSelected.emit(filename)
         
     def on_demodulate_clicked(self):
         """Solicita demodulação dos dados"""
+        log_info("Solicitando demodulação do sinal")
         self.demodulateRequested.emit()
     
     def on_demodulate(self):
@@ -236,7 +242,7 @@ class AnalysisPanel(QWidget):
             waveforms: Array de formas de onda
             channels: Lista com identificadores dos canais
         """
-        print(f"show_raw_data: t={len(t)}, waveforms={waveforms.shape}, channels={channels}")
+        log_debug(f"show_raw_data: t={len(t)}, waveforms={waveforms.shape}, channels={channels}")
         try:
             # Verificar se a média móvel está ativada para adicionar ao título
             titulo = 'Dados Brutos'
@@ -249,11 +255,11 @@ class AnalysisPanel(QWidget):
             )
             # Garantir que o gráfico seja atualizado
             self.raw_canvas.draw()
-            print("Gráfico de dados brutos atualizado com sucesso")
+            log_debug("Gráfico de dados brutos atualizado com sucesso")
             # Certificar-se que a aba está visível
             self.analysis_tabs.setCurrentIndex(0)
         except Exception as e:
-            print(f"Erro ao plotar dados brutos: {e}")
+            log_error(f"Erro ao plotar dados brutos: {e}")
         
     def show_ellipse(self, waveforms, ellipse_params=None):
         """
@@ -263,32 +269,37 @@ class AnalysisPanel(QWidget):
             waveforms: Array de formas de onda [canais, amostras]
             ellipse_params: Parâmetros da elipse ajustada (opcional)
         """
-        # Limitar número de pontos para plot
-        max_points = 5000
-        if waveforms.shape[1] > max_points:
-            step = waveforms.shape[1] // max_points
-            waveforms_plot = waveforms[:, ::step]
-        else:
-            waveforms_plot = waveforms
-            
-        # Preparar título
-        titulo = 'Figura de Lissajous'
-        if self.moving_avg_checkbox.isChecked():
-            titulo += f' (com Média Móvel: {self.window_size_spinbox.value()})'
-            
-        # Mostrar gráfico Lissajous
-        self.ellipse_canvas.plot_scatter(
-            waveforms_plot[0], waveforms_plot[1],
-            xlabel='Canal 1', ylabel='Canal 2', 
-            title=titulo
-        )
-        
-        # Se temos parâmetros da elipse, plotar a elipse ajustada
-        if ellipse_params is not None:
-            self.ellipse_canvas.plot_ellipse(
-                fitted_params=ellipse_params,
-                plot_params=True
+        log_debug(f"show_ellipse: waveforms={waveforms.shape}, ellipse_params={ellipse_params is not None}")
+        try:
+            # Limitar número de pontos para plot
+            max_points = 5000
+            if waveforms.shape[1] > max_points:
+                step = waveforms.shape[1] // max_points
+                waveforms_plot = waveforms[:, ::step]
+            else:
+                waveforms_plot = waveforms
+                
+            # Preparar título
+            titulo = 'Figura de Lissajous'
+            if self.moving_avg_checkbox.isChecked():
+                titulo += f' (com Média Móvel: {self.window_size_spinbox.value()})'
+                
+            # Mostrar gráfico Lissajous
+            self.ellipse_canvas.plot_scatter(
+                waveforms_plot[0], waveforms_plot[1],
+                xlabel='Canal 1', ylabel='Canal 2', 
+                title=titulo
             )
+            
+            # Se temos parâmetros da elipse, plotar a elipse ajustada
+            if ellipse_params is not None:
+                self.ellipse_canvas.plot_ellipse(
+                    fitted_params=ellipse_params,
+                    plot_params=True
+                )
+                log_debug("Elipse ajustada plotada com sucesso")
+        except Exception as e:
+            log_error(f"Erro ao plotar elipse: {e}")
             
     def show_demodulated(self, t, demodulated):
         """
@@ -298,24 +309,34 @@ class AnalysisPanel(QWidget):
             t: Vetor de tempo
             demodulated: Sinal demodulado
         """
-        # Limitar número de pontos para plotagem
-        max_points = 10000
-        if len(t) > max_points:
-            step = len(t) // max_points
-            t_plot = t[::step]
-            demod_plot = demodulated[::step]
-        else:
-            t_plot = t
-            demod_plot = demodulated
-        
-        # Plotar sinal demodulado
-        self.demod_canvas.axes.clear()
-        self.demod_canvas.axes.plot(t_plot, demod_plot)
-        self.demod_canvas.axes.set_xlabel('Tempo (s)')
-        self.demod_canvas.axes.set_ylabel('Fase (rad)')
-        self.demod_canvas.axes.set_title('Sinal Demodulado')
-        self.demod_canvas.axes.grid(True)
-        self.demod_canvas.draw()
+        log_debug(f"show_demodulated: t={len(t)}, demodulated={len(demodulated)}")
+        try:
+            # Limitar número de pontos para plotagem
+            max_points = 10000
+            if len(t) > max_points:
+                step = len(t) // max_points
+                t_plot = t[::step]
+                demod_plot = demodulated[::step]
+            else:
+                t_plot = t
+                demod_plot = demodulated
+            
+            # Preparar título
+            titulo = 'Sinal Demodulado'
+            if self.moving_avg_checkbox.isChecked():
+                titulo += f' (com Média Móvel: {self.window_size_spinbox.value()})'
+            
+            # Plotar sinal demodulado
+            self.demod_canvas.axes.clear()
+            self.demod_canvas.axes.plot(t_plot, demod_plot)
+            self.demod_canvas.axes.set_xlabel('Tempo (s)')
+            self.demod_canvas.axes.set_ylabel('Fase (rad)')
+            self.demod_canvas.axes.set_title(titulo)
+            self.demod_canvas.axes.grid(True)
+            self.demod_canvas.draw()
+            log_debug("Sinal demodulado plotado com sucesso")
+        except Exception as e:
+            log_error(f"Erro ao plotar sinal demodulado: {e}")
         
     def show_spectrum(self, freq_axis, magnitudes, peaks=None):
         """
@@ -326,21 +347,31 @@ class AnalysisPanel(QWidget):
             magnitudes: Magnitudes do espectro em dB
             peaks: Lista de tuplas (freq, mag) com picos detectados
         """
-        # Plotar espectro principal
-        self.spectrum_canvas.plot_spectrum(
-            freq_axis, magnitudes, peaks=peaks,
-            title=f'Espectro FFT (Fs={freq_axis[-1]*2/1000:.1f} kHz, N={len(magnitudes)*2})'
-        )
-        
-        # Adicionar visualização com escala logarítmica
-        inset_ax = self.spectrum_canvas.draw_inset()
-        inset_ax.semilogx(freq_axis, magnitudes)
-        inset_ax.set_title("Escala log", fontsize=8)
-        inset_ax.grid(True, which='both', linestyle='--', alpha=0.6)
-        
-        # Marcar os mesmos picos na visualização em escala logarítmica
-        if peaks:
-            for freq, mag in peaks:
-                inset_ax.plot(freq, mag, 'ro', markersize=4)
-                
-        self.spectrum_canvas.draw() 
+        log_debug(f"show_spectrum: freq_axis={len(freq_axis)}, magnitudes={len(magnitudes)}, peaks={peaks is not None}")
+        try:
+            # Preparar título
+            titulo = f'Espectro FFT (Fs={freq_axis[-1]*2/1000:.1f} kHz, N={len(magnitudes)*2})'
+            if self.moving_avg_checkbox.isChecked():
+                titulo += f' (com Média Móvel: {self.window_size_spinbox.value()})'
+            
+            # Plotar espectro principal
+            self.spectrum_canvas.plot_spectrum(
+                freq_axis, magnitudes, peaks=peaks,
+                title=titulo
+            )
+            
+            # Adicionar visualização com escala logarítmica
+            inset_ax = self.spectrum_canvas.draw_inset()
+            inset_ax.semilogx(freq_axis, magnitudes)
+            inset_ax.set_title("Escala log", fontsize=8)
+            inset_ax.grid(True, which='both', linestyle='--', alpha=0.6)
+            
+            # Marcar os mesmos picos na visualização em escala logarítmica
+            if peaks:
+                for freq, mag in peaks:
+                    inset_ax.plot(freq, mag, 'ro', markersize=4)
+                    
+            self.spectrum_canvas.draw()
+            log_debug("Espectro plotado com sucesso")
+        except Exception as e:
+            log_error(f"Erro ao plotar espectro: {e}") 

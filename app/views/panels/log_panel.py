@@ -8,6 +8,7 @@ from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QTextEdit, QPushButton, QHBox
                            QLabel, QCheckBox, QFileDialog)
 from PyQt5.QtCore import Qt, pyqtSlot, QObject, pyqtSignal
 from PyQt5.QtGui import QColor
+from app.utils.debug_log import log_info, log_error
 
 class LogStream(QObject):
     """Stream para redirecionar saída do console para um widget"""
@@ -15,10 +16,16 @@ class LogStream(QObject):
     # Sinal emitido quando novos dados são recebidos
     newText = pyqtSignal(str)
     
-    def __init__(self):
-        """Inicializa o stream de logs"""
+    def __init__(self, original_stream=None):
+        """
+        Inicializa o stream de logs
+        
+        Args:
+            original_stream: Stream original para replicar a saída
+        """
         super().__init__()
         self.buffer = StringIO()
+        self.original_stream = original_stream
     
     def write(self, text):
         """
@@ -31,9 +38,15 @@ class LogStream(QObject):
             self.newText.emit(text)
             self.buffer.write(text)
             
+            # Também enviar para o stream original, se existir
+            if self.original_stream is not None:
+                self.original_stream.write(text)
+                self.original_stream.flush()
+            
     def flush(self):
         """Limpa o buffer"""
-        pass
+        if self.original_stream is not None:
+            self.original_stream.flush()
         
     def getvalue(self):
         """Retorna o conteúdo do buffer"""
@@ -118,16 +131,18 @@ class LogPanel(QWidget):
         self.original_stderr = sys.stderr
         
         # Criar e conectar o stream de logs
-        self.log_stream = LogStream()
+        self.log_stream = LogStream(self.original_stdout)
+        self.error_stream = LogStream(self.original_stderr)
         self.log_stream.newText.connect(self.append_log)
+        self.error_stream.newText.connect(self.append_log)
         
-        # Redirecionar saídas
+        # Redirecionar saídas, mas mantendo a saída para o terminal original
         sys.stdout = self.log_stream
-        sys.stderr = self.log_stream
+        sys.stderr = self.error_stream
         
         # Adicionar mensagem inicial
-        print("=== Log de eventos do OAS-GUI ===")
-        print("Sistema iniciado. Logs serão registrados aqui.")
+        self.append_log("=== Log de eventos do OAS-GUI ===\n")
+        self.append_log("Sistema iniciado. Logs serão registrados aqui.\n")
         
     def toggle_word_wrap(self, state):
         """Alterna a quebra de linha no widget de texto"""
@@ -156,10 +171,13 @@ class LogPanel(QWidget):
             
     def clear_logs(self):
         """Limpa o conteúdo dos logs"""
+        from app.utils.debug_log import log_info
+        
         self.log_text.clear()
         
         # Adicionar mensagem inicial
-        print("=== Log limpo ===")
+        self.append_log("=== Log limpo ===\n")
+        log_info("Log limpo pelo usuário")
         
     def copy_logs(self):
         """Copia logs para a área de transferência"""
@@ -186,15 +204,17 @@ class LogPanel(QWidget):
             try:
                 with open(filename, 'w', encoding='utf-8') as f:
                     f.write(self.log_text.toPlainText())
-                print(f"Logs salvos em: {filename}")
+                log_info(f"Logs salvos em: {filename}")
             except Exception as e:
-                print(f"Erro ao salvar logs: {str(e)}")
+                log_error(f"Erro ao salvar logs: {str(e)}")
                 
     def closeEvent(self, event):
         """Restaura saída original ao fechar"""
-        # Restaurar os streams originais
-        sys.stdout = self.original_stdout
-        sys.stderr = self.original_stderr
+        # Verificar se os streams foram modificados
+        if hasattr(self, 'original_stdout') and hasattr(self, 'original_stderr'):
+            # Restaurar os streams originais
+            sys.stdout = self.original_stdout
+            sys.stderr = self.original_stderr
         
         # Continuar com o evento de fechamento
         super().closeEvent(event) 
