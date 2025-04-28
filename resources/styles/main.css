@@ -1,0 +1,185 @@
+/* Estilo principal do OAS-GUI */
+
+/* Estilo do aplicativo */
+QMainWindow {
+    background-color: #f5f5f5;
+}
+
+/* Painel de navegação lateral */
+#nav_panel {
+    background-color: #2C3E50;
+    min-width: 200px;
+    max-width: 250px;
+    padding: 10px;
+}
+
+#nav_panel QPushButton {
+    background-color: transparent;
+    border: none;
+    border-radius: 4px;
+    color: white;
+    text-align: left;
+    padding: 10px;
+    margin: 2px 0px;
+    font-size: 14px;
+}
+
+#nav_panel QPushButton:hover {
+    background-color: #34495E;
+}
+
+#nav_panel QPushButton:pressed {
+    background-color: #1ABC9C;
+}
+
+#nav_panel QPushButton:checked {
+    background-color: #1ABC9C;
+    font-weight: bold;
+}
+
+/* Barra de ferramentas */
+QToolBar {
+    background-color: #ECF0F1;
+    border: none;
+    spacing: 3px;
+    padding: 3px;
+}
+
+QToolBar QToolButton {
+    background-color: transparent;
+    border: none;
+    border-radius: 4px;
+    padding: 5px;
+}
+
+QToolBar QToolButton:hover {
+    background-color: #D6DBDF;
+}
+
+QToolBar QToolButton:pressed {
+    background-color: #AEB6BF;
+}
+
+/* Painéis e áreas de conteúdo */
+QGroupBox {
+    border: 1px solid #BDC3C7;
+    border-radius: 5px;
+    margin-top: 1ex;
+    font-weight: bold;
+}
+
+QGroupBox::title {
+    subcontrol-origin: margin;
+    subcontrol-position: top center;
+    padding: 0 5px;
+}
+
+/* Barra de status */
+QStatusBar {
+    background-color: #ECF0F1;
+    color: #2C3E50;
+}
+
+/* Barra de progresso */
+QProgressBar {
+    border: 1px solid #BDC3C7;
+    border-radius: 3px;
+    text-align: center;
+    background-color: #ECF0F1;
+}
+
+QProgressBar::chunk {
+    background-color: #1ABC9C;
+    width: 10px;
+}
+
+/* Lista de arquivos */
+QListWidget {
+    border: 1px solid #BDC3C7;
+    border-radius: 3px;
+    background-color: white;
+}
+
+QListWidget::item {
+    height: 25px;
+    padding: 2px;
+}
+
+QListWidget::item:selected {
+    background-color: #2980B9;
+    color: white;
+}
+
+QListWidget::item:hover {
+    background-color: #D6EAF8;
+}
+
+/* Abas */
+QTabWidget::pane {
+    border: 1px solid #BDC3C7;
+    border-radius: 3px;
+}
+
+QTabBar::tab {
+    background-color: #ECF0F1;
+    border: 1px solid #BDC3C7;
+    border-bottom: none;
+    border-top-left-radius: 4px;
+    border-top-right-radius: 4px;
+    min-width: 10ex;
+    padding: 6px 10px;
+}
+
+QTabBar::tab:selected {
+    background-color: white;
+    border-bottom: 1px solid white;
+}
+
+QTabBar::tab:hover:!selected {
+    background-color: #D6EAF8;
+}
+
+/* Botões */
+QPushButton {
+    background-color: #3498DB;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    padding: 5px 15px;
+}
+
+QPushButton:hover {
+    background-color: #2980B9;
+}
+
+QPushButton:pressed {
+    background-color: #21618C;
+}
+
+QPushButton:disabled {
+    background-color: #BDC3C7;
+}
+
+/* Botões específicos */
+QPushButton#demodulate_button {
+    background-color: #1ABC9C;
+}
+
+QPushButton#demodulate_button:hover {
+    background-color: #16A085;
+}
+
+/* QComboBox */
+QComboBox {
+    border: 1px solid #BDC3C7;
+    border-radius: 3px;
+    padding: 5px;
+    background-color: white;
+}
+
+QComboBox::drop-down {
+    subcontrol-origin: padding;
+    subcontrol-position: top right;
+    width: 20px;
+    border-left: 1px solid #BDC3C7;
+} 

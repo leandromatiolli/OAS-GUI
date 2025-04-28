@@ -18,6 +18,8 @@ from app.controllers.acquisition_controller import AcquisitionController
 from app.controllers.processing_controller import ProcessingController
 from app.controllers.file_controller import FileController
 from app.models.hardware.redpitaya_client import RedPitayaClient
+# Importar módulo de recursos
+from app.utils.resources import apply_stylesheet
 
 def exception_hook(exctype, value, tb):
     """
@@ -53,6 +55,9 @@ class Application:
         # Criar a aplicação Qt
         self.app = QApplication(sys.argv)
         self.app.setApplicationName("OAS - Interface de Aquisição e Análise")
+        
+        # Aplicar folha de estilo
+        apply_stylesheet(self.app)
         
         # Inicializar controladores
         self.init_controllers()
@@ -139,21 +144,72 @@ class Application:
         self.window.acquisition_panel.set_enabled(True)
         self.window.show_status_message("Aquisição concluída")
         
-        # Processar dados automaticamente
-        self.window.show_status_message("Realizando processamento automático...")
-        success = self.processing_controller.auto_demodulate(data)
+        # Armazenar dados no controlador de processamento desde o início
+        self.processing_controller.set_data(data)
         
-        if success:
-            # Salvar dados com demodulação incluída
-            try:
-                filename = self.processing_controller.save_demodulated_data()
-                self.window.show_status_message(f"Dados processados salvos em {filename}")
-            except Exception as e:
-                self.window.show_status_message(f"Erro ao salvar dados processados: {str(e)}")
+        # Mudar para a aba de análise
+        self.window.switch_to_tab(2)
         
-        # Atualizar lista de arquivos e mudar para aba de análise
-        self.file_controller.refresh_file_list()
-        self.window.switch_to_tab(2)  # Mudar para a aba de análise (índice 2)
+        # ETAPA 1: Mostrar dados brutos adquiridos
+        try:
+            # Verificar o conteúdo dos dados
+            print("Conteúdo dos dados adquiridos:")
+            if 'waveforms' in data:
+                print(f"- Waveforms: shape={data['waveforms'].shape}")
+            else:
+                print("- Waveforms: não encontrado")
+                
+            if 't' in data:
+                print(f"- Vetor de tempo: length={len(data['t'])}")
+            else:
+                print("- Vetor de tempo: não encontrado")
+                
+            if 'channels' in data:
+                print(f"- Canais: {data['channels']}")
+            else:
+                print("- Canais: não encontrado")
+            
+            if 'waveforms' in data and 't' in data:
+                channels = data.get('channels', [1, 2])
+                print(f"Exibindo dados brutos: canais {channels}")
+                self.window.analysis_panel.show_raw_data(data['t'], data['waveforms'], channels)
+                
+                # Verificar se temos dois canais para a elipse
+                if data['waveforms'].shape[0] >= 2:
+                    ellipse_params = data.get('ellipse_params', None)
+                    print("Exibindo elipse")
+                    self.window.analysis_panel.show_ellipse(data['waveforms'], ellipse_params)
+            else:
+                print("Não foi possível exibir dados brutos: waveforms ou vetor de tempo ausentes")
+                
+            # Selecionar a aba de dados brutos no painel de análise
+            self.window.analysis_panel.analysis_tabs.setCurrentIndex(0)
+            
+        except Exception as e:
+            print(f"Erro ao exibir dados brutos: {str(e)}")
+            self.window.show_status_message(f"Erro ao exibir dados brutos: {str(e)}")
+        
+        # ETAPA 2: Processar dados automaticamente
+        try:
+            self.window.show_status_message("Realizando processamento automático...")
+            success = self.processing_controller.auto_demodulate(data)
+            
+            if success:
+                try:
+                    filename = self.processing_controller.save_demodulated_data()
+                    self.window.show_status_message(f"Dados processados salvos em {filename}")
+                except Exception as e:
+                    self.window.show_status_message(f"Erro ao salvar dados processados: {str(e)}")
+                    print(f"Erro ao salvar dados processados: {str(e)}")
+        except Exception as e:
+            self.window.show_status_message(f"Erro no processamento automático: {str(e)}")
+            print(f"Erro no processamento automático: {str(e)}")
+        
+        # ETAPA 3: Atualizar lista de arquivos
+        try:
+            self.file_controller.refresh_file_list()
+        except Exception as e:
+            print(f"Erro ao atualizar lista de arquivos: {str(e)}")
     
     def on_acquisition_error(self, message):
         """
@@ -256,10 +312,19 @@ class Application:
         self.window.show_error_message("Erro na Demodulação", message)
     
     def run(self):
-        """Executa a aplicação"""
+        """
+        Executa a aplicação
+        
+        Returns:
+            Código de retorno da aplicação
+        """
         self.window.show()
         return self.app.exec_()
 
-if __name__ == '__main__':
+def main():
+    """Função principal"""
     app = Application()
-    sys.exit(app.run()) 
+    return app.run()
+
+if __name__ == "__main__":
+    sys.exit(main()) 

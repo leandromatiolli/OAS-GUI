@@ -55,12 +55,16 @@ class MplCanvas(FigureCanvas):
             ylabel: Rótulo do eixo y
             title: Título do gráfico
         """
+        print(f"plot_timeseries: t={type(t)}, data={type(data)}, channels={channels}")
+        print(f"t shape={len(t)}, data shape={data.shape}")
+        
         self.axes.clear()
         
         # Verificar se os comprimentos coincidem
         if len(t) != data.shape[1]:
             # Truncar para o tamanho menor
             min_len = min(len(t), data.shape[1])
+            print(f"Ajustando tamanhos: t={len(t)} -> {min_len}, data={data.shape[1]} -> {min_len}")
             t = t[:min_len]
             data = data[:, :min_len]
         
@@ -69,6 +73,7 @@ class MplCanvas(FigureCanvas):
             step = len(t) // max_points
             t_plot = t[::step]
             data_plot = data[:, ::step]
+            print(f"Reduzindo pontos para plotagem: {len(t)} -> {len(t_plot)}")
         else:
             t_plot = t
             data_plot = data
@@ -81,8 +86,12 @@ class MplCanvas(FigureCanvas):
         colors = ['b', 'r', 'g', 'c', 'm', 'y', 'k']
         for i, channel in enumerate(channels):
             if i < len(data_plot):
-                self.axes.plot(t_plot, data_plot[i], color=colors[i % len(colors)], 
-                           label=f'Canal {channel}')
+                print(f"Plotando canal {channel}: {len(t_plot)} pontos")
+                try:
+                    self.axes.plot(t_plot, data_plot[i], color=colors[i % len(colors)], 
+                               label=f'Canal {channel}')
+                except Exception as e:
+                    print(f"Erro ao plotar canal {channel}: {e}")
         
         self.axes.set_xlabel(xlabel)
         self.axes.set_ylabel(ylabel)
@@ -90,7 +99,11 @@ class MplCanvas(FigureCanvas):
         self.axes.legend()
         self.axes.grid(True)
         
-        self.draw()
+        try:
+            self.draw()
+            print("Canvas atualizado com sucesso")
+        except Exception as e:
+            print(f"Erro ao atualizar canvas: {e}")
         
     def plot_scatter(self, x, y, color='b', alpha=0.3, size=1, 
                    xlabel='Canal 1', ylabel='Canal 2', title='Gráfico de Dispersão'):

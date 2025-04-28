@@ -1,0 +1,247 @@
+/* Tema escuro do OAS-GUI */
+
+/* Estilo do aplicativo */
+QMainWindow, QDialog, QWidget {
+    background-color: #2C3E50;
+    color: #ECF0F1;
+}
+
+/* Painel de navegação lateral */
+#nav_panel {
+    background-color: #1A2530;
+    min-width: 200px;
+    max-width: 250px;
+    padding: 10px;
+}
+
+#nav_panel QPushButton {
+    background-color: transparent;
+    border: none;
+    border-radius: 4px;
+    color: #ECF0F1;
+    text-align: left;
+    padding: 10px;
+    margin: 2px 0px;
+    font-size: 14px;
+}
+
+#nav_panel QPushButton:hover {
+    background-color: #34495E;
+}
+
+#nav_panel QPushButton:pressed {
+    background-color: #1ABC9C;
+}
+
+#nav_panel QPushButton:checked {
+    background-color: #1ABC9C;
+    font-weight: bold;
+}
+
+/* Barra de ferramentas */
+QToolBar {
+    background-color: #34495E;
+    border: none;
+    spacing: 3px;
+    padding: 3px;
+}
+
+QToolBar QToolButton {
+    background-color: transparent;
+    border: none;
+    border-radius: 4px;
+    padding: 5px;
+}
+
+QToolBar QToolButton:hover {
+    background-color: #5D6D7E;
+}
+
+QToolBar QToolButton:pressed {
+    background-color: #1ABC9C;
+}
+
+/* Painéis e áreas de conteúdo */
+QGroupBox {
+    border: 1px solid #566573;
+    border-radius: 5px;
+    margin-top: 1ex;
+    font-weight: bold;
+    color: #ECF0F1;
+}
+
+QGroupBox::title {
+    subcontrol-origin: margin;
+    subcontrol-position: top center;
+    padding: 0 5px;
+}
+
+/* Barra de status */
+QStatusBar {
+    background-color: #34495E;
+    color: #ECF0F1;
+}
+
+/* Barra de progresso */
+QProgressBar {
+    border: 1px solid #566573;
+    border-radius: 3px;
+    text-align: center;
+    background-color: #34495E;
+    color: #ECF0F1;
+}
+
+QProgressBar::chunk {
+    background-color: #1ABC9C;
+    width: 10px;
+}
+
+/* Lista de arquivos */
+QListWidget {
+    border: 1px solid #566573;
+    border-radius: 3px;
+    background-color: #34495E;
+    color: #ECF0F1;
+}
+
+QListWidget::item {
+    height: 25px;
+    padding: 2px;
+}
+
+QListWidget::item:selected {
+    background-color: #1ABC9C;
+    color: #ECF0F1;
+}
+
+QListWidget::item:hover {
+    background-color: #3498DB;
+}
+
+/* Abas */
+QTabWidget::pane {
+    border: 1px solid #566573;
+    border-radius: 3px;
+}
+
+QTabBar::tab {
+    background-color: #34495E;
+    border: 1px solid #566573;
+    border-bottom: none;
+    border-top-left-radius: 4px;
+    border-top-right-radius: 4px;
+    min-width: 10ex;
+    padding: 6px 10px;
+    color: #ECF0F1;
+}
+
+QTabBar::tab:selected {
+    background-color: #2C3E50;
+    border-bottom: 1px solid #2C3E50;
+}
+
+QTabBar::tab:hover:!selected {
+    background-color: #3498DB;
+}
+
+/* Botões */
+QPushButton {
+    background-color: #3498DB;
+    color: #ECF0F1;
+    border: none;
+    border-radius: 4px;
+    padding: 5px 15px;
+}
+
+QPushButton:hover {
+    background-color: #2980B9;
+}
+
+QPushButton:pressed {
+    background-color: #1ABC9C;
+}
+
+QPushButton:disabled {
+    background-color: #566573;
+    color: #7F8C8D;
+}
+
+/* Botões específicos */
+QPushButton#demodulate_button {
+    background-color: #1ABC9C;
+}
+
+QPushButton#demodulate_button:hover {
+    background-color: #16A085;
+}
+
+/* QComboBox */
+QComboBox {
+    border: 1px solid #566573;
+    border-radius: 3px;
+    padding: 5px;
+    background-color: #34495E;
+    color: #ECF0F1;
+}
+
+QComboBox::drop-down {
+    subcontrol-origin: padding;
+    subcontrol-position: top right;
+    width: 20px;
+    border-left: 1px solid #566573;
+}
+
+/* QLabel */
+QLabel {
+    color: #ECF0F1;
+}
+
+/* QLineEdit */
+QLineEdit {
+    background-color: #34495E;
+    border: 1px solid #566573;
+    border-radius: 3px;
+    padding: 5px;
+    color: #ECF0F1;
+}
+
+/* QSpinBox e QDoubleSpinBox */
+QSpinBox, QDoubleSpinBox {
+    background-color: #34495E;
+    border: 1px solid #566573;
+    border-radius: 3px;
+    padding: 5px;
+    color: #ECF0F1;
+}
+
+/* QCheckBox */
+QCheckBox {
+    color: #ECF0F1;
+}
+
+QCheckBox::indicator {
+    width: 13px;
+    height: 13px;
+}
+
+QCheckBox::indicator:unchecked {
+    border: 1px solid #566573;
+    background-color: #34495E;
+}
+
+QCheckBox::indicator:checked {
+    border: 1px solid #566573;
+    background-color: #1ABC9C;
+}
+
+/* QRadioButton */
+QRadioButton {
+    color: #ECF0F1;
+}
+
+/* Dicas de ferramentas */
+QToolTip {
+    background-color: #34495E;
+    color: #ECF0F1;
+    border: 1px solid #566573;
+} 

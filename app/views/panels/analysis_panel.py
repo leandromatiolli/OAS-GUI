@@ -144,6 +144,18 @@ class AnalysisPanel(QWidget):
     def on_demodulate_clicked(self):
         """Solicita demodulação dos dados"""
         self.demodulateRequested.emit()
+    
+    def on_demodulate(self):
+        """Método para demodular dados a partir da barra de ferramentas"""
+        self.on_demodulate_clicked()
+    
+    def on_select_file(self):
+        """Método para selecionar arquivo a partir da barra de ferramentas"""
+        self.on_browse_clicked()
+    
+    def on_refresh_files(self):
+        """Método para atualizar lista de arquivos a partir da barra de ferramentas"""
+        self.on_refresh_clicked()
         
     def clear_plots(self):
         """Limpa todos os gráficos"""
@@ -172,10 +184,19 @@ class AnalysisPanel(QWidget):
             waveforms: Array de formas de onda
             channels: Lista com identificadores dos canais
         """
-        self.raw_canvas.plot_timeseries(
-            t, waveforms, channels=channels,
-            title='Dados Brutos'
-        )
+        print(f"show_raw_data: t={len(t)}, waveforms={waveforms.shape}, channels={channels}")
+        try:
+            self.raw_canvas.plot_timeseries(
+                t, waveforms, channels=channels,
+                title='Dados Brutos'
+            )
+            # Garantir que o gráfico seja atualizado
+            self.raw_canvas.draw()
+            print("Gráfico de dados brutos atualizado com sucesso")
+            # Certificar-se que a aba está visível
+            self.analysis_tabs.setCurrentIndex(0)
+        except Exception as e:
+            print(f"Erro ao plotar dados brutos: {e}")
         
     def show_ellipse(self, waveforms, ellipse_params=None):
         """
