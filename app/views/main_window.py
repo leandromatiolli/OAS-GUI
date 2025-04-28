@@ -8,6 +8,7 @@ from PyQt5.QtCore import Qt, QSize
 from app.views.panels.acquisition_panel import AcquisitionPanel
 from app.views.panels.metadata_panel import MetadataPanel
 from app.views.panels.analysis_panel import AnalysisPanel
+from app.views.panels.log_panel import LogPanel
 from app.utils.resources import get_icon, toggle_theme
 
 class MainWindow(QMainWindow):
@@ -50,10 +51,14 @@ class MainWindow(QMainWindow):
         # Aba de Análise
         self.analysis_panel = AnalysisPanel()
         
+        # Aba de Logs
+        self.log_panel = LogPanel()
+        
         # Adicionar todas as abas
         self.tabs.addTab(self.acquisition_panel, "Aquisição")
         self.tabs.addTab(self.metadata_panel, "Metadados")
         self.tabs.addTab(self.analysis_panel, "Análise")
+        self.tabs.addTab(self.log_panel, "Logs")
         
         # Barra de status
         self.status_bar = QStatusBar()
@@ -108,6 +113,12 @@ class MainWindow(QMainWindow):
         self.toolbar.addAction(self.action_refresh)
         
         self.toolbar.addSeparator()
+        
+        # Ação para visualizar logs
+        self.action_logs = QAction(get_icon("logs"), "Logs", self)
+        self.action_logs.setStatusTip("Visualizar logs da aplicação")
+        self.action_logs.triggered.connect(lambda: self.switch_to_tab(3))
+        self.toolbar.addAction(self.action_logs)
         
         # Ação para alternar tema
         self.action_theme = QAction(get_icon("theme"), "Alternar Tema", self)
@@ -209,7 +220,7 @@ class MainWindow(QMainWindow):
         Muda para a aba especificada
         
         Args:
-            index: Índice da aba (0 = Aquisição, 1 = Metadados, 2 = Análise)
+            index: Índice da aba (0 = Aquisição, 1 = Metadados, 2 = Análise, 3 = Logs)
         """
         if 0 <= index < self.tabs.count():
             self.tabs.setCurrentIndex(index) 
