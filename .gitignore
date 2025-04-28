@@ -1,2 +1,36 @@
-*.pyc
+# Arquivos de bytecode do Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Distribuição / empacotamento
+dist/
+build/
+*.egg-info/
+
+# Ambiente virtual
+venv/
+env/
+ENV/
+
+# Arquivos de dados
 *.pkl
+*.npy
+*.h5
+
+# Configurações específicas do usuário
+oas_config.json
+
+# Logs e arquivos temporários
+*.log
+*.tmp
+
+# Arquivos específicos do sistema
+.DS_Store
+Thumbs.db
+
+# Arquivos de IDE
+.idea/
+.vscode/
+*.sublime-project
+*.sublime-workspace
