@@ -3,7 +3,7 @@ Módulo com o painel de metadados para informações do teste
 """
 from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QFormLayout, QGroupBox,
                            QComboBox, QLineEdit, QDoubleSpinBox, QLabel, QPushButton,
-                           QFileDialog)
+                           QFileDialog, QTextEdit)
 from PyQt5.QtCore import Qt
 from datetime import datetime
 from typing import Dict, Any
@@ -99,12 +99,12 @@ class MetadataPanel(QWidget):
         metadata_form.addRow("Fotos:", self.setup_photos_label)
 
         # Comentários
-        self.comments_edit = QLineEdit()
-        metadata_form.addRow("Comentários:", self.comments_edit)
-        # Alinhar texto à esquerda superior
+        self.comments_edit = QTextEdit()
+        self.comments_edit.setAcceptRichText(False)  # Desabilitar formatação rica
+        self.comments_edit.setPlaceholderText("Digite seus comentários aqui...")
         self.comments_edit.setAlignment(Qt.AlignLeft | Qt.AlignTop)
-        # Aumentar altura da caixa de comentários      
         self.comments_edit.setMinimumHeight(400)
+        metadata_form.addRow("Comentários:", self.comments_edit)
         metadata_group.setLayout(metadata_form)
         layout.addWidget(metadata_group)  
         
@@ -147,7 +147,7 @@ class MetadataPanel(QWidget):
             "pressure": self.pressure_spin.value(),
             "flow": self.flow_spin.value(),
             "distance": self.distance_spin.value(),
-            "comments": self.comments_edit.text(),
+            "comments": self.comments_edit.toPlainText(),
             "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         }
         
