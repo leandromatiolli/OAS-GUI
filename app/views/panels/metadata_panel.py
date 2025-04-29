@@ -85,13 +85,21 @@ class MetadataPanel(QWidget):
         self.distance_spin.setSuffix(" cm")
         metadata_form.addRow("Distância:", self.distance_spin)
 
+        #temperatura da água
+        self.water_temperature_spin = QDoubleSpinBox()
+        self.water_temperature_spin.setRange(0, 100.0)
+        self.water_temperature_spin.setValue(30.0)
+        self.water_temperature_spin.setSingleStep(1.0)
+        self.water_temperature_spin.setSuffix(" °C")
+        metadata_form.addRow("Temperatura da Água:", self.water_temperature_spin)
+
         # localização do vazamento
         self.location_edit = QLineEdit()
         metadata_form.addRow("Localização:", self.location_edit)
 
         #configuração do setup
         self.setup_config_edit = QTextEdit()
-        self.setup_config_edit.setPlaceholderText("Digite a configuração do setup aqui...")
+        self.setup_config_edit.setPlaceholderText("Digite mais detalhes do experimento aqui...")
         self.setup_config_edit.setAlignment(Qt.AlignLeft | Qt.AlignTop)
         self.setup_config_edit.setMinimumHeight(40)
         metadata_form.addRow("Configuração do Setup:", self.setup_config_edit)
