@@ -128,6 +128,10 @@ class Application:
         # Conexão para configuração do filtro passa-banda
         self.window.analysis_panel.bandpassFilterChanged.connect(self.processing_controller.set_bandpass_filter)
         self.processing_controller.bandpassFilterApplied.connect(self.on_bandpass_filter_applied)
+        
+        # Conexão para geração de espectrograma
+        self.window.analysis_panel.spectrogramRequested.connect(self.processing_controller.generate_spectrogram)
+        self.processing_controller.spectrogramGenerated.connect(self.on_spectrogram_generated)
     
     def initialize_state(self):
         """Inicializa o estado da aplicação"""
@@ -185,8 +189,9 @@ class Application:
                     return
                 log_info("Usuário optou por continuar sem calibração")
         
-        # Resetar as configurações de filtro na interface
+        # Resetar as configurações de filtro e espectrograma na interface
         self.window.analysis_panel.reset_bandpass_filter()
+        self.window.analysis_panel.reset_spectrogram()
         
         # Obter metadados
         metadata = self.window.metadata_panel.get_metadata()
@@ -596,6 +601,31 @@ class Application:
         except Exception as e:
             log_error(f"Erro ao aplicar filtro passa-banda: {str(e)}")
             self.window.show_status_message(f"Erro ao aplicar filtro passa-banda: {str(e)}")
+            
+    def on_spectrogram_generated(self, data, t, freqs, Sxx):
+        """
+        Manipula o evento de geração do espectrograma
+        
+        Args:
+            data: Dados completos
+            t: Vetor de tempo para o eixo x
+            freqs: Vetor de frequências para o eixo y
+            Sxx: Matriz do espectrograma
+        """
+        log_info("Espectrograma gerado com sucesso")
+        
+        try:
+            # Mostrar espectrograma
+            params = data.get('spectrogram_params', {})
+            log_debug(f"on_spectrogram_generated: Parâmetros: {params}")
+            log_debug(f"on_spectrogram_generated: t={len(t)}, freqs={len(freqs)}, Sxx={Sxx.shape}")
+            
+            self.window.analysis_panel.show_spectrogram(t, freqs, Sxx, params)
+            self.window.show_status_message("Espectrograma gerado com sucesso")
+                
+        except Exception as e:
+            log_error(f"Erro ao exibir espectrograma: {str(e)}")
+            self.window.show_status_message(f"Erro ao exibir espectrograma: {str(e)}")
             
     def diagnose_filtered_data(self, data):
         """

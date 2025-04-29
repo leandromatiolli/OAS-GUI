@@ -22,6 +22,7 @@ class AnalysisPanel(QWidget):
     refreshFilesRequested = pyqtSignal()  # Emitido quando o usuário solicita atualização da lista de arquivos
     movingAverageChanged = pyqtSignal(bool, int)  # Emitido quando a configuração de média móvel é alterada
     bandpassFilterChanged = pyqtSignal(bool, float, float, int)  # Emitido quando a configuração do filtro passa-banda é alterada
+    spectrogramRequested = pyqtSignal(bool, int, float, float)  # Emitido quando o usuário solicita gerar espectrograma
     
     def __init__(self, parent=None):
         """
@@ -121,6 +122,37 @@ class AnalysisPanel(QWidget):
         self.apply_filter_button.clicked.connect(self.on_apply_filter_clicked)
         self.apply_filter_button.setEnabled(False)
         
+        # Grupo para espectrograma
+        spectrogram_group = QGroupBox("Espectrograma")
+        spectrogram_layout = QFormLayout()
+        
+        self.spectrogram_checkbox = QCheckBox("Ativar")
+        self.spectrogram_checkbox.stateChanged.connect(self.on_spectrogram_changed)
+        
+        self.window_size_spectrogram_spinbox = QSpinBox()
+        self.window_size_spectrogram_spinbox.setRange(16, 4096)
+        self.window_size_spectrogram_spinbox.setSingleStep(16)
+        self.window_size_spectrogram_spinbox.setValue(1024)
+        self.window_size_spectrogram_spinbox.setEnabled(False)
+        
+        self.overlap_spectrogram_spinbox = QDoubleSpinBox()
+        self.overlap_spectrogram_spinbox.setRange(0.0, 0.99)
+        self.overlap_spectrogram_spinbox.setSingleStep(0.1)
+        self.overlap_spectrogram_spinbox.setValue(0.5)
+        self.overlap_spectrogram_spinbox.setEnabled(False)
+        
+        self.max_freq_spectrogram_spinbox = QDoubleSpinBox()
+        self.max_freq_spectrogram_spinbox.setRange(100.0, 1_000_000.0)
+        self.max_freq_spectrogram_spinbox.setSingleStep(1000.0)
+        self.max_freq_spectrogram_spinbox.setValue(250_000.0)
+        self.max_freq_spectrogram_spinbox.setSuffix(" Hz")
+        self.max_freq_spectrogram_spinbox.setEnabled(False)
+        
+        # Botão para gerar espectrograma
+        self.generate_spectrogram_button = QPushButton("Gerar Espectrograma")
+        self.generate_spectrogram_button.clicked.connect(self.on_generate_spectrogram_clicked)
+        self.generate_spectrogram_button.setEnabled(False)
+        
         bandpass_layout.addRow(self.bandpass_checkbox)
         bandpass_layout.addRow("Frequência Inferior:", self.low_freq_spinbox)
         bandpass_layout.addRow("Frequência Superior:", self.high_freq_spinbox)
@@ -128,9 +160,17 @@ class AnalysisPanel(QWidget):
         bandpass_layout.addRow(self.apply_filter_button)
         bandpass_group.setLayout(bandpass_layout)
         
+        spectrogram_layout.addRow(self.spectrogram_checkbox)
+        spectrogram_layout.addRow("Tamanho da Janela:", self.window_size_spectrogram_spinbox)
+        spectrogram_layout.addRow("Sobreposição:", self.overlap_spectrogram_spinbox)
+        spectrogram_layout.addRow("Freq. Máxima:", self.max_freq_spectrogram_spinbox)
+        spectrogram_layout.addRow(self.generate_spectrogram_button)
+        spectrogram_group.setLayout(spectrogram_layout)
+        
         # Adicionar grupos ao layout de processamento
         processing_layout.addWidget(moving_avg_group)
         processing_layout.addWidget(bandpass_group)
+        processing_layout.addWidget(spectrogram_group)
         processing_layout.addStretch()
         
         # Conectar sinais
@@ -198,12 +238,21 @@ class AnalysisPanel(QWidget):
         spectrum_layout.addWidget(self.spectrum_toolbar)
         spectrum_layout.addWidget(self.spectrum_canvas)
         
+        # Aba de espectrograma
+        spectrogram_tab = QWidget()
+        spectrogram_layout = QVBoxLayout(spectrogram_tab)
+        self.spectrogram_canvas = MplCanvas(self, width=9, height=5)
+        self.spectrogram_toolbar = NavigationToolbarCustom(self.spectrogram_canvas, self)
+        spectrogram_layout.addWidget(self.spectrogram_toolbar)
+        spectrogram_layout.addWidget(self.spectrogram_canvas)
+        
         # Adicionar as sub-abas ao TabWidget de análise
         self.analysis_tabs.addTab(raw_tab, "Dados Brutos")
         self.analysis_tabs.addTab(ellipse_tab, "Fit da Elipse")
         self.analysis_tabs.addTab(demod_tab, "Sinal Demodulado")
         self.analysis_tabs.addTab(filtered_tab, "Sinal Filtrado")
         self.analysis_tabs.addTab(spectrum_tab, "Espectro")
+        self.analysis_tabs.addTab(spectrogram_tab, "Espectrograma")
         
         layout.addWidget(self.analysis_tabs)
         
@@ -363,6 +412,7 @@ class AnalysisPanel(QWidget):
         self.demod_canvas.clear()
         self.filtered_canvas.clear()
         self.spectrum_canvas.clear()
+        self.spectrogram_canvas.clear()
         
     def show_message(self, text, canvas):
         """
@@ -667,3 +717,89 @@ class AnalysisPanel(QWidget):
             metadata_str += f"{key}: {value}\n"
             
         self.metadata_text.setPlainText(metadata_str) 
+
+    def on_spectrogram_changed(self, state):
+        """
+        Manipula a mudança no estado da caixa de seleção do espectrograma
+        
+        Args:
+            state: Estado da caixa de seleção
+        """
+        is_checked = state == Qt.Checked
+        self.window_size_spectrogram_spinbox.setEnabled(is_checked)
+        self.overlap_spectrogram_spinbox.setEnabled(is_checked)
+        self.max_freq_spectrogram_spinbox.setEnabled(is_checked)
+        self.generate_spectrogram_button.setEnabled(is_checked)
+        
+        if is_checked:
+            window_size = self.window_size_spectrogram_spinbox.value()
+            overlap = self.overlap_spectrogram_spinbox.value()
+            max_freq = self.max_freq_spectrogram_spinbox.value()
+            log_info(f"Espectrograma configurado (janela: {window_size}, sobreposição: {overlap:.2f}, freq_max: {max_freq:.1f}Hz)")
+        else:
+            log_info("Espectrograma desativado")
+    
+    def on_generate_spectrogram_clicked(self):
+        """Solicita a geração do espectrograma"""
+        if not self.spectrogram_checkbox.isChecked():
+            return
+            
+        window_size = self.window_size_spectrogram_spinbox.value()
+        overlap = self.overlap_spectrogram_spinbox.value()
+        max_freq = self.max_freq_spectrogram_spinbox.value()
+        
+        log_info(f"Gerando espectrograma (janela: {window_size}, sobreposição: {overlap:.2f}, freq_max: {max_freq:.1f}Hz)")
+        self.spectrogramRequested.emit(True, window_size, overlap, max_freq)
+        
+    def show_spectrogram(self, t, freqs, Sxx, params=None):
+        """
+        Exibe o espectrograma do sinal
+        
+        Args:
+            t: Vetor de tempo para o eixo x
+            freqs: Vetor de frequências para o eixo y
+            Sxx: Matriz do espectrograma
+            params: Parâmetros usados para gerar o espectrograma
+        """
+        log_debug(f"show_spectrogram: t={len(t)}, freqs={len(freqs)}, Sxx={Sxx.shape}")
+        
+        try:
+            # Preparar título
+            titulo = 'Espectrograma'
+            if params:
+                window_size = params.get('window_size', 0)
+                overlap = params.get('overlap', 0)
+                max_freq = params.get('max_freq', 0)
+                titulo = f'Espectrograma (Janela: {window_size}, Sobreposição: {overlap:.2f}, Freq Max: {max_freq/1000:.1f} kHz)'
+            
+            # Plotar espectrograma
+            self.spectrogram_canvas.axes.clear()
+            pcm = self.spectrogram_canvas.axes.pcolormesh(t, freqs, 10 * np.log10(Sxx), shading='gouraud', cmap='viridis')
+            self.spectrogram_canvas.axes.set_xlabel('Tempo (s)')
+            self.spectrogram_canvas.axes.set_ylabel('Frequência (Hz)')
+            self.spectrogram_canvas.axes.set_title(titulo)
+            
+            # Adicionar barra de cores
+            cbar = self.spectrogram_canvas.fig.colorbar(pcm, ax=self.spectrogram_canvas.axes)
+            cbar.set_label('Potência/Frequência (dB/Hz)')
+            
+            self.spectrogram_canvas.draw()
+            
+            # Mudar para a aba de espectrograma
+            self.analysis_tabs.setCurrentIndex(5)  # Índice da aba de espectrograma
+            
+            log_debug("Espectrograma plotado com sucesso")
+        except Exception as e:
+            log_error(f"Erro ao plotar espectrograma: {str(e)}")
+            
+    def reset_spectrogram(self):
+        """Reseta as configurações do espectrograma"""
+        log_debug("reset_spectrogram: Resetando configurações do espectrograma")
+        self.spectrogram_checkbox.setChecked(False)
+        self.window_size_spectrogram_spinbox.setValue(256)
+        self.overlap_spectrogram_spinbox.setValue(0.5)
+        self.max_freq_spectrogram_spinbox.setValue(100000.0)
+        self.window_size_spectrogram_spinbox.setEnabled(False)
+        self.overlap_spectrogram_spinbox.setEnabled(False)
+        self.max_freq_spectrogram_spinbox.setEnabled(False)
+        self.generate_spectrogram_button.setEnabled(False) 

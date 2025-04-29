@@ -3,6 +3,7 @@ Módulo controlador para processamento de dados
 """
 from PyQt5.QtCore import QObject, pyqtSignal, pyqtSlot
 import numpy as np
+from scipy import signal
 
 from app.models.processing import SignalProcessor
 from app.models.data_store import DataStore
@@ -19,6 +20,7 @@ class ProcessingController(QObject):
     processingProgress = pyqtSignal(str)
     movingAverageApplied = pyqtSignal(dict)  # Novo sinal específico para média móvel
     bandpassFilterApplied = pyqtSignal(dict)  # Novo sinal para filtro passa-banda
+    spectrogramGenerated = pyqtSignal(dict, object, object, object)  # Sinal emitido quando o espectrograma é gerado
     
     def __init__(self, parent=None):
         """
@@ -616,4 +618,115 @@ class ProcessingController(QObject):
             return self.demodulated_data is not None
         except Exception as e:
             log_error(f"Erro na demodulação automática: {str(e)}")
-            return False 
+            return False
+    
+    @pyqtSlot(bool, int, float, float)
+    def generate_spectrogram(self, enabled, window_size, overlap, max_freq):
+        """
+        Gera o espectrograma do sinal
+        
+        Args:
+            enabled: Se o espectrograma está habilitado
+            window_size: Tamanho da janela para o STFT (Short-Time Fourier Transform)
+            overlap: Porcentagem de sobreposição entre janelas consecutivas (0.0 a 0.99)
+            max_freq: Frequência máxima a ser exibida no espectrograma
+            
+        Returns:
+            Um dicionário com os parâmetros e o resultado do espectrograma
+        """
+        log_debug(f"generate_spectrogram: window_size={window_size}, overlap={overlap:.2f}, max_freq={max_freq}")
+        
+        if not enabled:
+            log_info("Espectrograma desabilitado")
+            return
+            
+        # Verificar se temos dados válidos
+        if not self.data or 't' not in self.data:
+            log_warning("generate_spectrogram: Sem dados para gerar espectrograma")
+            self.processingProgress.emit("Sem dados para gerar espectrograma")
+            return
+            
+        # Determinar taxa de amostragem
+        if 'sample_frequency' in self.data and 'decimation' in self.data:
+            fs = self.data['sample_frequency'] / self.data['decimation']
+        elif 'sample_frequency_effective' in self.data:
+            fs = self.data['sample_frequency_effective']
+        elif len(self.data['t']) >= 2:
+            fs = 1 / (self.data['t'][1] - self.data['t'][0])
+        else:
+            fs = 1.953125e6  # valor padrão (125MHz/64)
+            
+        log_debug(f"generate_spectrogram: Taxa de amostragem: {fs} Hz")
+        
+        # Selecionar o sinal a ser usado para o espectrograma
+        if self.use_bandpass_filter and 'filtered_demodulated' in self.data:
+            log_debug("generate_spectrogram: Usando sinal filtrado para o espectrograma")
+            signal_data = self.data['filtered_demodulated']
+        elif 'demodulated' in self.data:
+            log_debug("generate_spectrogram: Usando sinal demodulado para o espectrograma")
+            signal_data = self.data['demodulated']
+        elif 'waveforms' in self.data and self.data['waveforms'].shape[0] > 0:
+            log_debug("generate_spectrogram: Usando primeiro canal de dados brutos para o espectrograma")
+            signal_data = self.data['waveforms'][0]
+        else:
+            log_warning("generate_spectrogram: Não há sinal adequado para gerar o espectrograma")
+            self.processingProgress.emit("Não há sinal adequado para gerar o espectrograma")
+            return
+            
+        try:
+            # Calcular o tamanho do passo (nperseg - noverlap)
+            noverlap = int(window_size * overlap)
+            
+            # Calcular o espectrograma usando STFT
+            log_debug(f"generate_spectrogram: Calculando espectrograma (fs={fs}, nperseg={window_size}, noverlap={noverlap})")
+            self.processingProgress.emit("Calculando espectrograma...")
+            
+            # Limitar a frequência máxima, se especificado
+            if max_freq > 0 and max_freq < fs/2:
+                freqs_limit = int(max_freq * window_size / fs) + 1
+            else:
+                freqs_limit = None
+            
+            # Calcular o espectrograma
+            f, t, Sxx = signal.spectrogram(
+                signal_data, 
+                fs=fs, 
+                window='hann',
+                nperseg=window_size, 
+                noverlap=noverlap, 
+                scaling='density'
+            )
+            
+            # Limitar a frequência máxima para exibição
+            if freqs_limit:
+                f = f[:freqs_limit]
+                Sxx = Sxx[:freqs_limit, :]
+                
+            log_debug(f"generate_spectrogram: Espectrograma calculado com sucesso (shape={Sxx.shape})")
+            
+            # Preparar parâmetros para retorno
+            params = {
+                'window_size': window_size,
+                'overlap': overlap,
+                'max_freq': max_freq,
+                'fs': fs
+            }
+            
+            # Salvar os resultados no objeto de dados
+            self.data['spectrogram_t'] = t
+            self.data['spectrogram_f'] = f
+            self.data['spectrogram_Sxx'] = Sxx
+            self.data['spectrogram_params'] = params
+            
+            # Emitir sinal com os resultados
+            log_info("Espectrograma gerado com sucesso")
+            self.processingProgress.emit("Espectrograma gerado com sucesso")
+            # Emitir sinal com os arrays NumPy diretamente
+            self.spectrogramGenerated.emit(self.data, t, f, Sxx)
+            
+            return self.data
+            
+        except Exception as e:
+            log_error(f"Erro ao gerar espectrograma: {str(e)}")
+            self.processingProgress.emit(f"Erro ao gerar espectrograma: {str(e)}")
+            return None 
