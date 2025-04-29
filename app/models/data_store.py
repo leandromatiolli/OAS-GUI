@@ -27,7 +27,30 @@ class DataStore:
             Nome do arquivo onde os dados foram salvos
         """
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        filename = f"{prefix}_{timestamp}.pkl"
+        
+        # Extrair metadados se disponíveis
+        metadata_str = ""
+        if 'metadata' in data and isinstance(data['metadata'], dict):
+            metadata = data['metadata']
+            # Adicionar informações relevantes ao nome do arquivo
+            if metadata.get('sensor_sn'):
+                metadata_str += f"_SN{metadata['sensor_sn']}"
+            if metadata.get('test_type'):
+                metadata_str += f"_{metadata['test_type']}"
+            if metadata.get('material'):
+                metadata_str += f"_{metadata['material']}"
+            if metadata.get('distance') and float(metadata.get('distance', 0)) > 0:
+                metadata_str += f"_Dist{float(metadata['distance']):.1f}cm"
+            if metadata.get('pressure') and float(metadata.get('pressure', 0)) > 0:
+                metadata_str += f"_Press{float(metadata['pressure']):.1f}bar"
+            if metadata.get('flow') and float(metadata.get('flow', 0)) > 0:
+                metadata_str += f"_Fluxo{float(metadata['flow']):.1f}Lpm"
+        
+        # Criar nome do arquivo com timestamp e metadados
+        filename = f"{prefix}_{timestamp}{metadata_str}.pkl"
+        
+        # Limpar caracteres inválidos no nome do arquivo
+        filename = filename.replace(" ", "_").replace("/", "-").replace(":", "-")
         
         with open(filename, 'wb') as f:
             pickle.dump(data, f)
@@ -63,6 +86,7 @@ class DataStore:
         calibration_data = data.copy()
         
         # Adicionar timestamp à calibração
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         calibration_data['timestamp'] = datetime.now().isoformat()
         calibration_data['is_calibration'] = True
         
@@ -71,7 +95,25 @@ class DataStore:
             raise ValueError("Os dados não contêm os parâmetros da elipse necessários para calibração")
         
         # Determinar nome do arquivo
-        calibration_file = filename if filename else DataStore.DEFAULT_CALIBRATION_FILE
+        if filename is None:
+            # Extrair metadados se disponíveis
+            metadata_str = ""
+            if 'metadata' in calibration_data and isinstance(calibration_data['metadata'], dict):
+                metadata = calibration_data['metadata']
+                # Adicionar informações relevantes ao nome do arquivo
+                if metadata.get('sensor_sn'):
+                    metadata_str += f"_SN{metadata['sensor_sn']}"
+                if metadata.get('material'):
+                    metadata_str += f"_{metadata['material']}"
+                if metadata.get('test_type'):
+                    metadata_str += f"_{metadata['test_type']}"
+            
+            # Criar nome do arquivo com metadados se disponíveis
+            calibration_file = f"calibracao_{timestamp}{metadata_str}.pkl"
+            # Limpar caracteres inválidos no nome do arquivo
+            calibration_file = calibration_file.replace(" ", "_").replace("/", "-").replace(":", "-")
+        else:
+            calibration_file = filename
         
         with open(calibration_file, 'wb') as f:
             pickle.dump(calibration_data, f)
