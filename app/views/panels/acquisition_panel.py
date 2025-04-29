@@ -3,14 +3,16 @@ Módulo com o painel de configurações de aquisição
 """
 from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QFormLayout, QGroupBox,
                            QComboBox, QLineEdit, QDoubleSpinBox, QCheckBox, QPushButton,
-                           QLabel, QMessageBox)
+                           QLabel, QMessageBox, QFileDialog)
 from PyQt5.QtCore import Qt, pyqtSignal
+import os
 
 class AcquisitionPanel(QWidget):
     """Painel de configurações para aquisição de dados"""
     
     # Sinais
     acquisitionRequested = pyqtSignal(dict)  # Emitido quando o usuário solicita aquisição
+    calibrationFileSelected = pyqtSignal(str)  # Emitido quando um arquivo de calibração é selecionado
     
     def __init__(self, parent=None):
         """
@@ -66,18 +68,54 @@ class AcquisitionPanel(QWidget):
         channels_layout.addWidget(self.ch2_check)
         acquisition_form.addRow("Canais:", channels_layout)
         
+        # Grupo de configurações de calibração
+        self.calibration_group = QGroupBox("Configurações de Calibração")
+        calibration_form = QFormLayout()
+        
         # Adicionar checkbox de calibração
-        self.calibration_check = QCheckBox("Calibração?")
+        self.calibration_check = QCheckBox("Modo Calibração")
         self.calibration_check.setToolTip("Marque para adquirir dados de calibração para o fit da elipse")
-        acquisition_form.addRow("Modo:", self.calibration_check)
+        self.calibration_check.stateChanged.connect(self.update_calibration_mode)
+        calibration_form.addRow("Modo:", self.calibration_check)
+        
+        # Campo para nome de arquivo de calibração
+        self.calib_name_layout = QHBoxLayout()
+        self.calib_name_edit = QLineEdit("calibracao_sensor")
+        self.calib_name_edit.setPlaceholderText("Nome do arquivo de calibração")
+        self.calib_name_layout.addWidget(self.calib_name_edit)
+        
+        self.calib_extension_label = QLabel(".pkl")
+        self.calib_name_layout.addWidget(self.calib_extension_label)
+        
+        calibration_form.addRow("Nome do arquivo:", self.calib_name_layout)
+        
+        # Lista suspensa com calibrações disponíveis
+        self.calib_selection_layout = QHBoxLayout()
+        self.calib_combo = QComboBox()
+        self.calib_combo.setToolTip("Selecione um arquivo de calibração para usar")
+        self.calib_combo.currentIndexChanged.connect(self.on_calibration_selected)
+        self.calib_selection_layout.addWidget(self.calib_combo, 1)
+        
+        # Botão para atualizar a lista de calibrações
+        self.refresh_calib_button = QPushButton("↻")
+        self.refresh_calib_button.setToolTip("Atualizar lista de calibrações")
+        self.refresh_calib_button.setMaximumWidth(25)
+        self.refresh_calib_button.clicked.connect(self.on_refresh_calibration_list)
+        self.calib_selection_layout.addWidget(self.refresh_calib_button)
+        
+        calibration_form.addRow("Calibração atual:", self.calib_selection_layout)
         
         # Indicador de calibração
         self.calibration_status = QLabel("Sem arquivo de calibração")
         self.calibration_status.setStyleSheet("color: orange;")
-        acquisition_form.addRow("Status:", self.calibration_status)
+        calibration_form.addRow("Status:", self.calibration_status)
         
+        self.calibration_group.setLayout(calibration_form)
+        
+        # Adicionar grupos ao layout principal
         self.acquisition_group.setLayout(acquisition_form)
         layout.addWidget(self.acquisition_group)
+        layout.addWidget(self.calibration_group)
         
         # Botões de aquisição
         button_layout = QHBoxLayout()
@@ -89,6 +127,9 @@ class AcquisitionPanel(QWidget):
         
         # Adicionar espaço vazio para expansão
         layout.addStretch(1)
+        
+        # Inicializar estado
+        self.update_calibration_mode(self.calibration_check.checkState())
     
     def update_effective_rate(self):
         """Atualiza o rótulo da taxa de amostragem efetiva"""
@@ -118,6 +159,59 @@ class AcquisitionPanel(QWidget):
         else:
             self.effective_rate_label.setStyleSheet("")
     
+    def update_calibration_mode(self, state):
+        """
+        Atualiza a interface com base no modo de calibração
+        
+        Args:
+            state: Estado do checkbox de calibração
+        """
+        is_calibration_mode = (state == Qt.Checked)
+        self.calib_name_edit.setEnabled(is_calibration_mode)
+        self.calib_extension_label.setEnabled(is_calibration_mode)
+        self.calib_combo.setEnabled(not is_calibration_mode)
+        self.refresh_calib_button.setEnabled(not is_calibration_mode)
+    
+    def update_calibration_list(self, calibration_files):
+        """
+        Atualiza a lista de arquivos de calibração disponíveis
+        
+        Args:
+            calibration_files: Lista de arquivos de calibração
+        """
+        self.calib_combo.clear()
+        
+        if not calibration_files:
+            self.calib_combo.addItem("Nenhuma calibração disponível", None)
+            return
+            
+        self.calib_combo.addItem("Selecione uma calibração", None)
+        
+        for calib_file in calibration_files:
+            # Extrair apenas o nome do arquivo sem o caminho
+            filename = os.path.basename(calib_file)
+            self.calib_combo.addItem(filename, calib_file)
+    
+    def on_calibration_selected(self, index):
+        """
+        Manipula a seleção de um arquivo de calibração
+        
+        Args:
+            index: Índice selecionado na lista
+        """
+        if index <= 0:  # Ignorar a primeira opção (Selecione uma calibração)
+            return
+        
+        selected_file = self.calib_combo.currentData()
+        if selected_file:
+            self.calibrationFileSelected.emit(selected_file)
+    
+    def on_refresh_calibration_list(self):
+        """Solicita atualização da lista de calibrações"""
+        # Este sinal será conectado ao sistema para solicitar atualização da lista
+        # Vamos usar o mesmo sinal de seleção com None para indicar refresh
+        self.calibrationFileSelected.emit(None)
+    
     def update_calibration_status(self, has_calibration=False, calibration_file=None):
         """
         Atualiza o indicador de status da calibração
@@ -127,8 +221,15 @@ class AcquisitionPanel(QWidget):
             calibration_file: Nome do arquivo de calibração, se disponível
         """
         if has_calibration:
-            self.calibration_status.setText(f"Calibração disponível: {calibration_file}")
+            filename = os.path.basename(calibration_file) if calibration_file else "calibração"
+            self.calibration_status.setText(f"Calibração disponível: {filename}")
             self.calibration_status.setStyleSheet("color: green;")
+            
+            # Selecionar o arquivo na lista suspensa
+            if calibration_file:
+                index = self.calib_combo.findData(calibration_file)
+                if index > 0:
+                    self.calib_combo.setCurrentIndex(index)
         else:
             self.calibration_status.setText("Sem arquivo de calibração")
             self.calibration_status.setStyleSheet("color: orange;")
@@ -153,9 +254,23 @@ class AcquisitionPanel(QWidget):
             return
         
         # Verificar se ambos os canais estão selecionados para calibração
-        if self.calibration_check.isChecked() and len(channels) < 2:
+        is_calibration = self.calibration_check.isChecked()
+        if is_calibration and len(channels) < 2:
             QMessageBox.warning(self, "Erro", "A calibração requer ambos os canais (1 e 2)")
             return
+        
+        # Se estiver em modo de calibração, verificar nome do arquivo
+        calibration_file = None
+        if is_calibration:
+            calibration_name = self.calib_name_edit.text().strip()
+            if not calibration_name:
+                QMessageBox.warning(self, "Erro", "Forneça um nome para o arquivo de calibração")
+                return
+            calibration_file = f"{calibration_name}.pkl"
+        else:
+            # Se não estiver em modo de calibração, verificar se há calibração selecionada
+            if self.calib_combo.currentIndex() > 0:
+                calibration_file = self.calib_combo.currentData()
         
         # Emitir sinal com os parâmetros de aquisição
         params = {
@@ -164,7 +279,8 @@ class AcquisitionPanel(QWidget):
             'sample_rate': sample_rate,
             'decimation': decimation,
             'channels': channels,
-            'is_calibration': self.calibration_check.isChecked()  # Novo parâmetro
+            'is_calibration': is_calibration,
+            'calibration_file': calibration_file
         }
         
         self.acquisitionRequested.emit(params)
@@ -177,4 +293,5 @@ class AcquisitionPanel(QWidget):
             enabled: Estado de habilitação
         """
         self.acquisition_group.setEnabled(enabled)
+        self.calibration_group.setEnabled(enabled)
         self.acquire_button.setEnabled(enabled) 

@@ -23,6 +23,7 @@ from app.models.hardware.redpitaya_client import RedPitayaClient
 from app.utils.resources import apply_stylesheet
 # Importar módulo de logging
 from app.utils.debug_log import set_gui_log_handler, log_debug, log_info, log_warning, log_error
+from app.models.data_store import DataStore
 
 def exception_hook(exctype, value, tb):
     """
@@ -97,6 +98,7 @@ class Application:
         """Conecta sinais e slots entre os componentes"""
         # Conexões do controlador de aquisição
         self.window.acquisition_panel.acquisitionRequested.connect(self.on_acquisition_requested)
+        self.window.acquisition_panel.calibrationFileSelected.connect(self.file_controller.set_current_calibration)
         self.acquisition_controller.acquisitionStarted.connect(self.on_acquisition_started)
         self.acquisition_controller.acquisitionFinished.connect(self.on_acquisition_finished)
         self.acquisition_controller.calibrationFinished.connect(self.on_calibration_finished)
@@ -110,6 +112,7 @@ class Application:
         self.file_controller.fileLoaded.connect(self.on_file_loaded)
         self.file_controller.fileError.connect(self.on_file_error)
         self.file_controller.calibrationStatusChanged.connect(self.window.acquisition_panel.update_calibration_status)
+        self.file_controller.calibrationListUpdated.connect(self.window.acquisition_panel.update_calibration_list)
         
         # Conexões do controlador de processamento
         self.window.analysis_panel.demodulateRequested.connect(self.processing_controller.demodulate_data)
@@ -139,11 +142,18 @@ class Application:
         # Carregar lista de arquivos
         self.file_controller.refresh_file_list()
         
-        # Verificar e carregar calibração existente
-        calibration_data = self.file_controller.load_calibration_data()
-        if calibration_data:
-            log_info("Arquivo de calibração encontrado e carregado")
-            self.processing_controller.set_calibration_data(calibration_data)
+        # Carregar lista de calibrações disponíveis
+        calibration_files = DataStore.get_available_calibration_files()
+        self.window.acquisition_panel.update_calibration_list(calibration_files)
+        
+        # Se houver calibrações, carregar a primeira disponível
+        if calibration_files:
+            calibration_data = self.file_controller.load_calibration_data(calibration_files[0])
+            if calibration_data:
+                log_info(f"Arquivo de calibração encontrado e carregado: {calibration_files[0]}")
+                self.processing_controller.set_calibration_data(calibration_data)
+            else:
+                log_info("Nenhum arquivo de calibração válido encontrado")
         else:
             log_info("Nenhum arquivo de calibração encontrado")
     
@@ -201,6 +211,11 @@ class Application:
         self.window.acquisition_panel.set_enabled(True)
         self.window.show_status_message("Processando dados de calibração...")
         
+        # Verificar se temos nome de arquivo específico
+        calibration_file = data.get('calibration_file')
+        if calibration_file:
+            log_info(f"Usando arquivo de calibração especificado: {calibration_file}")
+        
         # Processar os dados de calibração
         success = self.processing_controller.process_calibration_data(data)
         
@@ -208,8 +223,8 @@ class Application:
             log_info("Calibração processada com sucesso")
             self.window.show_status_message("Calibração concluída com sucesso")
             
-            # Atualizar status de calibração na interface
-            self.file_controller.check_calibration_status()
+            # Atualizar lista de calibrações e status
+            self.file_controller.refresh_calibration_list()
             
             # Mudar para a aba de análise
             self.window.switch_to_tab(2)

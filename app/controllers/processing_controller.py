@@ -530,6 +530,9 @@ class ProcessingController(QObject):
             log_info("Processando dados de calibração...")
             self.processingProgress.emit("Processando dados de calibração...")
             
+            # Verificar se temos nome de arquivo específico para calibração
+            calibration_file = data.get('calibration_file')
+            
             # Determinar taxa de amostragem
             if 'sample_frequency' in data and 'decimation' in data:
                 fs = data['sample_frequency'] / data['decimation']
@@ -572,8 +575,8 @@ class ProcessingController(QObject):
             }
             
             # Salvar dados de calibração
-            log_info("Salvando arquivo de calibração...")
-            DataStore.save_calibration_data(calibration_data)
+            log_info(f"Salvando arquivo de calibração: {calibration_file or 'padrão'}...")
+            DataStore.save_calibration_data(calibration_data, calibration_file)
             
             # Armazenar dados de calibração para uso futuro
             self.calibration_data = calibration_data

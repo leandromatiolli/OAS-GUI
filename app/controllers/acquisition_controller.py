@@ -2,10 +2,11 @@
 Módulo controlador para aquisição de dados
 """
 from PyQt5.QtCore import QObject, pyqtSignal, pyqtSlot, QThread
+import os
 
 from app.models.hardware.redpitaya_client import RedPitayaClient
 from app.models.data_store import DataStore
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 
 class AcquisitionThread(QThread):
     """Thread para aquisição de dados sem congelar a interface"""
@@ -13,7 +14,7 @@ class AcquisitionThread(QThread):
     progress = pyqtSignal(str)   # Sinal para atualizar o status
     error = pyqtSignal(str)      # Sinal para reportar erros
 
-    def __init__(self, ip, duration, sample_rate, decimation, channels, is_calibration=False, metadata=None):
+    def __init__(self, ip, duration, sample_rate, decimation, channels, is_calibration=False, calibration_file=None, metadata=None):
         """
         Inicializa a thread de aquisição
         
@@ -24,6 +25,7 @@ class AcquisitionThread(QThread):
             decimation: Fator de decimação
             channels: Lista de canais para adquirir (1 ou 2)
             is_calibration: Se é uma aquisição para calibração
+            calibration_file: Nome do arquivo de calibração a ser usado ou salvo
             metadata: Metadados opcionais para incluir nos dados
         """
         super().__init__()
@@ -33,6 +35,7 @@ class AcquisitionThread(QThread):
         self.decimation = decimation
         self.channels = channels
         self.is_calibration = is_calibration
+        self.calibration_file = calibration_file
         self.metadata = metadata or {}
 
     def run(self):
@@ -43,6 +46,8 @@ class AcquisitionThread(QThread):
             # Atualizar metadados com flag de calibração
             updated_metadata = self.metadata.copy()
             updated_metadata['is_calibration'] = self.is_calibration
+            if self.calibration_file:
+                updated_metadata['calibration_file'] = self.calibration_file
             
             # Adquirir dados usando o cliente RedPitaya
             data = RedPitayaClient.acquire_data(
@@ -56,11 +61,13 @@ class AcquisitionThread(QThread):
             
             # Adicionar flag de calibração aos dados
             data['is_calibration'] = self.is_calibration
+            if self.calibration_file:
+                data['calibration_file'] = self.calibration_file
             
-            # Se for calibração, apenas salvar, mas não processar automaticamente
+            # Se for calibração, salvar com o nome específico fornecido
             if self.is_calibration:
-                self.progress.emit("Salvando dados de calibração...")
-                prefix = "calibracao"
+                self.progress.emit(f"Salvando dados de calibração como {self.calibration_file}...")
+                prefix = os.path.splitext(self.calibration_file)[0] if self.calibration_file else "calibracao"
             else:
                 self.progress.emit("Salvando dados...")
                 prefix = "vazamento_continuo"
@@ -116,6 +123,7 @@ class AcquisitionController(QObject):
         
         # Verificar se é uma aquisição para calibração
         is_calibration = params.get('is_calibration', False)
+        calibration_file = params.get('calibration_file')
         
         # Verificar se temos dois canais para calibração
         if is_calibration and len(params['channels']) < 2:
@@ -130,6 +138,7 @@ class AcquisitionController(QObject):
             params['decimation'], 
             params['channels'],
             is_calibration,
+            calibration_file,
             metadata
         )
         

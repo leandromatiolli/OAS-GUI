@@ -12,7 +12,7 @@ class DataStore:
     """Classe para gerenciamento de dados de aquisição e análise"""
     
     # Constantes
-    CALIBRATION_FILE = "calibracao_sistema.pkl"
+    DEFAULT_CALIBRATION_FILE = "calibracao_sistema.pkl"
     
     @staticmethod
     def save_data(data: Dict[str, Any], prefix: str = "vazamento_continuo") -> str:
@@ -48,12 +48,13 @@ class DataStore:
         return DataStore.save_data(data, prefix="vazamento_demodulado")
     
     @staticmethod
-    def save_calibration_data(data: Dict[str, Any]) -> str:
+    def save_calibration_data(data: Dict[str, Any], filename: Optional[str] = None) -> str:
         """
         Salva dados de calibração do sistema
         
         Args:
             data: Dicionário contendo os dados de calibração (parâmetros da elipse)
+            filename: Nome do arquivo para salvar a calibração (opcional)
             
         Returns:
             Nome do arquivo onde os dados foram salvos
@@ -68,25 +69,34 @@ class DataStore:
         # Verificar se os dados de calibração contêm os parâmetros da elipse
         if 'ellipse_params' not in calibration_data:
             raise ValueError("Os dados não contêm os parâmetros da elipse necessários para calibração")
-            
-        with open(DataStore.CALIBRATION_FILE, 'wb') as f:
+        
+        # Determinar nome do arquivo
+        calibration_file = filename if filename else DataStore.DEFAULT_CALIBRATION_FILE
+        
+        with open(calibration_file, 'wb') as f:
             pickle.dump(calibration_data, f)
             
-        return DataStore.CALIBRATION_FILE
+        return calibration_file
     
     @staticmethod
-    def load_calibration_data() -> Optional[Dict[str, Any]]:
+    def load_calibration_data(filename: Optional[str] = None) -> Optional[Dict[str, Any]]:
         """
         Carrega os dados de calibração do sistema, se disponíveis
         
+        Args:
+            filename: Nome do arquivo de calibração para carregar (opcional)
+            
         Returns:
             Dicionário contendo os dados de calibração ou None se não existir
         """
-        if not os.path.exists(DataStore.CALIBRATION_FILE):
+        # Determinar nome do arquivo
+        calibration_file = filename if filename else DataStore.DEFAULT_CALIBRATION_FILE
+        
+        if not os.path.exists(calibration_file):
             return None
             
         try:
-            with open(DataStore.CALIBRATION_FILE, 'rb') as f:
+            with open(calibration_file, 'rb') as f:
                 calibration_data = pickle.load(f)
                 
             # Verificar se é um arquivo de calibração válido
@@ -98,14 +108,39 @@ class DataStore:
             return None
     
     @staticmethod
-    def has_valid_calibration() -> bool:
+    def has_valid_calibration(filename: Optional[str] = None) -> bool:
         """
         Verifica se existe um arquivo de calibração válido
         
+        Args:
+            filename: Nome do arquivo de calibração para verificar (opcional)
+            
         Returns:
             True se existe um arquivo de calibração válido, False caso contrário
         """
-        return DataStore.load_calibration_data() is not None
+        return DataStore.load_calibration_data(filename) is not None
+    
+    @staticmethod
+    def get_available_calibration_files() -> List[str]:
+        """
+        Obtém a lista de arquivos de calibração disponíveis
+        
+        Returns:
+            Lista de caminhos para os arquivos de calibração disponíveis
+        """
+        calibration_files = []
+        
+        # Procurar arquivos de calibração com padrão calibracao_*.pkl
+        calibration_files.extend(glob.glob("calibracao_*.pkl"))
+        
+        # Incluir o arquivo padrão de calibração se existir
+        if os.path.exists(DataStore.DEFAULT_CALIBRATION_FILE):
+            calibration_files.append(DataStore.DEFAULT_CALIBRATION_FILE)
+        
+        # Ordenar por data de modificação (mais recente primeiro)
+        calibration_files.sort(key=os.path.getmtime, reverse=True)
+        
+        return calibration_files
     
     @staticmethod
     def load_data(filename: str) -> Dict[str, Any]:
