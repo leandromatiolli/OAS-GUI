@@ -89,6 +89,13 @@ class MetadataPanel(QWidget):
         self.location_edit = QLineEdit()
         metadata_form.addRow("Localização:", self.location_edit)
 
+        #configuração do setup
+        self.setup_config_edit = QTextEdit()
+        self.setup_config_edit.setPlaceholderText("Digite a configuração do setup aqui...")
+        self.setup_config_edit.setAlignment(Qt.AlignLeft | Qt.AlignTop)
+        self.setup_config_edit.setMinimumHeight(40)
+        metadata_form.addRow("Configuração do Setup:", self.setup_config_edit)
+
         # Foto do setup
         self.setup_photo_button = QPushButton("Carregar Foto do Setup")
         self.setup_photo_button.clicked.connect(self.load_setup_photos)
