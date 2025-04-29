@@ -14,6 +14,7 @@ class FileController(QObject):
     fileListUpdated = pyqtSignal(list)  # Lista de arquivos disponíveis
     fileLoaded = pyqtSignal(dict)  # Dados carregados
     fileError = pyqtSignal(str)  # Erro ao carregar arquivo
+    calibrationStatusChanged = pyqtSignal(bool, str)  # Status da calibração (disponível, nome do arquivo)
     
     def __init__(self, parent=None):
         """
@@ -30,8 +31,21 @@ class FileController(QObject):
         try:
             files = DataStore.get_available_files()
             self.fileListUpdated.emit(files)
+            
+            # Verificar status da calibração
+            self.check_calibration_status()
+            
         except Exception as e:
             self.fileError.emit(f"Erro ao listar arquivos: {str(e)}")
+    
+    def check_calibration_status(self):
+        """Verifica se existe um arquivo de calibração válido e emite o sinal de status"""
+        try:
+            has_calibration = DataStore.has_valid_calibration()
+            calibration_file = DataStore.CALIBRATION_FILE if has_calibration else None
+            self.calibrationStatusChanged.emit(has_calibration, calibration_file)
+        except Exception as e:
+            self.fileError.emit(f"Erro ao verificar calibração: {str(e)}")
             
     @pyqtSlot(str)
     def load_file(self, filename: str):
@@ -51,6 +65,37 @@ class FileController(QObject):
             
         except Exception as e:
             self.fileError.emit(f"Erro ao carregar arquivo: {str(e)}")
+    
+    def load_calibration_data(self) -> Optional[Dict[str, Any]]:
+        """
+        Carrega os dados de calibração se disponíveis
+        
+        Returns:
+            Dicionário com os dados de calibração ou None se não existir
+        """
+        try:
+            return DataStore.load_calibration_data()
+        except Exception as e:
+            self.fileError.emit(f"Erro ao carregar calibração: {str(e)}")
+            return None
+            
+    def save_calibration_data(self, data: Dict[str, Any]) -> bool:
+        """
+        Salva os dados de calibração
+        
+        Args:
+            data: Dados de calibração a serem salvos
+            
+        Returns:
+            True se a operação for bem-sucedida, False caso contrário
+        """
+        try:
+            filename = DataStore.save_calibration_data(data)
+            self.check_calibration_status()  # Atualizar status após salvar
+            return True
+        except Exception as e:
+            self.fileError.emit(f"Erro ao salvar calibração: {str(e)}")
+            return False
             
     def save_demodulated_data(self, data: Dict[str, Any]) -> str:
         """

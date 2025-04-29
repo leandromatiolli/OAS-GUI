@@ -66,6 +66,16 @@ class AcquisitionPanel(QWidget):
         channels_layout.addWidget(self.ch2_check)
         acquisition_form.addRow("Canais:", channels_layout)
         
+        # Adicionar checkbox de calibração
+        self.calibration_check = QCheckBox("Calibração?")
+        self.calibration_check.setToolTip("Marque para adquirir dados de calibração para o fit da elipse")
+        acquisition_form.addRow("Modo:", self.calibration_check)
+        
+        # Indicador de calibração
+        self.calibration_status = QLabel("Sem arquivo de calibração")
+        self.calibration_status.setStyleSheet("color: orange;")
+        acquisition_form.addRow("Status:", self.calibration_status)
+        
         self.acquisition_group.setLayout(acquisition_form)
         layout.addWidget(self.acquisition_group)
         
@@ -108,6 +118,21 @@ class AcquisitionPanel(QWidget):
         else:
             self.effective_rate_label.setStyleSheet("")
     
+    def update_calibration_status(self, has_calibration=False, calibration_file=None):
+        """
+        Atualiza o indicador de status da calibração
+        
+        Args:
+            has_calibration: Se existe calibração válida
+            calibration_file: Nome do arquivo de calibração, se disponível
+        """
+        if has_calibration:
+            self.calibration_status.setText(f"Calibração disponível: {calibration_file}")
+            self.calibration_status.setStyleSheet("color: green;")
+        else:
+            self.calibration_status.setText("Sem arquivo de calibração")
+            self.calibration_status.setStyleSheet("color: orange;")
+    
     def request_acquisition(self):
         """Coleta os parâmetros e emite o sinal de solicitação de aquisição"""
         # Obter parâmetros
@@ -127,13 +152,19 @@ class AcquisitionPanel(QWidget):
             QMessageBox.warning(self, "Erro", "Selecione pelo menos um canal")
             return
         
+        # Verificar se ambos os canais estão selecionados para calibração
+        if self.calibration_check.isChecked() and len(channels) < 2:
+            QMessageBox.warning(self, "Erro", "A calibração requer ambos os canais (1 e 2)")
+            return
+        
         # Emitir sinal com os parâmetros de aquisição
         params = {
             'ip': ip,
             'duration': duration,
             'sample_rate': sample_rate,
             'decimation': decimation,
-            'channels': channels
+            'channels': channels,
+            'is_calibration': self.calibration_check.isChecked()  # Novo parâmetro
         }
         
         self.acquisitionRequested.emit(params)

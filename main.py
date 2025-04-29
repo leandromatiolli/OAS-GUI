@@ -99,6 +99,7 @@ class Application:
         self.window.acquisition_panel.acquisitionRequested.connect(self.on_acquisition_requested)
         self.acquisition_controller.acquisitionStarted.connect(self.on_acquisition_started)
         self.acquisition_controller.acquisitionFinished.connect(self.on_acquisition_finished)
+        self.acquisition_controller.calibrationFinished.connect(self.on_calibration_finished)
         self.acquisition_controller.acquisitionProgress.connect(self.window.show_status_message)
         self.acquisition_controller.acquisitionError.connect(self.on_acquisition_error)
         
@@ -108,6 +109,7 @@ class Application:
         self.file_controller.fileListUpdated.connect(self.window.analysis_panel.update_file_list)
         self.file_controller.fileLoaded.connect(self.on_file_loaded)
         self.file_controller.fileError.connect(self.on_file_error)
+        self.file_controller.calibrationStatusChanged.connect(self.window.acquisition_panel.update_calibration_status)
         
         # Conexões do controlador de processamento
         self.window.analysis_panel.demodulateRequested.connect(self.processing_controller.demodulate_data)
@@ -136,6 +138,14 @@ class Application:
         
         # Carregar lista de arquivos
         self.file_controller.refresh_file_list()
+        
+        # Verificar e carregar calibração existente
+        calibration_data = self.file_controller.load_calibration_data()
+        if calibration_data:
+            log_info("Arquivo de calibração encontrado e carregado")
+            self.processing_controller.set_calibration_data(calibration_data)
+        else:
+            log_info("Nenhum arquivo de calibração encontrado")
     
     def on_acquisition_requested(self, params):
         """
@@ -145,6 +155,25 @@ class Application:
             params: Parâmetros da aquisição
         """
         log_info(f"Solicitação de aquisição recebida: {params}")
+        
+        # Verificar se é uma calibração
+        is_calibration = params.get('is_calibration', False)
+        if is_calibration:
+            log_info("Modo de calibração selecionado")
+            self.window.show_status_message("Iniciando aquisição para calibração...")
+        else:
+            # Verificar se temos uma calibração válida
+            if not self.processing_controller.has_calibration_data():
+                log_warning("Tentativa de aquisição sem calibração prévia")
+                if QMessageBox.question(
+                    self.window, 
+                    "Calibração não encontrada", 
+                    "Não foi encontrada uma calibração válida. Deseja continuar com a aquisição sem calibração?",
+                    QMessageBox.Yes | QMessageBox.No
+                ) == QMessageBox.No:
+                    log_info("Aquisição cancelada pelo usuário devido à falta de calibração")
+                    return
+                log_info("Usuário optou por continuar sem calibração")
         
         # Resetar as configurações de filtro na interface
         self.window.analysis_panel.reset_bandpass_filter()
@@ -160,6 +189,52 @@ class Application:
         log_info("Aquisição iniciada")
         self.window.acquisition_panel.set_enabled(False)
         self.window.show_status_message("Aquisição em andamento...")
+    
+    def on_calibration_finished(self, data):
+        """
+        Manipula o evento de conclusão de calibração
+        
+        Args:
+            data: Dados de calibração adquiridos
+        """
+        log_info("Calibração concluída, processando dados de calibração...")
+        self.window.acquisition_panel.set_enabled(True)
+        self.window.show_status_message("Processando dados de calibração...")
+        
+        # Processar os dados de calibração
+        success = self.processing_controller.process_calibration_data(data)
+        
+        if success:
+            log_info("Calibração processada com sucesso")
+            self.window.show_status_message("Calibração concluída com sucesso")
+            
+            # Atualizar status de calibração na interface
+            self.file_controller.check_calibration_status()
+            
+            # Mudar para a aba de análise
+            self.window.switch_to_tab(2)
+            
+            # Exibir os dados brutos da calibração
+            if 'waveforms' in data and 't' in data:
+                channels = data.get('channels', [1, 2])
+                waveforms = data['waveforms']
+                self.window.analysis_panel.show_raw_data(data['t'], waveforms, channels)
+                
+                # Verificar se temos dois canais para a elipse
+                if waveforms.shape[0] >= 2:
+                    ellipse_params = data.get('ellipse_params')
+                    if not ellipse_params and self.processing_controller.has_calibration_data():
+                        ellipse_params = self.processing_controller.calibration_data['ellipse_params']
+                    
+                    if ellipse_params:
+                        log_info("Exibindo elipse da calibração")
+                        self.window.analysis_panel.show_ellipse(waveforms, ellipse_params)
+        else:
+            log_error("Falha no processamento da calibração")
+            self.window.show_error_message(
+                "Erro de Calibração",
+                "Não foi possível processar os dados de calibração. Verifique o log para mais detalhes."
+            )
     
     def on_acquisition_finished(self, data):
         """

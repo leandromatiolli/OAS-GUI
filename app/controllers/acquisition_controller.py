@@ -13,7 +13,7 @@ class AcquisitionThread(QThread):
     progress = pyqtSignal(str)   # Sinal para atualizar o status
     error = pyqtSignal(str)      # Sinal para reportar erros
 
-    def __init__(self, ip, duration, sample_rate, decimation, channels, metadata=None):
+    def __init__(self, ip, duration, sample_rate, decimation, channels, is_calibration=False, metadata=None):
         """
         Inicializa a thread de aquisição
         
@@ -23,6 +23,7 @@ class AcquisitionThread(QThread):
             sample_rate: Taxa de amostragem em Hz
             decimation: Fator de decimação
             channels: Lista de canais para adquirir (1 ou 2)
+            is_calibration: Se é uma aquisição para calibração
             metadata: Metadados opcionais para incluir nos dados
         """
         super().__init__()
@@ -31,12 +32,17 @@ class AcquisitionThread(QThread):
         self.sample_rate = sample_rate
         self.decimation = decimation
         self.channels = channels
+        self.is_calibration = is_calibration
         self.metadata = metadata or {}
 
     def run(self):
         """Executa a aquisição em thread separada"""
         try:
             self.progress.emit("Iniciando aquisição...")
+            
+            # Atualizar metadados com flag de calibração
+            updated_metadata = self.metadata.copy()
+            updated_metadata['is_calibration'] = self.is_calibration
             
             # Adquirir dados usando o cliente RedPitaya
             data = RedPitayaClient.acquire_data(
@@ -45,13 +51,22 @@ class AcquisitionThread(QThread):
                 sample_rate=self.sample_rate,
                 decimation=self.decimation,
                 channels=self.channels,
-                metadata=self.metadata
+                metadata=updated_metadata
             )
             
-            self.progress.emit("Salvando dados...")
+            # Adicionar flag de calibração aos dados
+            data['is_calibration'] = self.is_calibration
             
+            # Se for calibração, apenas salvar, mas não processar automaticamente
+            if self.is_calibration:
+                self.progress.emit("Salvando dados de calibração...")
+                prefix = "calibracao"
+            else:
+                self.progress.emit("Salvando dados...")
+                prefix = "vazamento_continuo"
+                
             # Salvar dados usando o DataStore
-            filename = DataStore.save_data(data)
+            filename = DataStore.save_data(data, prefix=prefix)
             self.progress.emit(f"Dados salvos em {filename}")
             
             # Emitir sinal de conclusão com os dados
@@ -68,6 +83,7 @@ class AcquisitionController(QObject):
     acquisitionFinished = pyqtSignal(dict)
     acquisitionProgress = pyqtSignal(str)
     acquisitionError = pyqtSignal(str)
+    calibrationFinished = pyqtSignal(dict)  # Sinal específico para calibração concluída
     
     def __init__(self, parent=None):
         """
@@ -97,6 +113,14 @@ class AcquisitionController(QObject):
         if self.acquisition_thread and self.acquisition_thread.isRunning():
             self.acquisitionError.emit("Uma aquisição já está em andamento")
             return
+        
+        # Verificar se é uma aquisição para calibração
+        is_calibration = params.get('is_calibration', False)
+        
+        # Verificar se temos dois canais para calibração
+        if is_calibration and len(params['channels']) < 2:
+            self.acquisitionError.emit("A calibração requer ambos os canais (1 e 2)")
+            return
             
         # Criar e iniciar thread de aquisição
         self.acquisition_thread = AcquisitionThread(
@@ -105,6 +129,7 @@ class AcquisitionController(QObject):
             params['sample_rate'], 
             params['decimation'], 
             params['channels'],
+            is_calibration,
             metadata
         )
         
@@ -145,4 +170,10 @@ class AcquisitionController(QObject):
         Args:
             data: Dados adquiridos
         """
-        self.acquisitionFinished.emit(data) 
+        # Verificar se é uma aquisição de calibração
+        if data.get('is_calibration', False):
+            # Emitir sinal específico para calibração concluída
+            self.calibrationFinished.emit(data)
+        else:
+            # Emitir sinal normal para aquisição concluída
+            self.acquisitionFinished.emit(data) 

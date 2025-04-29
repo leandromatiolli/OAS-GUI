@@ -11,6 +11,9 @@ from typing import Dict, List, Tuple, Optional, Union, Any
 class DataStore:
     """Classe para gerenciamento de dados de aquisição e análise"""
     
+    # Constantes
+    CALIBRATION_FILE = "calibracao_sistema.pkl"
+    
     @staticmethod
     def save_data(data: Dict[str, Any], prefix: str = "vazamento_continuo") -> str:
         """
@@ -43,6 +46,66 @@ class DataStore:
             Nome do arquivo onde os dados foram salvos
         """
         return DataStore.save_data(data, prefix="vazamento_demodulado")
+    
+    @staticmethod
+    def save_calibration_data(data: Dict[str, Any]) -> str:
+        """
+        Salva dados de calibração do sistema
+        
+        Args:
+            data: Dicionário contendo os dados de calibração (parâmetros da elipse)
+            
+        Returns:
+            Nome do arquivo onde os dados foram salvos
+        """
+        # Criar uma cópia do dicionário para não modificar o original
+        calibration_data = data.copy()
+        
+        # Adicionar timestamp à calibração
+        calibration_data['timestamp'] = datetime.now().isoformat()
+        calibration_data['is_calibration'] = True
+        
+        # Verificar se os dados de calibração contêm os parâmetros da elipse
+        if 'ellipse_params' not in calibration_data:
+            raise ValueError("Os dados não contêm os parâmetros da elipse necessários para calibração")
+            
+        with open(DataStore.CALIBRATION_FILE, 'wb') as f:
+            pickle.dump(calibration_data, f)
+            
+        return DataStore.CALIBRATION_FILE
+    
+    @staticmethod
+    def load_calibration_data() -> Optional[Dict[str, Any]]:
+        """
+        Carrega os dados de calibração do sistema, se disponíveis
+        
+        Returns:
+            Dicionário contendo os dados de calibração ou None se não existir
+        """
+        if not os.path.exists(DataStore.CALIBRATION_FILE):
+            return None
+            
+        try:
+            with open(DataStore.CALIBRATION_FILE, 'rb') as f:
+                calibration_data = pickle.load(f)
+                
+            # Verificar se é um arquivo de calibração válido
+            if not calibration_data.get('is_calibration', False) or 'ellipse_params' not in calibration_data:
+                return None
+                
+            return calibration_data
+        except Exception:
+            return None
+    
+    @staticmethod
+    def has_valid_calibration() -> bool:
+        """
+        Verifica se existe um arquivo de calibração válido
+        
+        Returns:
+            True se existe um arquivo de calibração válido, False caso contrário
+        """
+        return DataStore.load_calibration_data() is not None
     
     @staticmethod
     def load_data(filename: str) -> Dict[str, Any]:
