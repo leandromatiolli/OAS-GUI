@@ -2,7 +2,8 @@
 Módulo com o painel de metadados para informações do teste
 """
 from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QFormLayout, QGroupBox,
-                           QComboBox, QLineEdit, QDoubleSpinBox, QLabel)
+                           QComboBox, QLineEdit, QDoubleSpinBox, QLabel, QPushButton,
+                           QFileDialog)
 from PyQt5.QtCore import Qt
 from datetime import datetime
 from typing import Dict, Any
@@ -59,9 +60,6 @@ class MetadataPanel(QWidget):
         ])
         metadata_form.addRow("Material:", self.material_combo)
         
-        # Posição do sensor
-        self.position_edit = QLineEdit()
-        metadata_form.addRow("Posição (cm):", self.position_edit)
         
         # Pressão do teste
         self.pressure_spin = QDoubleSpinBox()
@@ -86,21 +84,47 @@ class MetadataPanel(QWidget):
         self.distance_spin.setSingleStep(10.0)
         self.distance_spin.setSuffix(" cm")
         metadata_form.addRow("Distância:", self.distance_spin)
+
+        # localização do vazamento
+        self.location_edit = QLineEdit()
+        metadata_form.addRow("Localização:", self.location_edit)
+
+        # Foto do setup
+        self.setup_photo_button = QPushButton("Carregar Foto do Setup")
+        self.setup_photo_button.clicked.connect(self.load_setup_photos)
+        metadata_form.addRow("Foto do Setup:", self.setup_photo_button)
         
+        # Lista de fotos carregadas
+        self.setup_photos_label = QLabel("Nenhuma foto carregada")
+        metadata_form.addRow("Fotos:", self.setup_photos_label)
+
         # Comentários
         self.comments_edit = QLineEdit()
         metadata_form.addRow("Comentários:", self.comments_edit)
-        
+        # Aumentar altura da caixa de comentários
+        self.comments_edit.setMinimumHeight(400)
         metadata_group.setLayout(metadata_form)
         layout.addWidget(metadata_group)
         
         # Informações adicionais
-        info_label = QLabel("Estes metadados serão salvos junto com os dados de aquisição e podem ser usados posteriormente para treinar modelos de IA.")
+        info_label = QLabel("Estes metadados serão salvos junto com os dados de aquisição e podem ser usados posteriormente para treinar modelos de IA. Preencha os campos com as informações do teste antes de iniciar a aquisição.")
         info_label.setWordWrap(True)
         layout.addWidget(info_label)
         
         # Adicionar espaço vazio para expansão
         layout.addStretch(1)
+        
+    def load_setup_photos(self):
+        """Abre um diálogo para selecionar fotos do setup"""
+        file_dialog = QFileDialog()
+        file_dialog.setFileMode(QFileDialog.ExistingFiles)
+        file_dialog.setNameFilter("Imagens (*.png *.jpg *.jpeg *.bmp)")
+        
+        if file_dialog.exec_():
+            selected_files = file_dialog.selectedFiles()
+            if selected_files:
+                self.setup_photos = selected_files
+                self.setup_photos_label.setText(f"{len(selected_files)} foto(s) selecionada(s)")
         
     def get_metadata(self) -> Dict[str, Any]:
         """
@@ -109,11 +133,11 @@ class MetadataPanel(QWidget):
         Returns:
             Dicionário com os metadados
         """
-        return {
+        metadata = {
             "sensor_sn": self.sensor_sn_edit.text(),
             "test_type": self.test_type_combo.currentText(),
             "material": self.material_combo.currentText(),
-            "position": self.position_edit.text(),
+            "location": self.location_edit.text(),
             "pressure": self.pressure_spin.value(),
             "flow": self.flow_spin.value(),
             "distance": self.distance_spin.value(),
@@ -121,13 +145,22 @@ class MetadataPanel(QWidget):
             "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         }
         
+        # Adicionar fotos se existirem
+        if hasattr(self, 'setup_photos'):
+            metadata['setup_photos'] = self.setup_photos
+            
+        return metadata
+        
     def clear_fields(self):
         """Limpa todos os campos do formulário"""
         self.sensor_sn_edit.clear()
         self.test_type_combo.setCurrentIndex(0)
         self.material_combo.setCurrentIndex(0)
-        self.position_edit.clear()
+        self.location_edit.clear()
         self.pressure_spin.setValue(0.0)
         self.flow_spin.setValue(0.0)
         self.distance_spin.setValue(0.0)
-        self.comments_edit.clear() 
+        self.comments_edit.clear()
+        if hasattr(self, 'setup_photos'):
+            delattr(self, 'setup_photos')
+        self.setup_photos_label.setText("Nenhuma foto carregada") 

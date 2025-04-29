@@ -42,11 +42,11 @@ class MainWindow(QMainWindow):
         self.tabs = QTabWidget()
         main_layout.addWidget(self.tabs)
         
-        # Aba de Aquisição
-        self.acquisition_panel = AcquisitionPanel()
-        
         # Aba de Metadados
         self.metadata_panel = MetadataPanel()
+        
+        # Aba de Aquisição
+        self.acquisition_panel = AcquisitionPanel()
         
         # Aba de Análise
         self.analysis_panel = AnalysisPanel()
@@ -55,8 +55,8 @@ class MainWindow(QMainWindow):
         self.log_panel = LogPanel()
         
         # Adicionar todas as abas
-        self.tabs.addTab(self.acquisition_panel, "Aquisição")
         self.tabs.addTab(self.metadata_panel, "Metadados")
+        self.tabs.addTab(self.acquisition_panel, "Aquisição")
         self.tabs.addTab(self.analysis_panel, "Análise")
         self.tabs.addTab(self.log_panel, "Logs")
         
