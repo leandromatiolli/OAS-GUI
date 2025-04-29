@@ -101,13 +101,19 @@ class MetadataPanel(QWidget):
         # Comentários
         self.comments_edit = QLineEdit()
         metadata_form.addRow("Comentários:", self.comments_edit)
-        # Aumentar altura da caixa de comentários
+        # Alinhar texto à esquerda superior
+        self.comments_edit.setAlignment(Qt.AlignLeft | Qt.AlignTop)
+        # Aumentar altura da caixa de comentários      
         self.comments_edit.setMinimumHeight(400)
         metadata_group.setLayout(metadata_form)
-        layout.addWidget(metadata_group)
+        layout.addWidget(metadata_group)  
+        
+
+
+
         
         # Informações adicionais
-        info_label = QLabel("Estes metadados serão salvos junto com os dados de aquisição e podem ser usados posteriormente para treinar modelos de IA. Preencha os campos com as informações do teste antes de iniciar a aquisição.")
+        info_label = QLabel("Estes metadados serão salvos junto compermitir os dados de aquisição e podem ser usados posteriormente para treinar modelos de IA. Preencha os campos com as informações do teste antes de iniciar a aquisição.")
         info_label.setWordWrap(True)
         layout.addWidget(info_label)
         
