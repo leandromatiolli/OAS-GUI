@@ -359,6 +359,14 @@ class Application:
         log_info(f"Arquivo carregado com sucesso")
         self.window.show_status_message(f"Arquivo carregado")
         
+        # Exibir metadados do arquivo
+        if 'metadata' in data:
+            log_debug(f"Exibindo metadados do arquivo: {data['metadata']}")
+            self.window.analysis_panel.show_metadata(data['metadata'])
+        else:
+            log_debug("Arquivo não contém metadados")
+            self.window.analysis_panel.show_metadata(None)
+        
         # Atualizar controlador de processamento com os novos dados
         self.processing_controller.set_data(data)
         

@@ -3,7 +3,8 @@ Módulo com o painel de análise e visualização de dados
 """
 from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QTabWidget, QPushButton,
                            QComboBox, QLabel, QFileDialog, QMessageBox, QSplitter,
-                           QCheckBox, QSpinBox, QDoubleSpinBox, QGroupBox, QFormLayout)
+                           QCheckBox, QSpinBox, QDoubleSpinBox, QGroupBox, QFormLayout,
+                           QTextEdit)
 from PyQt5.QtCore import Qt, pyqtSignal
 import numpy as np
 
@@ -55,6 +56,17 @@ class AnalysisPanel(QWidget):
         file_selection.addWidget(self.load_button)
         
         layout.addLayout(file_selection)
+
+        # Área de metadados
+        metadata_group = QGroupBox("Metadados do Arquivo")
+        metadata_layout = QVBoxLayout()
+        self.metadata_text = QTextEdit()
+        self.metadata_text.setReadOnly(True)
+        self.metadata_text.setMaximumHeight(150)
+        self.metadata_text.setStyleSheet("font-family: monospace;")
+        metadata_layout.addWidget(self.metadata_text)
+        metadata_group.setLayout(metadata_layout)
+        layout.addWidget(metadata_group)
 
         # Layout para os controles de processamento
         processing_layout = QHBoxLayout()
@@ -637,3 +649,21 @@ class AnalysisPanel(QWidget):
         
         # Emitir sinal para desabilitar o filtro
         self.bandpassFilterChanged.emit(False, 50.0, 5000.0, 4) 
+
+    def show_metadata(self, metadata):
+        """
+        Exibe os metadados do arquivo
+        
+        Args:
+            metadata: Dicionário com os metadados
+        """
+        if not metadata:
+            self.metadata_text.setPlainText("Sem metadados disponíveis")
+            return
+            
+        # Formatar texto
+        metadata_str = ""
+        for key, value in metadata.items():
+            metadata_str += f"{key}: {value}\n"
+            
+        self.metadata_text.setPlainText(metadata_str) 
