@@ -1,12 +1,16 @@
 {
     "sensor_sn": "01",
     "test_type": "Vazamento de Água",
-    "material": "Aço",
+    "material": "Epoxy",
     "location": "MKFotonica Labs",
     "pressure": 10.0,
-    "flow": 10.0,
+    "flow": 1.0,
     "distance": 250.0,
-    "equipment_type": "Serpentina",
-    "equipment_status": [],
-    "comments": ""
+    "equipment_type": "Válvula",
+    "equipment_status": [
+        "Água Estática",
+        "Sem Vazamento"
+    ],
+    "comments": "teste com voz",
+    "custom_labels": ""
 }

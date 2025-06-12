@@ -116,8 +116,25 @@ class DataStore:
         else:
             status_str = status_abbr.get(str(equipment_status), clean(equipment_status))
         location = clean(metadata.get('location', ''))
+        # Procurar informação de vazamento/não vazamento nos metadados
+        vazamento_info = ''
+        for key in metadata:
+            if 'vazamento' in key.lower():
+                val = str(metadata[key]).lower()
+                if 'nao' in val or 'não' in val:
+                    vazamento_info = '_NaoVazamento'
+                    break
+                elif 'sim' in val or 'com' in val:
+                    vazamento_info = '_ComVazamento'
+                    break
+                elif 'sem' in val:
+                    vazamento_info = '_SemVazamento'
+                    break
+                elif 'vazamento' in val:
+                    vazamento_info = '_Vazamento'
+                    break
         # Montar string de labels abreviados
-        label_str = f"_{field_abbr['sensor_sn']}{sensor_sn}_{field_abbr['test_type']}{test_type}_{field_abbr['material']}{material}_{field_abbr['distance']}{distance}cm_{field_abbr['pressure']}{pressure}b_{field_abbr['flow']}{flow}L_{field_abbr['equipment_type']}{equipment_type}_{field_abbr['equipment_status']}{status_str}_{field_abbr['location']}{location}"
+        label_str = f"_{field_abbr['sensor_sn']}{sensor_sn}_{field_abbr['test_type']}{test_type}_{field_abbr['material']}{material}_{field_abbr['distance']}{distance}cm_{field_abbr['pressure']}{pressure}b_{field_abbr['flow']}{flow}L_{field_abbr['equipment_type']}{equipment_type}_{field_abbr['equipment_status']}{status_str}_{field_abbr['location']}{location}{vazamento_info}"
         filename = f"{prefix}_{timestamp}{label_str}.pkl"
         if 'metadata' not in data:
             data['metadata'] = {}
@@ -171,7 +188,7 @@ class DataStore:
             filepath = os.path.join(directory, filename)
         else:
             filepath = filename
-            
+        
         # Salvar arquivo
         with open(filepath, 'wb') as f:
             pickle.dump(data, f)
