@@ -3,7 +3,7 @@ Módulo com o painel de metadados para informações do teste
 """
 from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QFormLayout, QGroupBox,
                            QComboBox, QLineEdit, QDoubleSpinBox, QLabel, QPushButton,
-                           QFileDialog, QTextEdit)
+                           QFileDialog, QTextEdit, QCheckBox)
 from PyQt5.QtCore import Qt
 from datetime import datetime
 from typing import Dict, Any
@@ -117,6 +117,24 @@ class MetadataPanel(QWidget):
         self.save_dir_button.setText(self.save_directory)  # Mostrar pasta atual
         metadata_form.addRow("Pasta de Destino:", self.save_dir_button)
 
+        # Tipo de Equipamento
+        self.equipment_type_combo = QComboBox()
+        metadata_form.addRow("Tipo de Equipamento:", self.equipment_type_combo)
+        # Grupo de status do equipamento (checkboxes)
+        self.status_options = [
+            "Água Circulante", "Oxigênio Ligado", "Oxigênio Desligado", "Ligado", "Desligado",
+            "Aberta", "Fechada", "Com Vazamento", "Sem Vazamento"
+        ]
+        self.status_checkboxes = []
+        status_layout = QHBoxLayout()
+        for opt in self.status_options:
+            cb = QCheckBox(opt)
+            self.status_checkboxes.append(cb)
+            status_layout.addWidget(cb)
+        status_group = QGroupBox()
+        status_group.setLayout(status_layout)
+        metadata_form.addRow("Status do Equipamento:", status_group)
+
         metadata_group.setLayout(metadata_form)
         layout.addWidget(metadata_group)  
         
@@ -144,6 +162,11 @@ class MetadataPanel(QWidget):
                 if 'materials' in config:
                     self.material_combo.clear()
                     self.material_combo.addItems(config['materials'])
+                    
+                # Novo: opções de equipamento
+                self.equipment_types = config.get('equipment_types', [])
+                self.equipment_type_combo.clear()
+                self.equipment_type_combo.addItems(self.equipment_types)
         except Exception as e:
             print(f"Erro ao carregar opções: {str(e)}")
             
@@ -155,7 +178,8 @@ class MetadataPanel(QWidget):
             
             config = {
                 'test_types': [self.test_type_combo.itemText(i) for i in range(self.test_type_combo.count())],
-                'materials': [self.material_combo.itemText(i) for i in range(self.material_combo.count())]
+                'materials': [self.material_combo.itemText(i) for i in range(self.material_combo.count())],
+                'equipment_types': self.equipment_types
             }
             
             with open(self.config_file, 'w', encoding='utf-8') as f:
@@ -189,6 +213,15 @@ class MetadataPanel(QWidget):
                     self.flow_spin.setValue(state['flow'])
                 if 'distance' in state:
                     self.distance_spin.setValue(state['distance'])
+                if 'equipment_type' in state:
+                    index = self.equipment_type_combo.findText(state['equipment_type'])
+                    if index >= 0:
+                        self.equipment_type_combo.setCurrentIndex(index)
+                if 'equipment_status' in state:
+                    # Novo: restaurar checkboxes
+                    checked_status = state['equipment_status'] if isinstance(state['equipment_status'], list) else []
+                    for cb in self.status_checkboxes:
+                        cb.setChecked(cb.text() in checked_status)
                 if 'comments' in state:
                     self.comments_edit.setPlainText(state['comments'])
         except Exception as e:
@@ -199,7 +232,7 @@ class MetadataPanel(QWidget):
         try:
             # Criar diretório se não existir
             os.makedirs(os.path.dirname(self.last_state_file), exist_ok=True)
-            
+            checked_status = [cb.text() for cb in self.status_checkboxes if cb.isChecked()]
             state = {
                 'sensor_sn': self.sensor_sn_edit.text(),
                 'test_type': self.test_type_combo.currentText(),
@@ -208,6 +241,8 @@ class MetadataPanel(QWidget):
                 'pressure': self.pressure_spin.value(),
                 'flow': self.flow_spin.value(),
                 'distance': self.distance_spin.value(),
+                'equipment_type': self.equipment_type_combo.currentText(),
+                'equipment_status': checked_status,
                 'comments': self.comments_edit.toPlainText()
             }
             
@@ -247,6 +282,7 @@ class MetadataPanel(QWidget):
         Returns:
             Dicionário com os metadados
         """
+        checked_status = [cb.text() for cb in self.status_checkboxes if cb.isChecked()]
         metadata = {
             "sensor_sn": self.sensor_sn_edit.text(),
             "test_type": self.test_type_combo.currentText(),
@@ -255,6 +291,8 @@ class MetadataPanel(QWidget):
             "pressure": self.pressure_spin.value(),
             "flow": self.flow_spin.value(),
             "distance": self.distance_spin.value(),
+            "equipment_type": self.equipment_type_combo.currentText(),
+            "equipment_status": checked_status,
             "comments": self.comments_edit.toPlainText(),
             "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             "save_directory": self.save_directory

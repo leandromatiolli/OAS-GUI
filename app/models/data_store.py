@@ -8,6 +8,7 @@ import pickle
 from datetime import datetime
 from typing import Dict, List, Tuple, Optional, Union, Any
 import json
+import unicodedata
 
 class DataStore:
     """Classe para gerenciamento de dados de aquisição e análise"""
@@ -64,46 +65,65 @@ class DataStore:
         Returns:
             Nome do arquivo onde os dados foram salvos
         """
-        # Se não foi especificado um diretório, tentar carregar das configurações
+        def clean(s):
+            # Remove acentos, espaços e caracteres especiais
+            s = ''.join(c for c in unicodedata.normalize('NFD', str(s)) if unicodedata.category(c) != 'Mn')
+            s = s.replace(' ', '').replace('/', '-').replace(':', '-')
+            return s
+        # Dicionário de abreviações para status
+        status_abbr = {
+            'Água Circulante': 'AgC',
+            'Oxigênio Ligado': 'OxL',
+            'Oxigênio Desligado': 'OxD',
+            'Ligado': 'Lig',
+            'Desligado': 'Des',
+            'Aberta': 'Ab',
+            'Fechada': 'Fe',
+            'Com Vazamento': 'CVaz',
+            'Sem Vazamento': 'SVaz',
+        }
+        # Abreviações para campos principais
+        field_abbr = {
+            'sensor_sn': 'SN',
+            'test_type': 'Tipo',
+            'material': 'Mat',
+            'distance': 'Dist',
+            'pressure': 'Press',
+            'flow': 'Flux',
+            'equipment_type': 'Equip',
+            'equipment_status': 'Status',
+            'location': 'Local',
+        }
         if directory is None:
             directory = DataStore.load_config().get('save_directory')
-            
-        # Se ainda não temos diretório, usar o atual
         if directory is None:
             directory = os.getcwd()
-            
-        # Garantir que o diretório existe
         os.makedirs(directory, exist_ok=True)
-        
-        # Criar nome do arquivo com timestamp e labels
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         metadata = data.get('metadata', {})
-        
-        # Extrair labels principais (sempre incluir, mesmo se zero ou vazio)
-        sensor_sn = metadata.get('sensor_sn', '')
-        test_type = metadata.get('test_type', '')
-        material = metadata.get('material', '')
-        distance = metadata.get('distance', 0)
-        pressure = metadata.get('pressure', 0)
-        flow = metadata.get('flow', 0)
-        
-        # Montar string de labels
-        label_str = f"_SN{sensor_sn}_Tipo{test_type}_Material{material}_Dist{distance}cm_Press{pressure}bar_Fluxo{flow}Lmin"
-        # Limpar caracteres inválidos
-        label_str = label_str.replace(' ', '_').replace('/', '-').replace(':', '-')
-        
+        # Extrair e abreviar campos
+        sensor_sn = clean(metadata.get('sensor_sn', ''))
+        test_type = clean(metadata.get('test_type', ''))
+        material = clean(metadata.get('material', ''))
+        distance = clean(metadata.get('distance', 0))
+        pressure = clean(metadata.get('pressure', 0))
+        flow = clean(metadata.get('flow', 0))
+        equipment_type = clean(metadata.get('equipment_type', ''))
+        equipment_status = metadata.get('equipment_status', [])
+        if isinstance(equipment_status, list):
+            status_str = '_'.join([status_abbr.get(s, clean(s)) for s in equipment_status])
+        else:
+            status_str = status_abbr.get(str(equipment_status), clean(equipment_status))
+        location = clean(metadata.get('location', ''))
+        # Montar string de labels abreviados
+        label_str = f"_{field_abbr['sensor_sn']}{sensor_sn}_{field_abbr['test_type']}{test_type}_{field_abbr['material']}{material}_{field_abbr['distance']}{distance}cm_{field_abbr['pressure']}{pressure}b_{field_abbr['flow']}{flow}L_{field_abbr['equipment_type']}{equipment_type}_{field_abbr['equipment_status']}{status_str}_{field_abbr['location']}{location}"
         filename = f"{prefix}_{timestamp}{label_str}.pkl"
-        
-        # Adicionar metadados ao arquivo
         if 'metadata' not in data:
             data['metadata'] = {}
         data['metadata']['timestamp'] = timestamp
-        
-        # Salvar arquivo
         filepath = os.path.join(directory, filename)
         with open(filepath, 'wb') as f:
             pickle.dump(data, f)
-        
         return filepath
     
     @staticmethod

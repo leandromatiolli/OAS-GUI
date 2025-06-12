@@ -1,10 +1,12 @@
 {
     "sensor_sn": "01",
-    "test_type": "Vazamento de Ar",
+    "test_type": "Vazamento de Água",
     "material": "Aço",
     "location": "MKFotonica Labs",
     "pressure": 10.0,
     "flow": 10.0,
     "distance": 250.0,
+    "equipment_type": "Serpentina",
+    "equipment_status": [],
     "comments": ""
 }
