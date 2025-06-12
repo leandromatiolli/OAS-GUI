@@ -10,6 +10,8 @@ from typing import Dict, Any
 import os
 import json
 
+from app.models.data_store import DataStore
+
 class MetadataPanel(QWidget):
     """Painel para coleta de metadados sobre o teste"""
     
@@ -107,6 +109,14 @@ class MetadataPanel(QWidget):
         self.comments_edit.setAlignment(Qt.AlignLeft | Qt.AlignTop)
         self.comments_edit.setMinimumHeight(400)
         metadata_form.addRow("Comentários:", self.comments_edit)
+
+        # Botão para selecionar pasta de salvamento
+        self.save_dir_button = QPushButton("Selecionar Pasta de Destino")
+        self.save_dir_button.clicked.connect(self.select_save_directory)
+        self.save_directory = DataStore.load_config().get('save_directory', os.getcwd())  # Carregar das configurações
+        self.save_dir_button.setText(self.save_directory)  # Mostrar pasta atual
+        metadata_form.addRow("Pasta de Destino:", self.save_dir_button)
+
         metadata_group.setLayout(metadata_form)
         layout.addWidget(metadata_group)  
         
@@ -218,6 +228,18 @@ class MetadataPanel(QWidget):
                 self.setup_photos = selected_files
                 self.setup_photos_label.setText(f"{len(selected_files)} foto(s) selecionada(s)")
         
+    def select_save_directory(self):
+        """Abre um diálogo para selecionar a pasta de destino dos arquivos"""
+        dir_path = QFileDialog.getExistingDirectory(self, "Selecione a pasta para salvar os dados", self.save_directory)
+        if dir_path:
+            self.save_directory = dir_path
+            self.save_dir_button.setText(dir_path)
+            
+            # Salvar a pasta escolhida nas configurações
+            config = DataStore.load_config()
+            config['save_directory'] = dir_path
+            DataStore.save_config(config)
+        
     def get_metadata(self) -> Dict[str, Any]:
         """
         Coleta os metadados do painel
@@ -234,7 +256,8 @@ class MetadataPanel(QWidget):
             "flow": self.flow_spin.value(),
             "distance": self.distance_spin.value(),
             "comments": self.comments_edit.toPlainText(),
-            "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "save_directory": self.save_directory
         }
         
         # Adicionar fotos se existirem

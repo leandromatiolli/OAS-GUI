@@ -7,55 +7,104 @@ import numpy as np
 import pickle
 from datetime import datetime
 from typing import Dict, List, Tuple, Optional, Union, Any
+import json
 
 class DataStore:
     """Classe para gerenciamento de dados de aquisição e análise"""
     
     # Constantes
     DEFAULT_CALIBRATION_FILE = "calibracao_sistema.pkl"
+    CONFIG_FILE = "config/data_store_config.json"
     
     @staticmethod
-    def save_data(data: Dict[str, Any], prefix: str = "vazamento_continuo") -> str:
+    def save_config(config: Dict[str, Any]) -> None:
+        """
+        Salva as configurações em arquivo
+        
+        Args:
+            config: Dicionário com as configurações
+        """
+        # Criar diretório se não existir
+        os.makedirs(os.path.dirname(DataStore.CONFIG_FILE), exist_ok=True)
+        
+        # Salvar configurações
+        with open(DataStore.CONFIG_FILE, 'w', encoding='utf-8') as f:
+            json.dump(config, f, indent=4, ensure_ascii=False)
+            
+    @staticmethod
+    def load_config() -> Dict[str, Any]:
+        """
+        Carrega as configurações do arquivo
+        
+        Returns:
+            Dicionário com as configurações
+        """
+        # Se o arquivo não existe, retornar configurações padrão
+        if not os.path.exists(DataStore.CONFIG_FILE):
+            return {}
+            
+        # Carregar configurações
+        try:
+            with open(DataStore.CONFIG_FILE, 'r', encoding='utf-8') as f:
+                return json.load(f)
+        except Exception as e:
+            print(f"Erro ao carregar configurações: {str(e)}")
+            return {}
+    
+    @staticmethod
+    def save_data(data: Dict[str, Any], prefix: str = "vazamento_continuo", directory: str = None) -> str:
         """
         Salva dados em arquivo pickle
         
         Args:
             data: Dicionário contendo os dados
             prefix: Prefixo para o nome do arquivo
+            directory: Diretório onde salvar o arquivo
             
         Returns:
             Nome do arquivo onde os dados foram salvos
         """
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        
-        # Extrair metadados se disponíveis
-        metadata_str = ""
-        if 'metadata' in data and isinstance(data['metadata'], dict):
-            metadata = data['metadata']
-            # Adicionar informações relevantes ao nome do arquivo
-            if metadata.get('sensor_sn'):
-                metadata_str += f"_SN{metadata['sensor_sn']}"
-            if metadata.get('test_type'):
-                metadata_str += f"_{metadata['test_type']}"
-            if metadata.get('material'):
-                metadata_str += f"_{metadata['material']}"
-            if metadata.get('distance') and float(metadata.get('distance', 0)) > 0:
-                metadata_str += f"_Dist{float(metadata['distance']):.1f}cm"
-            if metadata.get('pressure') and float(metadata.get('pressure', 0)) > 0:
-                metadata_str += f"_Press{float(metadata['pressure']):.1f}bar"
-            if metadata.get('flow') and float(metadata.get('flow', 0)) > 0:
-                metadata_str += f"_Fluxo{float(metadata['flow']):.1f}Lpm"
-        
-        # Criar nome do arquivo com timestamp e metadados
-        filename = f"{prefix}_{timestamp}{metadata_str}.pkl"
-        
-        # Limpar caracteres inválidos no nome do arquivo
-        filename = filename.replace(" ", "_").replace("/", "-").replace(":", "-")
-        
-        with open(filename, 'wb') as f:
-            pickle.dump(data, f)
+        # Se não foi especificado um diretório, tentar carregar das configurações
+        if directory is None:
+            directory = DataStore.load_config().get('save_directory')
             
-        return filename
+        # Se ainda não temos diretório, usar o atual
+        if directory is None:
+            directory = os.getcwd()
+            
+        # Garantir que o diretório existe
+        os.makedirs(directory, exist_ok=True)
+        
+        # Criar nome do arquivo com timestamp e labels
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        metadata = data.get('metadata', {})
+        
+        # Extrair labels principais (sempre incluir, mesmo se zero ou vazio)
+        sensor_sn = metadata.get('sensor_sn', '')
+        test_type = metadata.get('test_type', '')
+        material = metadata.get('material', '')
+        distance = metadata.get('distance', 0)
+        pressure = metadata.get('pressure', 0)
+        flow = metadata.get('flow', 0)
+        
+        # Montar string de labels
+        label_str = f"_SN{sensor_sn}_Tipo{test_type}_Material{material}_Dist{distance}cm_Press{pressure}bar_Fluxo{flow}Lmin"
+        # Limpar caracteres inválidos
+        label_str = label_str.replace(' ', '_').replace('/', '-').replace(':', '-')
+        
+        filename = f"{prefix}_{timestamp}{label_str}.pkl"
+        
+        # Adicionar metadados ao arquivo
+        if 'metadata' not in data:
+            data['metadata'] = {}
+        data['metadata']['timestamp'] = timestamp
+        
+        # Salvar arquivo
+        filepath = os.path.join(directory, filename)
+        with open(filepath, 'wb') as f:
+            pickle.dump(data, f)
+        
+        return filepath
     
     @staticmethod
     def save_demodulated_data(data: Dict[str, Any]) -> str:
@@ -68,57 +117,41 @@ class DataStore:
         Returns:
             Nome do arquivo onde os dados foram salvos
         """
-        return DataStore.save_data(data, prefix="vazamento_demodulado")
+        # Obter diretório das configurações
+        directory = DataStore.load_config().get('save_directory')
+        return DataStore.save_data(data, prefix="vazamento_demodulado", directory=directory)
     
     @staticmethod
     def save_calibration_data(data: Dict[str, Any], filename: Optional[str] = None) -> str:
         """
-        Salva dados de calibração do sistema
+        Salva dados de calibração em arquivo pickle
         
         Args:
-            data: Dicionário contendo os dados de calibração (parâmetros da elipse)
-            filename: Nome do arquivo para salvar a calibração (opcional)
+            data: Dicionário contendo os dados de calibração
+            filename: Nome do arquivo de calibração ou None para usar o padrão
             
         Returns:
             Nome do arquivo onde os dados foram salvos
         """
-        # Criar uma cópia do dicionário para não modificar o original
-        calibration_data = data.copy()
-        
-        # Adicionar timestamp à calibração
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        calibration_data['timestamp'] = datetime.now().isoformat()
-        calibration_data['is_calibration'] = True
-        
-        # Verificar se os dados de calibração contêm os parâmetros da elipse
-        if 'ellipse_params' not in calibration_data:
-            raise ValueError("Os dados não contêm os parâmetros da elipse necessários para calibração")
-        
-        # Determinar nome do arquivo
+        # Se não foi especificado um nome de arquivo, usar o padrão
         if filename is None:
-            # Extrair metadados se disponíveis
-            metadata_str = ""
-            if 'metadata' in calibration_data and isinstance(calibration_data['metadata'], dict):
-                metadata = calibration_data['metadata']
-                # Adicionar informações relevantes ao nome do arquivo
-                if metadata.get('sensor_sn'):
-                    metadata_str += f"_SN{metadata['sensor_sn']}"
-                if metadata.get('material'):
-                    metadata_str += f"_{metadata['material']}"
-                if metadata.get('test_type'):
-                    metadata_str += f"_{metadata['test_type']}"
+            filename = DataStore.DEFAULT_CALIBRATION_FILE
             
-            # Criar nome do arquivo com metadados se disponíveis
-            calibration_file = f"calibracao_{timestamp}{metadata_str}.pkl"
-            # Limpar caracteres inválidos no nome do arquivo
-            calibration_file = calibration_file.replace(" ", "_").replace("/", "-").replace(":", "-")
-        else:
-            calibration_file = filename
+        # Obter diretório das configurações
+        directory = DataStore.load_config().get('save_directory')
         
-        with open(calibration_file, 'wb') as f:
-            pickle.dump(calibration_data, f)
+        # Garantir que o diretório existe
+        if directory:
+            os.makedirs(directory, exist_ok=True)
+            filepath = os.path.join(directory, filename)
+        else:
+            filepath = filename
             
-        return calibration_file
+        # Salvar arquivo
+        with open(filepath, 'wb') as f:
+            pickle.dump(data, f)
+            
+        return filepath
     
     @staticmethod
     def load_calibration_data(filename: Optional[str] = None) -> Optional[Dict[str, Any]]:

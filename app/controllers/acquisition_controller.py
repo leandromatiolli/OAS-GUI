@@ -73,7 +73,10 @@ class AcquisitionThread(QThread):
                 prefix = "vazamento_continuo"
                 
             # Salvar dados usando o DataStore
-            filename = DataStore.save_data(data, prefix=prefix)
+            save_directory = None
+            if 'metadata' in data and isinstance(data['metadata'], dict):
+                save_directory = data['metadata'].get('save_directory')
+            filename = DataStore.save_data(data, prefix=prefix, directory=save_directory)
             self.progress.emit(f"Dados salvos em {filename}")
             
             # Emitir sinal de conclusão com os dados

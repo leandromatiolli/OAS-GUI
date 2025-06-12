@@ -2,9 +2,9 @@
     "sensor_sn": "01",
     "test_type": "Controle (Sem Vazamento)",
     "material": "Aço",
-    "location": "",
-    "pressure": 0.0,
-    "flow": 0.0,
+    "location": "MKFotonica Labs",
+    "pressure": 10.0,
+    "flow": 10.0,
     "distance": 0.0,
     "comments": ""
 }
