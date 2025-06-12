@@ -73,12 +73,13 @@ class DataStore:
         # Dicionário de abreviações para status
         status_abbr = {
             'Água Circulante': 'AgC',
+            'Água Estática': 'AgE',
             'Oxigênio Ligado': 'OxL',
             'Oxigênio Desligado': 'OxD',
             'Ligado': 'Lig',
             'Desligado': 'Des',
-            'Aberta': 'Ab',
-            'Fechada': 'Fe',
+            'Válvula Aberta': 'VAb',
+            'Válvula Fechada': 'VFe',
             'Com Vazamento': 'CVaz',
             'Sem Vazamento': 'SVaz',
         }
@@ -124,6 +125,10 @@ class DataStore:
         filepath = os.path.join(directory, filename)
         with open(filepath, 'wb') as f:
             pickle.dump(data, f)
+        # Salvar metadados em JSON
+        metadata_filename = os.path.splitext(filepath)[0] + '.json'
+        with open(metadata_filename, 'w', encoding='utf-8') as fjson:
+            json.dump(data['metadata'], fjson, indent=4, ensure_ascii=False)
         return filepath
     
     @staticmethod
