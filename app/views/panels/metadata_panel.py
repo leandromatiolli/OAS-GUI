@@ -110,6 +110,22 @@ class MetadataPanel(QWidget):
         self.comments_edit.setMinimumHeight(400)
         metadata_form.addRow("Comentários:", self.comments_edit)
 
+        # Labels Personalizados
+        self.custom_labels_edit = QTextEdit()
+        self.custom_labels_edit.setAcceptRichText(False)
+        self.custom_labels_edit.setPlaceholderText('Exemplo:\n{"nome": "Temperatura", "valor": 25.3, "unidade": "C"}\n{"nome": "RPM", "valor": 1500, "unidade": "rpm"}')
+        self.custom_labels_edit.setMinimumHeight(100)
+        metadata_form.addRow("Labels Personalizados:", self.custom_labels_edit)
+        # Texto explicativo
+        self.custom_labels_help = QLabel(
+            'Para criar novos labels, escreva um por linha no formato:\n'
+            '{"nome": "Temperatura", "valor": 25.3, "unidade": "C"}\n'
+            '{"nome": "RPM", "valor": 1500, "unidade": "rpm"}\n'
+            'Você pode adicionar quantos quiser. Eles serão salvos nos metadados e carregados na próxima vez.'
+        )
+        self.custom_labels_help.setWordWrap(True)
+        metadata_form.addRow("", self.custom_labels_help)
+
         # Botão para selecionar pasta de salvamento
         self.save_dir_button = QPushButton("Selecionar Pasta de Destino")
         self.save_dir_button.clicked.connect(self.select_save_directory)
@@ -224,6 +240,8 @@ class MetadataPanel(QWidget):
                         cb.setChecked(cb.text() in checked_status)
                 if 'comments' in state:
                     self.comments_edit.setPlainText(state['comments'])
+                if 'custom_labels' in state:
+                    self.custom_labels_edit.setPlainText(state['custom_labels'])
         except Exception as e:
             print(f"Erro ao carregar último estado: {str(e)}")
             
@@ -243,7 +261,8 @@ class MetadataPanel(QWidget):
                 'distance': self.distance_spin.value(),
                 'equipment_type': self.equipment_type_combo.currentText(),
                 'equipment_status': checked_status,
-                'comments': self.comments_edit.toPlainText()
+                'comments': self.comments_edit.toPlainText(),
+                'custom_labels': self.custom_labels_edit.toPlainText()
             }
             
             with open(self.last_state_file, 'w', encoding='utf-8') as f:
@@ -283,28 +302,49 @@ class MetadataPanel(QWidget):
             Dicionário com os metadados
         """
         checked_status = [cb.text() for cb in self.status_checkboxes if cb.isChecked()]
+        # Parse custom labels
+        custom_labels_raw = self.custom_labels_edit.toPlainText().strip()
+        custom_labels = []
+        if custom_labels_raw:
+            for line in custom_labels_raw.splitlines():
+                line = line.strip()
+                if line:
+                    try:
+                        label = json.loads(line)
+                        custom_labels.append(label)
+                    except Exception:
+                        pass  # Ignora linhas inválidas
         metadata = {
             "sensor_sn": self.sensor_sn_edit.text(),
             "test_type": self.test_type_combo.currentText(),
             "material": self.material_combo.currentText(),
             "location": self.location_edit.text(),
             "pressure": self.pressure_spin.value(),
+            "pressure_unit": "bar",
             "flow": self.flow_spin.value(),
+            "flow_unit": "L/min",
             "distance": self.distance_spin.value(),
+            "distance_unit": "cm",
             "equipment_type": self.equipment_type_combo.currentText(),
             "equipment_status": checked_status,
             "comments": self.comments_edit.toPlainText(),
             "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             "save_directory": self.save_directory
         }
-        
+        # Adicionar labels personalizados no mesmo nível
+        for label in custom_labels:
+            if isinstance(label, dict) and 'nome' in label:
+                nome = label['nome']
+                valor = label.get('valor', None)
+                unidade = label.get('unidade', None)
+                metadata[nome] = valor
+                if unidade is not None:
+                    metadata[f"{nome}_unit"] = unidade
         # Adicionar fotos se existirem
         if hasattr(self, 'setup_photos'):
             metadata['setup_photos'] = self.setup_photos
-            
         # Salvar último estado
         self.save_last_state()
-            
         return metadata
         
     def clear_fields(self):
