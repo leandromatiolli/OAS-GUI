@@ -81,18 +81,13 @@ class AnalysisPanel(QWidget):
         self.window_size_spinbox = QSpinBox()
         self.window_size_spinbox.setRange(2, 101)
         self.window_size_spinbox.setSingleStep(1)
-        self.window_size_spinbox.setValue(4)
+        self.window_size_spinbox.setValue(10)
         self.window_size_spinbox.setEnabled(False)
         
-        # Botão para aplicar manualmente a média móvel
-        self.apply_moving_avg_button = QPushButton("Aplicar Média Móvel")
-        self.apply_moving_avg_button.clicked.connect(self.on_apply_moving_avg_clicked)
-        self.apply_moving_avg_button.setEnabled(False)
-        
         moving_avg_layout.addRow(self.moving_avg_checkbox)
-        moving_avg_layout.addRow("Tamanho da Janela:", self.window_size_spinbox)
-        moving_avg_layout.addRow(self.apply_moving_avg_button)
+        moving_avg_layout.addRow("Janela:", self.window_size_spinbox)
         moving_avg_group.setLayout(moving_avg_layout)
+        processing_layout.addWidget(moving_avg_group)
         
         # Grupo para filtro passa-banda
         bandpass_group = QGroupBox("Filtro Passa-Banda")
@@ -100,16 +95,14 @@ class AnalysisPanel(QWidget):
         
         self.bandpass_checkbox = QCheckBox("Ativar")
         self.low_freq_spinbox = QDoubleSpinBox()
-        self.low_freq_spinbox.setRange(0.1, 250_000.0)
-        self.low_freq_spinbox.setSingleStep(10.0)
-        self.low_freq_spinbox.setValue(20_000.0)
+        self.low_freq_spinbox.setRange(0.1, 100000.0)
+        self.low_freq_spinbox.setValue(50.0)
         self.low_freq_spinbox.setSuffix(" Hz")
         self.low_freq_spinbox.setEnabled(False)
         
         self.high_freq_spinbox = QDoubleSpinBox()
-        self.high_freq_spinbox.setRange(0.1, 1_000_000.0)
-        self.high_freq_spinbox.setSingleStep(100.0)
-        self.high_freq_spinbox.setValue(250_000.0)
+        self.high_freq_spinbox.setRange(0.1, 100000.0)
+        self.high_freq_spinbox.setValue(5000.0)
         self.high_freq_spinbox.setSuffix(" Hz")
         self.high_freq_spinbox.setEnabled(False)
         
@@ -118,74 +111,20 @@ class AnalysisPanel(QWidget):
         self.order_spinbox.setValue(4)
         self.order_spinbox.setEnabled(False)
         
-        # Botão para aplicar manualmente o filtro
-        self.apply_filter_button = QPushButton("Aplicar Filtro")
-        self.apply_filter_button.clicked.connect(self.on_apply_filter_clicked)
+        self.apply_filter_button = QPushButton("Aplicar")
         self.apply_filter_button.setEnabled(False)
         
-        # Grupo para espectrograma
-        spectrogram_group = QGroupBox("Espectrograma")
-        spectrogram_layout = QFormLayout()
-        
-        self.spectrogram_checkbox = QCheckBox("Ativar")
-        self.spectrogram_checkbox.stateChanged.connect(self.on_spectrogram_changed)
-        
-        self.window_size_spectrogram_spinbox = QSpinBox()
-        self.window_size_spectrogram_spinbox.setRange(16, 4096)
-        self.window_size_spectrogram_spinbox.setSingleStep(16)
-        self.window_size_spectrogram_spinbox.setValue(1024)
-        self.window_size_spectrogram_spinbox.setEnabled(False)
-        
-        self.overlap_spectrogram_spinbox = QDoubleSpinBox()
-        self.overlap_spectrogram_spinbox.setRange(0.0, 0.99)
-        self.overlap_spectrogram_spinbox.setSingleStep(0.1)
-        self.overlap_spectrogram_spinbox.setValue(0.5)
-        self.overlap_spectrogram_spinbox.setEnabled(False)
-        
-        self.max_freq_spectrogram_spinbox = QDoubleSpinBox()
-        self.max_freq_spectrogram_spinbox.setRange(100.0, 1_000_000.0)
-        self.max_freq_spectrogram_spinbox.setSingleStep(1000.0)
-        self.max_freq_spectrogram_spinbox.setValue(250_000.0)
-        self.max_freq_spectrogram_spinbox.setSuffix(" Hz")
-        self.max_freq_spectrogram_spinbox.setEnabled(False)
-        
-        # Botão para gerar espectrograma
-        self.generate_spectrogram_button = QPushButton("Gerar Espectrograma")
-        self.generate_spectrogram_button.clicked.connect(self.on_generate_spectrogram_clicked)
-        self.generate_spectrogram_button.setEnabled(False)
-        
         bandpass_layout.addRow(self.bandpass_checkbox)
-        bandpass_layout.addRow("Frequência Inferior:", self.low_freq_spinbox)
-        bandpass_layout.addRow("Frequência Superior:", self.high_freq_spinbox)
-        bandpass_layout.addRow("Ordem do Filtro:", self.order_spinbox)
+        bandpass_layout.addRow("Freq. Mínima:", self.low_freq_spinbox)
+        bandpass_layout.addRow("Freq. Máxima:", self.high_freq_spinbox)
+        bandpass_layout.addRow("Ordem:", self.order_spinbox)
         bandpass_layout.addRow(self.apply_filter_button)
         bandpass_group.setLayout(bandpass_layout)
-        
-        spectrogram_layout.addRow(self.spectrogram_checkbox)
-        spectrogram_layout.addRow("Tamanho da Janela:", self.window_size_spectrogram_spinbox)
-        spectrogram_layout.addRow("Sobreposição:", self.overlap_spectrogram_spinbox)
-        spectrogram_layout.addRow("Freq. Máxima:", self.max_freq_spectrogram_spinbox)
-        spectrogram_layout.addRow(self.generate_spectrogram_button)
-        spectrogram_group.setLayout(spectrogram_layout)
-        
-        # Adicionar grupos ao layout de processamento
-        processing_layout.addWidget(moving_avg_group)
         processing_layout.addWidget(bandpass_group)
-        processing_layout.addWidget(spectrogram_group)
-        processing_layout.addStretch()
-        
-        # Conectar sinais
-        self.moving_avg_checkbox.stateChanged.connect(self.on_moving_average_changed)
-        self.window_size_spinbox.valueChanged.connect(self.on_window_size_changed)
-        
-        self.bandpass_checkbox.stateChanged.connect(self.on_bandpass_filter_changed)
-        self.low_freq_spinbox.valueChanged.connect(self.on_bandpass_params_changed)
-        self.high_freq_spinbox.valueChanged.connect(self.on_bandpass_params_changed)
-        self.order_spinbox.valueChanged.connect(self.on_bandpass_params_changed)
         
         layout.addLayout(processing_layout)
         
-        # TabWidget para diferentes visualizações
+        # SubAbas para diferentes visualizações
         self.analysis_tabs = QTabWidget()
         
         # Aba de dados brutos
@@ -195,68 +134,114 @@ class AnalysisPanel(QWidget):
         self.raw_toolbar = NavigationToolbarCustom(self.raw_canvas, self)
         raw_layout.addWidget(self.raw_toolbar)
         raw_layout.addWidget(self.raw_canvas)
+        self.analysis_tabs.addTab(raw_tab, "Dados Brutos")
         
-        # Aba de fit de elipse
+        # Aba de elipse
         ellipse_tab = QWidget()
         ellipse_layout = QVBoxLayout(ellipse_tab)
         self.ellipse_canvas = MplCanvas(self, width=9, height=5)
         self.ellipse_toolbar = NavigationToolbarCustom(self.ellipse_canvas, self)
-        self.demodulate_button = QPushButton("Demodular Sinal")
-        self.demodulate_button.clicked.connect(self.on_demodulate_clicked)
-        
         ellipse_layout.addWidget(self.ellipse_toolbar)
         ellipse_layout.addWidget(self.ellipse_canvas)
-        ellipse_layout.addWidget(self.demodulate_button)
+        self.analysis_tabs.addTab(ellipse_tab, "Elipse")
         
         # Aba de sinal demodulado
-        demod_tab = QWidget()
-        demod_layout = QVBoxLayout(demod_tab)
-        self.demod_canvas = MplCanvas(self, width=9, height=5)
-        self.demod_toolbar = NavigationToolbarCustom(self.demod_canvas, self)
-        demod_layout.addWidget(self.demod_toolbar)
-        demod_layout.addWidget(self.demod_canvas)
+        demodulated_tab = QWidget()
+        demodulated_layout = QVBoxLayout(demodulated_tab)
+        self.demodulated_canvas = MplCanvas(self, width=9, height=5)
+        self.demodulated_toolbar = NavigationToolbarCustom(self.demodulated_canvas, self)
+        demodulated_layout.addWidget(self.demodulated_toolbar)
+        demodulated_layout.addWidget(self.demodulated_canvas)
+        self.analysis_tabs.addTab(demodulated_tab, "Sinal Demodulado")
         
         # Aba de sinal filtrado
         filtered_tab = QWidget()
         filtered_layout = QVBoxLayout(filtered_tab)
         self.filtered_canvas = MplCanvas(self, width=9, height=5)
         self.filtered_toolbar = NavigationToolbarCustom(self.filtered_canvas, self)
-        
-        # Adicionar botão para salvar o sinal filtrado
-        self.save_filtered_button = QPushButton("Salvar Sinal Filtrado")
-        self.save_filtered_button.setEnabled(False)
-        self.save_filtered_button.clicked.connect(self.on_save_filtered_clicked)
-        
         filtered_layout.addWidget(self.filtered_toolbar)
         filtered_layout.addWidget(self.filtered_canvas)
-        filtered_layout.addWidget(self.save_filtered_button)
+        self.analysis_tabs.addTab(filtered_tab, "Sinal Filtrado")
         
-        # Aba de espectro
+        # Aba de espectro (log)
         spectrum_tab = QWidget()
         spectrum_layout = QVBoxLayout(spectrum_tab)
         self.spectrum_canvas = MplCanvas(self, width=9, height=5)
         self.spectrum_toolbar = NavigationToolbarCustom(self.spectrum_canvas, self)
         spectrum_layout.addWidget(self.spectrum_toolbar)
         spectrum_layout.addWidget(self.spectrum_canvas)
+        self.analysis_tabs.addTab(spectrum_tab, "Espectro (Log)")
+        
+        # Nova aba de espectro (linear)
+        spectrum_linear_tab = QWidget()
+        spectrum_linear_layout = QVBoxLayout(spectrum_linear_tab)
+        self.spectrum_linear_canvas = MplCanvas(self, width=9, height=5)
+        self.spectrum_linear_toolbar = NavigationToolbarCustom(self.spectrum_linear_canvas, self)
+        spectrum_linear_layout.addWidget(self.spectrum_linear_toolbar)
+        spectrum_linear_layout.addWidget(self.spectrum_linear_canvas)
+        self.analysis_tabs.addTab(spectrum_linear_tab, "Espectro (Linear)")
         
         # Aba de espectrograma
         spectrogram_tab = QWidget()
         spectrogram_layout = QVBoxLayout(spectrogram_tab)
+        
+        # Controles do espectrograma
+        spectrogram_controls = QHBoxLayout()
+        
+        self.spectrogram_checkbox = QCheckBox("Ativar")
+        self.spectrogram_checkbox.stateChanged.connect(self.on_spectrogram_changed)
+        
+        self.window_size_spectrogram_spinbox = QSpinBox()
+        self.window_size_spectrogram_spinbox.setRange(16, 4096)
+        self.window_size_spectrogram_spinbox.setValue(256)
+        self.window_size_spectrogram_spinbox.setSingleStep(16)
+        self.window_size_spectrogram_spinbox.setEnabled(False)
+        
+        self.overlap_spectrogram_spinbox = QDoubleSpinBox()
+        self.overlap_spectrogram_spinbox.setRange(0.0, 0.99)
+        self.overlap_spectrogram_spinbox.setValue(0.5)
+        self.overlap_spectrogram_spinbox.setSingleStep(0.01)
+        self.overlap_spectrogram_spinbox.setEnabled(False)
+        
+        self.max_freq_spectrogram_spinbox = QDoubleSpinBox()
+        self.max_freq_spectrogram_spinbox.setRange(100.0, 1000000.0)
+        self.max_freq_spectrogram_spinbox.setValue(100000.0)
+        self.max_freq_spectrogram_spinbox.setSuffix(" Hz")
+        self.max_freq_spectrogram_spinbox.setEnabled(False)
+        
+        self.generate_spectrogram_button = QPushButton("Gerar")
+        self.generate_spectrogram_button.setEnabled(False)
+        self.generate_spectrogram_button.clicked.connect(self.on_generate_spectrogram_clicked)
+        
+        spectrogram_controls.addWidget(self.spectrogram_checkbox)
+        spectrogram_controls.addWidget(QLabel("Janela:"))
+        spectrogram_controls.addWidget(self.window_size_spectrogram_spinbox)
+        spectrogram_controls.addWidget(QLabel("Sobreposição:"))
+        spectrogram_controls.addWidget(self.overlap_spectrogram_spinbox)
+        spectrogram_controls.addWidget(QLabel("Freq. Máx:"))
+        spectrogram_controls.addWidget(self.max_freq_spectrogram_spinbox)
+        spectrogram_controls.addWidget(self.generate_spectrogram_button)
+        
+        spectrogram_layout.addLayout(spectrogram_controls)
+        
         self.spectrogram_canvas = MplCanvas(self, width=9, height=5)
         self.spectrogram_toolbar = NavigationToolbarCustom(self.spectrogram_canvas, self)
         spectrogram_layout.addWidget(self.spectrogram_toolbar)
         spectrogram_layout.addWidget(self.spectrogram_canvas)
         
-        # Adicionar as sub-abas ao TabWidget de análise
-        self.analysis_tabs.addTab(raw_tab, "Dados Brutos")
-        self.analysis_tabs.addTab(ellipse_tab, "Fit da Elipse")
-        self.analysis_tabs.addTab(demod_tab, "Sinal Demodulado")
-        self.analysis_tabs.addTab(filtered_tab, "Sinal Filtrado")
-        self.analysis_tabs.addTab(spectrum_tab, "Espectro")
         self.analysis_tabs.addTab(spectrogram_tab, "Espectrograma")
         
         layout.addWidget(self.analysis_tabs)
         
+        # Conectar sinais
+        self.moving_avg_checkbox.stateChanged.connect(self.on_moving_average_changed)
+        self.window_size_spinbox.valueChanged.connect(self.on_window_size_changed)
+        self.bandpass_checkbox.stateChanged.connect(self.on_bandpass_filter_changed)
+        self.low_freq_spinbox.valueChanged.connect(self.on_bandpass_params_changed)
+        self.high_freq_spinbox.valueChanged.connect(self.on_bandpass_params_changed)
+        self.order_spinbox.valueChanged.connect(self.on_bandpass_params_changed)
+        self.apply_filter_button.clicked.connect(self.on_apply_filter_clicked)
+
     def on_moving_average_changed(self, state):
         """
         Manipula a mudança no estado da caixa de seleção de média móvel
@@ -267,7 +252,6 @@ class AnalysisPanel(QWidget):
         is_checked = state == Qt.Checked
         # Atualizar a interface
         self.window_size_spinbox.setEnabled(is_checked)
-        self.apply_moving_avg_button.setEnabled(is_checked)
         
         # Mostrar mensagem na barra de status
         if is_checked:
@@ -413,9 +397,10 @@ class AnalysisPanel(QWidget):
         """Limpa todos os gráficos"""
         self.raw_canvas.clear()
         self.ellipse_canvas.clear()
-        self.demod_canvas.clear()
+        self.demodulated_canvas.clear()
         self.filtered_canvas.clear()
         self.spectrum_canvas.clear()
+        self.spectrum_linear_canvas.clear()
         self.spectrogram_canvas.clear()
         
     def show_message(self, text, canvas):
@@ -523,13 +508,13 @@ class AnalysisPanel(QWidget):
                 titulo += f' (com Média Móvel: {self.window_size_spinbox.value()})'
             
             # Plotar sinal demodulado
-            self.demod_canvas.axes.clear()
-            self.demod_canvas.axes.plot(t_plot, demod_plot)
-            self.demod_canvas.axes.set_xlabel('Tempo (s)')
-            self.demod_canvas.axes.set_ylabel('Fase (rad)')
-            self.demod_canvas.axes.set_title(titulo)
-            self.demod_canvas.axes.grid(True)
-            self.demod_canvas.draw()
+            self.demodulated_canvas.axes.clear()
+            self.demodulated_canvas.axes.plot(t_plot, demod_plot)
+            self.demodulated_canvas.axes.set_xlabel('Tempo (s)')
+            self.demodulated_canvas.axes.set_ylabel('Fase (rad)')
+            self.demodulated_canvas.axes.set_title(titulo)
+            self.demodulated_canvas.axes.grid(True)
+            self.demodulated_canvas.draw()
             log_debug("Sinal demodulado plotado com sucesso")
         except Exception as e:
             log_error(f"Erro ao plotar sinal demodulado: {e}")
@@ -684,26 +669,6 @@ class AnalysisPanel(QWidget):
         log_info("Aplicando filtro passa-banda manualmente")
         self.bandpassFilterChanged.emit(True, self.low_freq_spinbox.value(), self.high_freq_spinbox.value(), self.order_spinbox.value()) 
 
-    def on_apply_moving_avg_clicked(self):
-        """Método para aplicar a média móvel manualmente"""
-        log_info("Aplicando média móvel manualmente")
-        self.movingAverageChanged.emit(True, self.window_size_spinbox.value()) 
-
-    def reset_bandpass_filter(self):
-        """Reseta as configurações do filtro passa-banda"""
-        log_debug("reset_bandpass_filter: Resetando configurações do filtro passa-banda")
-        self.bandpass_checkbox.setChecked(False)
-        self.low_freq_spinbox.setValue(50.0)
-        self.high_freq_spinbox.setValue(5000.0)
-        self.order_spinbox.setValue(4)
-        self.low_freq_spinbox.setEnabled(False)
-        self.high_freq_spinbox.setEnabled(False)
-        self.order_spinbox.setEnabled(False)
-        self.apply_filter_button.setEnabled(False)
-        
-        # Emitir sinal para desabilitar o filtro
-        self.bandpassFilterChanged.emit(False, 50.0, 5000.0, 4) 
-
     def show_metadata(self, metadata):
         """
         Exibe os metadados do arquivo
@@ -806,7 +771,19 @@ class AnalysisPanel(QWidget):
         self.window_size_spectrogram_spinbox.setEnabled(False)
         self.overlap_spectrogram_spinbox.setEnabled(False)
         self.max_freq_spectrogram_spinbox.setEnabled(False)
-        self.generate_spectrogram_button.setEnabled(False) 
+        self.generate_spectrogram_button.setEnabled(False)
+
+    def reset_bandpass_filter(self):
+        """Reseta as configurações do filtro passa-banda"""
+        log_debug("reset_bandpass_filter: Resetando configurações do filtro passa-banda")
+        self.bandpass_checkbox.setChecked(False)
+        self.low_freq_spinbox.setValue(50.0)
+        self.high_freq_spinbox.setValue(5000.0)
+        self.order_spinbox.setValue(4)
+        self.low_freq_spinbox.setEnabled(False)
+        self.high_freq_spinbox.setEnabled(False)
+        self.order_spinbox.setEnabled(False)
+        self.apply_filter_button.setEnabled(False)
 
     def load_selected_file_from_list(self, file_list):
         """Carrega múltiplos arquivos a partir de uma lista de caminhos e plota espectros"""
@@ -856,41 +833,64 @@ class AnalysisPanel(QWidget):
         """Plota o espectro de todos os arquivos carregados, com cores e transparências diferentes"""
         import numpy as np
         from scipy.signal import get_window
-        ax = self.spectrum_canvas.axes
-        ax.clear()
-        colors = ['blue', 'red', 'green', 'orange', 'purple']
-        alphas = [1.0, 0.5, 0.7, 0.7, 0.7]
-        for idx, data in enumerate(self.multiple_demodulated_data):
-            if 'demodulated' not in data:
-                continue
-            demodulated = data['demodulated']
-            # Determinar a taxa de amostragem
-            if 'sample_frequency' in data and 'decimation' in data:
-                fs = data['sample_frequency'] / data['decimation']
-            elif 'sample_frequency_effective' in data:
-                fs = data['sample_frequency_effective']
-            elif 't' in data and len(data['t']) >= 2:
-                t = data['t']
-                dt = t[1] - t[0]
-                fs = 1 / dt
+        
+        # Plotar em ambas as abas (log e linear)
+        for canvas, is_log in [(self.spectrum_canvas, True), (self.spectrum_linear_canvas, False)]:
+            ax = canvas.axes
+            ax.clear()
+            colors = ['blue', 'red', 'green', 'orange', 'purple']
+            alphas = [1.0, 0.5, 0.7, 0.7, 0.7]
+            
+            for idx, data in enumerate(self.multiple_demodulated_data):
+                if 'demodulated' not in data:
+                    continue
+                demodulated = data['demodulated']
+                # Determinar a taxa de amostragem
+                if 'sample_frequency' in data and 'decimation' in data:
+                    fs = data['sample_frequency'] / data['decimation']
+                elif 'sample_frequency_effective' in data:
+                    fs = data['sample_frequency_effective']
+                elif 't' in data and len(data['t']) >= 2:
+                    t = data['t']
+                    dt = t[1] - t[0]
+                    fs = 1 / dt
+                else:
+                    fs = 1.953125e6
+                window = get_window('blackman', len(demodulated))
+                signal_windowed = demodulated * window
+                N = len(signal_windowed)
+                fft_result = np.fft.fft(signal_windowed)
+                fft_result = fft_result / N
+                magnitudes = np.abs(fft_result[:N//2])
+                freq_axis = np.arange(N//2) * fs / N
+                
+                if is_log:
+                    # Escala logarítmica em dB
+                    magnitudes_plot = 20 * np.log10(magnitudes + 1e-10)
+                    ylabel = 'Amplitude (dB)'
+                else:
+                    # Escala linear
+                    magnitudes_plot = magnitudes
+                    ylabel = 'Amplitude'
+                
+                label = f"Arquivo {idx+1}"
+                ax.plot(freq_axis, magnitudes_plot, color=colors[idx % len(colors)], alpha=alphas[idx % len(alphas)], label=label)
+            
+            # Configurar escala logarítmica no eixo x para ambas as abas
+            ax.set_xscale('log')
+            ax.set_xlim(10, fs/2)  # Começa em 10 Hz e vai até metade da frequência de amostragem
+            
+            # Configurar título e labels
+            if is_log:
+                ax.set_title('Espectro FFT de múltiplos arquivos (Escala Log)')
             else:
-                fs = 1.953125e6
-            window = get_window('blackman', len(demodulated))
-            signal_windowed = demodulated * window
-            N = len(signal_windowed)
-            fft_result = np.fft.fft(signal_windowed)
-            fft_result = fft_result / N
-            magnitudes = np.abs(fft_result[:N//2])
-            freq_axis = np.arange(N//2) * fs / N
-            magnitudes_db = 20 * np.log10(magnitudes + 1e-10)
-            label = f"Arquivo {idx+1}"
-            ax.plot(freq_axis, magnitudes_db, color=colors[idx % len(colors)], alpha=alphas[idx % len(alphas)], label=label)
-        ax.set_xlabel('Frequência (Hz)')
-        ax.set_ylabel('Amplitude (dB)')
-        ax.set_title('Espectro FFT de múltiplos arquivos')
-        ax.grid(True, which='both', linestyle='--', alpha=0.7)
-        ax.legend()
-        self.spectrum_canvas.draw() 
+                ax.set_title('Espectro FFT de múltiplos arquivos (Amplitude Linear)')
+            
+            ax.set_xlabel('Frequência (Hz)')
+            ax.set_ylabel(ylabel)
+            ax.grid(True, which='both', linestyle='--', alpha=0.7)
+            ax.legend()
+            canvas.draw()
 
     def show_metadata_multiple(self, metadata_list):
         """
