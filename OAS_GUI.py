@@ -76,6 +76,7 @@ class OASGui(QMainWindow):
         # Variáveis de estado
         self.data = None
         self.demodulated_data = None
+        self.multiple_demodulated_data = []  # Lista para armazenar dados de múltiplos arquivos
         
         # Configurar a interface
         self.setup_ui()
@@ -492,72 +493,53 @@ class OASGui(QMainWindow):
             return False
     
     def load_selected_file(self):
-        """Carrega o arquivo selecionado"""
-        if self.file_combo.count() == 0:
+        """Carrega os arquivos selecionados (agora múltiplos)"""
+        if hasattr(self, 'file_list') and self.file_list.count() > 0:
+            selected_files = [item.text() for item in self.file_list.selectedItems()]
+        elif hasattr(self, 'file_combo') and self.file_combo.count() > 0:
+            selected_files = [self.file_combo.currentText()]
+        else:
             return
-        
-        filename = self.file_combo.currentText()
-        try:
-            self.statusBar.showMessage(f"Carregando arquivo {filename}...")
-            
-            with open(filename, 'rb') as f:
-                self.data = pickle.load(f)
-            
-            # Converter dicionário para dict se for necessário
-            if not isinstance(self.data, dict):
-                temp_dict = {}
-                for key in dir(self.data):
-                    if not key.startswith('__') and not callable(getattr(self.data, key)):
-                        temp_dict[key] = getattr(self.data, key)
-                self.data = temp_dict
-                print("Convertido objeto para dicionário")
-            
-            # Verificar se já é um arquivo demodulado
-            if 'demodulated' in self.data:
-                self.demodulated_data = self.data
-                print(f"Arquivo contém dados demodulados: {self.data['demodulated'].shape if isinstance(self.data['demodulated'], np.ndarray) else type(self.data['demodulated'])}")
-            else:
-                self.demodulated_data = None
-                print("Arquivo não contém dados demodulados")
-            
-            # Verificar se temos dados de formas de onda
-            if 'waveforms' not in self.data:
-                QMessageBox.warning(self, "Aviso", "Arquivo não contém dados de formas de onda")
-                return
-                
-            # Verificar se temos dados de tempo
-            if 't' not in self.data:
-                # Criar vetor de tempo se não existir
-                if 'sample_frequency_effective' in self.data and 'waveforms' in self.data:
-                    fs = self.data['sample_frequency_effective']
-                    wf_len = self.data['waveforms'].shape[1]
-                    self.data['t'] = np.arange(wf_len) / fs
-                    print(f"Vetor de tempo criado: {wf_len} pontos")
-                else:
-                    QMessageBox.warning(self, "Aviso", "Impossível criar vetor de tempo")
-                    return
-            
-            # Atualizar visualizações
-            self.plot_raw_data()
-            self.plot_ellipse()
-            
-            # Verificar se temos dados demodulados para plotar
-            if self.demodulated_data and 'demodulated' in self.demodulated_data:
-                try:
-                    self.plot_demodulated()
-                    self.plot_spectrum()
-                    print("Dados demodulados plotados com sucesso")
-                except Exception as e:
-                    print(f"Erro ao plotar dados demodulados: {str(e)}")
-                    self.statusBar.showMessage(f"Erro ao plotar dados demodulados: {str(e)}")
-            
-            self.statusBar.showMessage(f"Arquivo carregado: {filename}")
-        
-        except Exception as e:
-            import traceback
-            traceback.print_exc()
-            QMessageBox.critical(self, "Erro", f"Erro ao carregar arquivo: {str(e)}")
-            self.statusBar.showMessage(f"Erro ao carregar arquivo")
+        self.multiple_demodulated_data = []
+        for filename in selected_files:
+            try:
+                self.statusBar.showMessage(f"Carregando arquivo {filename}...")
+                with open(filename, 'rb') as f:
+                    data = pickle.load(f)
+                # Converter dicionário para dict se necessário
+                if not isinstance(data, dict):
+                    temp_dict = {}
+                    for key in dir(data):
+                        if not key.startswith('__') and not callable(getattr(data, key)):
+                            temp_dict[key] = getattr(data, key)
+                    data = temp_dict
+                # Adicionar aos dados múltiplos se for demodulado
+                if 'demodulated' in data:
+                    self.multiple_demodulated_data.append(data)
+                # Atualizar self.data e self.demodulated_data para o primeiro arquivo (para compatibilidade)
+                if len(self.multiple_demodulated_data) == 1:
+                    self.data = data
+                    self.demodulated_data = data if 'demodulated' in data else None
+                # Atualizar visualizações apenas para o primeiro arquivo
+                if len(self.multiple_demodulated_data) == 1:
+                    if 'waveforms' in data:
+                        self.plot_raw_data()
+                        self.plot_ellipse()
+                    if self.demodulated_data and 'demodulated' in self.demodulated_data:
+                        try:
+                            self.plot_demodulated()
+                        except Exception as e:
+                            print(f"Erro ao plotar dados demodulados: {str(e)}")
+                            self.statusBar.showMessage(f"Erro ao plotar dados demodulados: {str(e)}")
+                self.statusBar.showMessage(f"Arquivo carregado: {filename}")
+            except Exception as e:
+                import traceback
+                traceback.print_exc()
+                QMessageBox.critical(self, "Erro", f"Erro ao carregar arquivo: {str(e)}")
+                self.statusBar.showMessage(f"Erro ao carregar arquivo")
+        # Após carregar todos, plotar espectros múltiplos
+        if self.multiple_demodulated_data:
+            self.plot_spectrum_multiple()
     
     def plot_raw_data(self):
         """Plota os dados brutos"""
@@ -1057,6 +1039,88 @@ class OASGui(QMainWindow):
             self.effective_rate_label.setStyleSheet("color: red;")
         else:
             self.effective_rate_label.setStyleSheet("")
+
+    def plot_spectrum_multiple(self):
+        """Plota o espectro de todos os arquivos carregados, com cores e transparências diferentes"""
+        ax = self.spectrum_canvas.axes
+        ax.clear()
+        colors = ['blue', 'red', 'green', 'orange', 'purple']
+        alphas = [1.0, 0.5, 0.7, 0.7, 0.7]
+        for idx, data in enumerate(self.multiple_demodulated_data):
+            if 'demodulated' not in data:
+                continue
+            demodulated = data['demodulated']
+            # Determinar a taxa de amostragem
+            if 'sample_frequency' in data and 'decimation' in data:
+                fs = data['sample_frequency'] / data['decimation']
+            elif 'sample_frequency_effective' in data:
+                fs = data['sample_frequency_effective']
+            elif 't' in data and len(data['t']) >= 2:
+                t = data['t']
+                dt = t[1] - t[0]
+                fs = 1 / dt
+            else:
+                fs = 1.953125e6
+            from scipy.signal import get_window
+            window = get_window('blackman', len(demodulated))
+            signal_windowed = demodulated * window
+            N = len(signal_windowed)
+            fft_result = np.fft.fft(signal_windowed)
+            fft_result = fft_result / N
+            magnitudes = np.abs(fft_result[:N//2])
+            freq_axis = np.arange(N//2) * fs / N
+            magnitudes_db = 20 * np.log10(magnitudes + 1e-10)
+            label = f"Arquivo {idx+1}"
+            ax.plot(freq_axis, magnitudes_db, color=colors[idx % len(colors)], alpha=alphas[idx % len(alphas)], label=label)
+        ax.set_xlabel('Frequência (Hz)')
+        ax.set_ylabel('Amplitude (dB)')
+        ax.set_title('Espectro FFT de múltiplos arquivos')
+        ax.grid(True, which='both', linestyle='--', alpha=0.7)
+        ax.legend()
+        self.spectrum_canvas.draw()
+
+    def load_selected_file_from_list(self, file_list):
+        """Carrega múltiplos arquivos a partir de uma lista de caminhos"""
+        self.multiple_demodulated_data = []
+        for filename in file_list:
+            try:
+                self.statusBar.showMessage(f"Carregando arquivo {filename}...")
+                with open(filename, 'rb') as f:
+                    data = pickle.load(f)
+                # Converter dicionário para dict se necessário
+                if not isinstance(data, dict):
+                    temp_dict = {}
+                    for key in dir(data):
+                        if not key.startswith('__') and not callable(getattr(data, key)):
+                            temp_dict[key] = getattr(data, key)
+                    data = temp_dict
+                # Adicionar aos dados múltiplos se for demodulado
+                if 'demodulated' in data:
+                    self.multiple_demodulated_data.append(data)
+                # Atualizar self.data e self.demodulated_data para o primeiro arquivo (para compatibilidade)
+                if len(self.multiple_demodulated_data) == 1:
+                    self.data = data
+                    self.demodulated_data = data if 'demodulated' in data else None
+                # Atualizar visualizações apenas para o primeiro arquivo
+                if len(self.multiple_demodulated_data) == 1:
+                    if 'waveforms' in data:
+                        self.plot_raw_data()
+                        self.plot_ellipse()
+                    if self.demodulated_data and 'demodulated' in self.demodulated_data:
+                        try:
+                            self.plot_demodulated()
+                        except Exception as e:
+                            print(f"Erro ao plotar dados demodulados: {str(e)}")
+                            self.statusBar.showMessage(f"Erro ao plotar dados demodulados: {str(e)}")
+                self.statusBar.showMessage(f"Arquivo carregado: {filename}")
+            except Exception as e:
+                import traceback
+                traceback.print_exc()
+                QMessageBox.critical(self, "Erro", f"Erro ao carregar arquivo: {str(e)}")
+                self.statusBar.showMessage(f"Erro ao carregar arquivo")
+        # Após carregar todos, plotar espectros múltiplos
+        if self.multiple_demodulated_data:
+            self.plot_spectrum_multiple()
 
 if __name__ == '__main__':
     app = QApplication(sys.argv)

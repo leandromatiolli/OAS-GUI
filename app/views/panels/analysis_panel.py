@@ -4,7 +4,7 @@ Módulo com o painel de análise e visualização de dados
 from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QTabWidget, QPushButton,
                            QComboBox, QLabel, QFileDialog, QMessageBox, QSplitter,
                            QCheckBox, QSpinBox, QDoubleSpinBox, QGroupBox, QFormLayout,
-                           QTextEdit)
+                           QTextEdit, QListWidget)
 from PyQt5.QtCore import Qt, pyqtSignal
 import numpy as np
 
@@ -15,7 +15,7 @@ class AnalysisPanel(QWidget):
     """Painel para análise e visualização de dados"""
     
     # Sinais
-    fileSelected = pyqtSignal(str)  # Emitido quando um arquivo é selecionado
+    fileSelected = pyqtSignal(list)  # Emitido quando uma lista de arquivos é selecionada
     demodulateRequested = pyqtSignal()  # Emitido quando o usuário solicita demodulação
     saveDemodulatedRequested = pyqtSignal()  # Emitido quando o usuário solicita salvar dados demodulados
     saveFilteredRequested = pyqtSignal()  # Emitido quando o usuário solicita salvar dados filtrados
@@ -41,8 +41,9 @@ class AnalysisPanel(QWidget):
         
         # Widget para selecionar arquivo
         file_selection = QHBoxLayout()
-        self.file_combo = QComboBox()
-        self.file_combo.setMinimumWidth(400)
+        self.file_list = QListWidget()
+        self.file_list.setSelectionMode(QListWidget.MultiSelection)
+        self.file_list.setMinimumWidth(400)
         self.refresh_button = QPushButton("Atualizar")
         self.refresh_button.clicked.connect(self.on_refresh_clicked)
         self.load_button = QPushButton("Carregar")
@@ -50,8 +51,8 @@ class AnalysisPanel(QWidget):
         self.browse_button = QPushButton("Procurar...")
         self.browse_button.clicked.connect(self.on_browse_clicked)
         
-        file_selection.addWidget(QLabel("Arquivo:"))
-        file_selection.addWidget(self.file_combo)
+        file_selection.addWidget(QLabel("Arquivo(s):"))
+        file_selection.addWidget(self.file_list)
         file_selection.addWidget(self.refresh_button)
         file_selection.addWidget(self.browse_button)
         file_selection.addWidget(self.load_button)
@@ -348,9 +349,9 @@ class AnalysisPanel(QWidget):
         Args:
             files: Lista de arquivos disponíveis
         """
-        self.file_combo.clear()
+        self.file_list.clear()
         for file in files:
-            self.file_combo.addItem(file)
+            self.file_list.addItem(file)
             
     def on_refresh_clicked(self):
         """Solicita atualização da lista de arquivos"""
@@ -358,35 +359,38 @@ class AnalysisPanel(QWidget):
         self.refreshFilesRequested.emit()
         
     def on_browse_clicked(self):
-        """Abre um diálogo para selecionar arquivo manualmente"""
-        file_path, _ = QFileDialog.getOpenFileName(
+        """Abre um diálogo para selecionar arquivos manualmente (agora múltiplos)"""
+        file_paths, _ = QFileDialog.getOpenFileNames(
             self,
-            "Selecionar arquivo de dados",
+            "Selecionar arquivos de dados",
             "",
             "Arquivos pickle (*.pkl)"
         )
         
-        if file_path:
-            log_info(f"Arquivo selecionado: {file_path}")
-            # Adicionar o arquivo ao combo box, se já não estiver lá
-            index = self.file_combo.findText(file_path)
-            if index == -1:
-                self.file_combo.addItem(file_path)
-                self.file_combo.setCurrentIndex(self.file_combo.count() - 1)
-            else:
-                self.file_combo.setCurrentIndex(index)
-            
-            # Carregar o arquivo selecionado
+        if file_paths:
+            log_info(f"Arquivos selecionados: {file_paths}")
+            # Adicionar arquivos à lista, evitando duplicados
+            for file_path in file_paths:
+                items = [self.file_list.item(i).text() for i in range(self.file_list.count())]
+                if file_path not in items:
+                    self.file_list.addItem(file_path)
+            # Selecionar todos os arquivos recém-adicionados
+            for i in range(self.file_list.count()):
+                self.file_list.item(i).setSelected(True)
+            # Carregar os arquivos selecionados
             self.on_load_clicked()
             
     def on_load_clicked(self):
-        """Solicita carregamento do arquivo selecionado"""
-        if self.file_combo.count() == 0:
+        """Solicita carregamento dos arquivos selecionados"""
+        if self.file_list.count() == 0:
             return
-        
-        filename = self.file_combo.currentText()
-        log_info(f"Carregando arquivo: {filename}")
-        self.fileSelected.emit(filename)
+        # Obter todos os arquivos selecionados
+        selected_files = [item.text() for item in self.file_list.selectedItems()]
+        if not selected_files:
+            return
+        log_info(f"Carregando arquivos: {selected_files}")
+        # Emitir sinal com a lista de arquivos
+        self.fileSelected.emit(selected_files)
         
     def on_demodulate_clicked(self):
         """Solicita demodulação dos dados"""
@@ -803,3 +807,115 @@ class AnalysisPanel(QWidget):
         self.overlap_spectrogram_spinbox.setEnabled(False)
         self.max_freq_spectrogram_spinbox.setEnabled(False)
         self.generate_spectrogram_button.setEnabled(False) 
+
+    def load_selected_file_from_list(self, file_list):
+        """Carrega múltiplos arquivos a partir de uma lista de caminhos e plota espectros"""
+        import pickle
+        import numpy as np
+        from scipy.signal import get_window
+        self.multiple_demodulated_data = []
+        self.multiple_metadata = []  # Lista para armazenar metadados de todos os arquivos
+        
+        for filename in file_list:
+            try:
+                with open(filename, 'rb') as f:
+                    data = pickle.load(f)
+                # Converter para dict se necessário
+                if not isinstance(data, dict):
+                    temp_dict = {}
+                    for key in dir(data):
+                        if not key.startswith('__') and not callable(getattr(data, key)):
+                            temp_dict[key] = getattr(data, key)
+                    data = temp_dict
+                if 'demodulated' in data:
+                    self.multiple_demodulated_data.append(data)
+                    # Coletar metadados do arquivo
+                    metadata = data.get('metadata', {})
+                    metadata['filename'] = filename  # Adicionar nome do arquivo aos metadados
+                    self.multiple_metadata.append(metadata)
+                    
+                # Para o primeiro arquivo, mostrar dados brutos e demodulados
+                if len(self.multiple_demodulated_data) == 1:
+                    if 't' in data and 'waveforms' in data:
+                        channels = data.get('channels', [1, 2])
+                        self.show_raw_data(data['t'], data['waveforms'], channels)
+                    if 't' in data and 'demodulated' in data:
+                        self.show_demodulated(data['t'], data['demodulated'])
+            except Exception as e:
+                from PyQt5.QtWidgets import QMessageBox
+                import traceback
+                traceback.print_exc()
+                QMessageBox.critical(self, "Erro", f"Erro ao carregar arquivo: {str(e)}")
+        
+        # Após carregar todos, plotar espectros múltiplos e mostrar metadados
+        if self.multiple_demodulated_data:
+            self.plot_spectrum_multiple()
+            self.show_metadata_multiple(self.multiple_metadata)
+
+    def plot_spectrum_multiple(self):
+        """Plota o espectro de todos os arquivos carregados, com cores e transparências diferentes"""
+        import numpy as np
+        from scipy.signal import get_window
+        ax = self.spectrum_canvas.axes
+        ax.clear()
+        colors = ['blue', 'red', 'green', 'orange', 'purple']
+        alphas = [1.0, 0.5, 0.7, 0.7, 0.7]
+        for idx, data in enumerate(self.multiple_demodulated_data):
+            if 'demodulated' not in data:
+                continue
+            demodulated = data['demodulated']
+            # Determinar a taxa de amostragem
+            if 'sample_frequency' in data and 'decimation' in data:
+                fs = data['sample_frequency'] / data['decimation']
+            elif 'sample_frequency_effective' in data:
+                fs = data['sample_frequency_effective']
+            elif 't' in data and len(data['t']) >= 2:
+                t = data['t']
+                dt = t[1] - t[0]
+                fs = 1 / dt
+            else:
+                fs = 1.953125e6
+            window = get_window('blackman', len(demodulated))
+            signal_windowed = demodulated * window
+            N = len(signal_windowed)
+            fft_result = np.fft.fft(signal_windowed)
+            fft_result = fft_result / N
+            magnitudes = np.abs(fft_result[:N//2])
+            freq_axis = np.arange(N//2) * fs / N
+            magnitudes_db = 20 * np.log10(magnitudes + 1e-10)
+            label = f"Arquivo {idx+1}"
+            ax.plot(freq_axis, magnitudes_db, color=colors[idx % len(colors)], alpha=alphas[idx % len(alphas)], label=label)
+        ax.set_xlabel('Frequência (Hz)')
+        ax.set_ylabel('Amplitude (dB)')
+        ax.set_title('Espectro FFT de múltiplos arquivos')
+        ax.grid(True, which='both', linestyle='--', alpha=0.7)
+        ax.legend()
+        self.spectrum_canvas.draw() 
+
+    def show_metadata_multiple(self, metadata_list):
+        """
+        Exibe os metadados de múltiplos arquivos
+        
+        Args:
+            metadata_list: Lista de dicionários com os metadados de cada arquivo
+        """
+        if not metadata_list:
+            self.metadata_text.setPlainText("Sem metadados disponíveis")
+            return
+            
+        # Formatar texto para múltiplos arquivos
+        metadata_str = ""
+        for idx, metadata in enumerate(metadata_list, 1):
+            metadata_str += f"=== ARQUIVO {idx} ===\n"
+            if 'filename' in metadata:
+                import os
+                filename = os.path.basename(metadata['filename'])
+                metadata_str += f"Nome: {filename}\n"
+            
+            # Exibir outros metadados
+            for key, value in metadata.items():
+                if key != 'filename':  # Já exibimos o filename acima
+                    metadata_str += f"{key}: {value}\n"
+            metadata_str += "\n"  # Linha em branco entre arquivos
+            
+        self.metadata_text.setPlainText(metadata_str) 

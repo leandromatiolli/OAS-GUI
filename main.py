@@ -106,7 +106,7 @@ class Application:
         self.acquisition_controller.acquisitionError.connect(self.on_acquisition_error)
         
         # Conexões do controlador de arquivos
-        self.window.analysis_panel.fileSelected.connect(self.file_controller.load_file)
+        self.window.analysis_panel.fileSelected.connect(self.on_files_selected)
         self.window.analysis_panel.refreshFilesRequested.connect(self.file_controller.refresh_file_list)
         self.file_controller.fileListUpdated.connect(self.window.analysis_panel.update_file_list)
         self.file_controller.fileLoaded.connect(self.on_file_loaded)
@@ -675,6 +675,10 @@ class Application:
             log_debug(f"- Parâmetros do filtro: {params}")
         else:
             log_warning("- Parâmetros do filtro não encontrados")
+    
+    def on_files_selected(self, file_list):
+        """Slot para carregar múltiplos arquivos selecionados na análise"""
+        self.window.analysis_panel.load_selected_file_from_list(file_list)
     
     def run(self):
         """
