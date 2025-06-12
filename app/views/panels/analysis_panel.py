@@ -7,9 +7,11 @@ from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QTabWidget, QPus
                            QTextEdit, QListWidget)
 from PyQt5.QtCore import Qt, pyqtSignal
 import numpy as np
+import os
 
 from app.views.widgets.canvas import MplCanvas, NavigationToolbarCustom
 from app.utils.debug_log import log_debug, log_info, log_warning, log_error
+from app.models.data_store import DataStore
 
 class AnalysisPanel(QWidget):
     """Painel para análise e visualização de dados"""
@@ -51,11 +53,22 @@ class AnalysisPanel(QWidget):
         self.browse_button = QPushButton("Procurar...")
         self.browse_button.clicked.connect(self.on_browse_clicked)
         
+        # Novo: seleção de pasta
+        self.select_dir_button = QPushButton("Selecionar Pasta")
+        self.select_dir_button.clicked.connect(self.on_select_dir_clicked)
+        self.use_save_dir_button = QPushButton("Usar pasta de gravação")
+        self.use_save_dir_button.clicked.connect(self.on_use_save_dir_clicked)
+        self.current_dir = DataStore.load_config().get('save_directory', os.getcwd())
+        self.dir_label = QLabel(self.current_dir)
+        
         file_selection.addWidget(QLabel("Arquivo(s):"))
         file_selection.addWidget(self.file_list)
         file_selection.addWidget(self.refresh_button)
         file_selection.addWidget(self.browse_button)
         file_selection.addWidget(self.load_button)
+        file_selection.addWidget(self.select_dir_button)
+        file_selection.addWidget(self.use_save_dir_button)
+        file_selection.addWidget(self.dir_label)
         
         layout.addLayout(file_selection)
 
@@ -338,9 +351,8 @@ class AnalysisPanel(QWidget):
             self.file_list.addItem(file)
             
     def on_refresh_clicked(self):
-        """Solicita atualização da lista de arquivos"""
-        log_debug("Solicitando atualização da lista de arquivos")
-        self.refreshFilesRequested.emit()
+        """Solicita atualização da lista de arquivos na pasta atual"""
+        self.refresh_file_list_in_dir()
         
     def on_browse_clicked(self):
         """Abre um diálogo para selecionar arquivos manualmente (agora múltiplos)"""
@@ -372,9 +384,11 @@ class AnalysisPanel(QWidget):
         selected_files = [item.text() for item in self.file_list.selectedItems()]
         if not selected_files:
             return
-        log_info(f"Carregando arquivos: {selected_files}")
+        # Montar caminho completo para cada arquivo
+        selected_files_full = [os.path.join(self.current_dir, f) for f in selected_files]
+        log_info(f"Carregando arquivos: {selected_files_full}")
         # Emitir sinal com a lista de arquivos
-        self.fileSelected.emit(selected_files)
+        self.fileSelected.emit(selected_files_full)
         
     def on_demodulate_clicked(self):
         """Solicita demodulação dos dados"""
@@ -919,3 +933,29 @@ class AnalysisPanel(QWidget):
             metadata_str += "\n"  # Linha em branco entre arquivos
             
         self.metadata_text.setPlainText(metadata_str) 
+
+    def on_select_dir_clicked(self):
+        """Abre diálogo para selecionar a pasta de análise"""
+        dir_path = QFileDialog.getExistingDirectory(self, "Selecione a pasta para análise", self.current_dir)
+        if dir_path:
+            self.current_dir = dir_path
+            self.dir_label.setText(dir_path)
+            self.refresh_file_list_in_dir()
+    
+    def on_use_save_dir_clicked(self):
+        """Usa a mesma pasta da gravação (configuração)"""
+        dir_path = DataStore.load_config().get('save_directory', os.getcwd())
+        self.current_dir = dir_path
+        self.dir_label.setText(dir_path)
+        self.refresh_file_list_in_dir()
+    
+    def refresh_file_list_in_dir(self):
+        """Atualiza a lista de arquivos demodulados (.pkl) na pasta atual de análise, sem duplicatas e só o nome do arquivo"""
+        self.file_list.clear()
+        # Procurar apenas arquivos demodulados na pasta selecionada
+        demod_files = [f for f in os.listdir(self.current_dir)
+                       if f.startswith("vazamento_demodulado_") and f.endswith('.pkl')]
+        # Remover duplicatas
+        demod_files = list(sorted(set(demod_files), key=lambda x: os.path.getmtime(os.path.join(self.current_dir, x)), reverse=True))
+        for file in demod_files:
+            self.file_list.addItem(file) 
