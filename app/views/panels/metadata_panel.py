@@ -122,8 +122,8 @@ class MetadataPanel(QWidget):
         metadata_form.addRow("Tipo de Equipamento:", self.equipment_type_combo)
         # Grupo de status do equipamento (checkboxes)
         self.status_options = [
-            "Água Circulante", "Oxigênio Ligado", "Oxigênio Desligado", "Ligado", "Desligado",
-            "Aberta", "Fechada", "Com Vazamento", "Sem Vazamento"
+            "Água Circulante", "Água Estática","Oxigênio Ligado", "Oxigênio Desligado", "Ligado", "Desligado",
+            "Válvula Aberta", "Válvula Fechada", "Com Vazamento", "Sem Vazamento"
         ]
         self.status_checkboxes = []
         status_layout = QHBoxLayout()
