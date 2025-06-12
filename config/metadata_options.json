@@ -1,0 +1,20 @@
+{
+    "test_types": [
+        "Vazamento de Água",
+        "Vazamento de Ar",
+        "Vazamento de Gás",
+        "Descarga Elétrica",
+        "Ruído Mecânico",
+        "Controle (Sem Vazamento)",
+        "Outro"
+    ],
+    "materials": [
+        "PVC",
+        "Aço",
+        "Cobre",
+        "Polietileno",
+        "Polipropileno",
+        "Ferro Fundido",
+        "Outro"
+    ]
+} 

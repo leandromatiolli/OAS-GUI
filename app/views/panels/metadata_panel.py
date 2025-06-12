@@ -7,6 +7,8 @@ from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QFormLayout, QGr
 from PyQt5.QtCore import Qt
 from datetime import datetime
 from typing import Dict, Any
+import os
+import json
 
 class MetadataPanel(QWidget):
     """Painel para coleta de metadados sobre o teste"""
@@ -19,7 +21,11 @@ class MetadataPanel(QWidget):
             parent: Widget pai
         """
         super().__init__(parent)
+        self.config_file = "config/metadata_options.json"
+        self.last_state_file = "config/last_metadata_state.json"
         self.setup_ui()
+        self.load_options()
+        self.load_last_state()
         
     def setup_ui(self):
         """Configura a interface do painel"""
@@ -60,52 +66,33 @@ class MetadataPanel(QWidget):
         ])
         metadata_form.addRow("Material:", self.material_combo)
         
+        # Localização
+        self.location_edit = QLineEdit()
+        metadata_form.addRow("Localização:", self.location_edit)
         
-        # Pressão do teste
+        # Pressão
         self.pressure_spin = QDoubleSpinBox()
-        self.pressure_spin.setRange(0, 100.0)
+        self.pressure_spin.setRange(0.0, 100.0)
         self.pressure_spin.setValue(0.0)
-        self.pressure_spin.setSingleStep(0.5)
         self.pressure_spin.setSuffix(" bar")
         metadata_form.addRow("Pressão:", self.pressure_spin)
         
-        # Fluxo do vazamento
+        # Fluxo
         self.flow_spin = QDoubleSpinBox()
-        self.flow_spin.setRange(0, 50.0)
+        self.flow_spin.setRange(0.0, 100.0)
         self.flow_spin.setValue(0.0)
-        self.flow_spin.setSingleStep(0.1)
         self.flow_spin.setSuffix(" L/min")
         metadata_form.addRow("Fluxo:", self.flow_spin)
         
-        # Distância do vazamento
+        # Distância
         self.distance_spin = QDoubleSpinBox()
-        self.distance_spin.setRange(0, 1000.0)
+        self.distance_spin.setRange(0.0, 1000.0)
         self.distance_spin.setValue(0.0)
-        self.distance_spin.setSingleStep(10.0)
         self.distance_spin.setSuffix(" cm")
         metadata_form.addRow("Distância:", self.distance_spin)
-
-        #temperatura da água
-        self.water_temperature_spin = QDoubleSpinBox()
-        self.water_temperature_spin.setRange(0, 100.0)
-        self.water_temperature_spin.setValue(30.0)
-        self.water_temperature_spin.setSingleStep(1.0)
-        self.water_temperature_spin.setSuffix(" °C")
-        metadata_form.addRow("Temperatura da Água:", self.water_temperature_spin)
-
-        # localização do vazamento
-        self.location_edit = QLineEdit()
-        metadata_form.addRow("Localização:", self.location_edit)
-
-        #configuração do setup
-        self.setup_config_edit = QTextEdit()
-        self.setup_config_edit.setPlaceholderText("Digite mais detalhes do experimento aqui...")
-        self.setup_config_edit.setAlignment(Qt.AlignLeft | Qt.AlignTop)
-        self.setup_config_edit.setMinimumHeight(40)
-        metadata_form.addRow("Configuração do Setup:", self.setup_config_edit)
-
-        # Foto do setup
-        self.setup_photo_button = QPushButton("Carregar Foto do Setup")
+        
+        # Botão para carregar fotos do setup
+        self.setup_photo_button = QPushButton("Carregar Fotos")
         self.setup_photo_button.clicked.connect(self.load_setup_photos)
         metadata_form.addRow("Foto do Setup:", self.setup_photo_button)
         
@@ -123,17 +110,101 @@ class MetadataPanel(QWidget):
         metadata_group.setLayout(metadata_form)
         layout.addWidget(metadata_group)  
         
-
-
-
-        
         # Informações adicionais
-        info_label = QLabel("Estes metadados serão salvos junto compermitir os dados de aquisição e podem ser usados posteriormente para treinar modelos de IA. Preencha os campos com as informações do teste antes de iniciar a aquisição.")
+        info_label = QLabel("Estes metadados serão salvos junto com os dados de aquisição e podem ser usados posteriormente para treinar modelos de IA. Preencha os campos com as informações do teste antes de iniciar a aquisição.")
         info_label.setWordWrap(True)
         layout.addWidget(info_label)
         
         # Adicionar espaço vazio para expansão
         layout.addStretch(1)
+        
+    def load_options(self):
+        """Carrega as opções disponíveis do arquivo de configuração"""
+        try:
+            if os.path.exists(self.config_file):
+                with open(self.config_file, 'r', encoding='utf-8') as f:
+                    config = json.load(f)
+                    
+                # Atualizar opções do tipo de teste
+                if 'test_types' in config:
+                    self.test_type_combo.clear()
+                    self.test_type_combo.addItems(config['test_types'])
+                    
+                # Atualizar opções de material
+                if 'materials' in config:
+                    self.material_combo.clear()
+                    self.material_combo.addItems(config['materials'])
+        except Exception as e:
+            print(f"Erro ao carregar opções: {str(e)}")
+            
+    def save_options(self):
+        """Salva as opções atuais no arquivo de configuração"""
+        try:
+            # Criar diretório se não existir
+            os.makedirs(os.path.dirname(self.config_file), exist_ok=True)
+            
+            config = {
+                'test_types': [self.test_type_combo.itemText(i) for i in range(self.test_type_combo.count())],
+                'materials': [self.material_combo.itemText(i) for i in range(self.material_combo.count())]
+            }
+            
+            with open(self.config_file, 'w', encoding='utf-8') as f:
+                json.dump(config, f, indent=4, ensure_ascii=False)
+        except Exception as e:
+            print(f"Erro ao salvar opções: {str(e)}")
+            
+    def load_last_state(self):
+        """Carrega o último estado usado"""
+        try:
+            if os.path.exists(self.last_state_file):
+                with open(self.last_state_file, 'r', encoding='utf-8') as f:
+                    state = json.load(f)
+                    
+                # Restaurar valores
+                if 'sensor_sn' in state:
+                    self.sensor_sn_edit.setText(state['sensor_sn'])
+                if 'test_type' in state:
+                    index = self.test_type_combo.findText(state['test_type'])
+                    if index >= 0:
+                        self.test_type_combo.setCurrentIndex(index)
+                if 'material' in state:
+                    index = self.material_combo.findText(state['material'])
+                    if index >= 0:
+                        self.material_combo.setCurrentIndex(index)
+                if 'location' in state:
+                    self.location_edit.setText(state['location'])
+                if 'pressure' in state:
+                    self.pressure_spin.setValue(state['pressure'])
+                if 'flow' in state:
+                    self.flow_spin.setValue(state['flow'])
+                if 'distance' in state:
+                    self.distance_spin.setValue(state['distance'])
+                if 'comments' in state:
+                    self.comments_edit.setPlainText(state['comments'])
+        except Exception as e:
+            print(f"Erro ao carregar último estado: {str(e)}")
+            
+    def save_last_state(self):
+        """Salva o estado atual para uso futuro"""
+        try:
+            # Criar diretório se não existir
+            os.makedirs(os.path.dirname(self.last_state_file), exist_ok=True)
+            
+            state = {
+                'sensor_sn': self.sensor_sn_edit.text(),
+                'test_type': self.test_type_combo.currentText(),
+                'material': self.material_combo.currentText(),
+                'location': self.location_edit.text(),
+                'pressure': self.pressure_spin.value(),
+                'flow': self.flow_spin.value(),
+                'distance': self.distance_spin.value(),
+                'comments': self.comments_edit.toPlainText()
+            }
+            
+            with open(self.last_state_file, 'w', encoding='utf-8') as f:
+                json.dump(state, f, indent=4, ensure_ascii=False)
+        except Exception as e:
+            print(f"Erro ao salvar último estado: {str(e)}")
         
     def load_setup_photos(self):
         """Abre um diálogo para selecionar fotos do setup"""
@@ -169,6 +240,9 @@ class MetadataPanel(QWidget):
         # Adicionar fotos se existirem
         if hasattr(self, 'setup_photos'):
             metadata['setup_photos'] = self.setup_photos
+            
+        # Salvar último estado
+        self.save_last_state()
             
         return metadata
         
