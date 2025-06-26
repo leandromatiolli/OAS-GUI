@@ -21,6 +21,7 @@ class ProcessingController(QObject):
     movingAverageApplied = pyqtSignal(dict)  # Novo sinal específico para média móvel
     bandpassFilterApplied = pyqtSignal(dict)  # Novo sinal para filtro passa-banda
     spectrogramGenerated = pyqtSignal(dict, object, object, object)  # Sinal emitido quando o espectrograma é gerado
+    audioGenerated = pyqtSignal(str)  # Sinal emitido quando o arquivo de áudio é gerado
     
     def __init__(self, parent=None):
         """
@@ -55,6 +56,8 @@ class ProcessingController(QObject):
             data: Dicionário com os dados a processar
         """
         log_debug(f"set_data: Recebendo novos dados para processamento")
+        log_debug(f"set_data: Chaves disponíveis nos dados: {list(data.keys())}")
+        
         self.data = data
         self.processed_waveforms = None
         self.filtered_demodulated = None
@@ -66,6 +69,7 @@ class ProcessingController(QObject):
             
         # Se já existirem dados demodulados, usar eles
         if 'demodulated' in data:
+            log_info(f"set_data: Dados demodulados encontrados! Configurando self.demodulated_data")
             self.demodulated_data = data
             
             # Se o arquivo carregado contém parâmetros de filtro, usar eles
@@ -77,6 +81,7 @@ class ProcessingController(QObject):
                 self.bandpass_high_freq = params.get('high_freq', self.bandpass_high_freq)
                 self.bandpass_order = params.get('order', self.bandpass_order)
         else:
+            log_warning("set_data: Nenhum dado demodulado encontrado nos dados carregados")
             self.demodulated_data = None
         
         # Processar os dados de acordo com as configurações atuais
@@ -729,4 +734,181 @@ class ProcessingController(QObject):
         except Exception as e:
             log_error(f"Erro ao gerar espectrograma: {str(e)}")
             self.processingProgress.emit(f"Erro ao gerar espectrograma: {str(e)}")
+            return None
+
+    def diagnose_data_state(self):
+        """
+        Diagnostica o estado atual dos dados para debugging
+        """
+        log_info("=== DIAGNÓSTICO DO ESTADO DOS DADOS ===")
+        
+        # Verificar self.data
+        if self.data:
+            log_info(f"self.data presente com {len(self.data)} chaves")
+            log_info(f"  Chaves em self.data: {list(self.data.keys())}")
+            if 'demodulated' in self.data:
+                log_info(f"  'demodulated' encontrado em self.data (tamanho: {len(self.data['demodulated'])})")
+            else:
+                log_warning("  'demodulated' NÃO encontrado em self.data")
+        else:
+            log_warning("self.data é None")
+        
+        # Verificar self.demodulated_data
+        if self.demodulated_data:
+            log_info(f"self.demodulated_data presente com {len(self.demodulated_data)} chaves")
+            log_info(f"  Chaves em self.demodulated_data: {list(self.demodulated_data.keys())}")
+            if 'demodulated' in self.demodulated_data:
+                log_info(f"  'demodulated' encontrado em self.demodulated_data (tamanho: {len(self.demodulated_data['demodulated'])})")
+            else:
+                log_warning("  'demodulated' NÃO encontrado em self.demodulated_data")
+        else:
+            log_warning("self.demodulated_data é None")
+        
+        # Verificar se são o mesmo objeto
+        if self.data and self.demodulated_data:
+            log_info(f"self.data is self.demodulated_data: {self.data is self.demodulated_data}")
+        
+        log_info("=== FIM DO DIAGNÓSTICO ===")
+
+    @pyqtSlot()
+    def generate_audio_wav(self):
+        """
+        Gera arquivo de áudio WAV a partir do sinal demodulado
+        
+        Returns:
+            str: Caminho do arquivo WAV gerado, ou None se houve erro
+        """
+        log_info("Iniciando geração de arquivo de áudio WAV")
+        
+        # Fazer diagnóstico completo do estado dos dados
+        self.diagnose_data_state()
+        
+        # Debug: verificar estado atual dos dados
+        log_debug(f"generate_audio_wav: self.demodulated_data={'presente' if self.demodulated_data else 'None'}")
+        log_debug(f"generate_audio_wav: self.data={'presente' if self.data else 'None'}")
+        
+        if self.demodulated_data:
+            log_debug(f"generate_audio_wav: Chaves em self.demodulated_data: {list(self.demodulated_data.keys())}")
+        if self.data:
+            log_debug(f"generate_audio_wav: Chaves em self.data: {list(self.data.keys())}")
+        
+        # Verificar se temos dados demodulados em qualquer um dos locais
+        data_source = None
+        if self.demodulated_data and 'demodulated' in self.demodulated_data:
+            data_source = self.demodulated_data
+            log_info("generate_audio_wav: Usando dados de self.demodulated_data")
+        elif self.data and 'demodulated' in self.data:
+            data_source = self.data
+            log_info("generate_audio_wav: Usando dados de self.data")
+        else:
+            log_warning("generate_audio_wav: Sem dados demodulados para gerar áudio")
+            log_warning(f"generate_audio_wav: DEBUG - self.demodulated_data has 'demodulated': {self.demodulated_data and 'demodulated' in self.demodulated_data if self.demodulated_data else 'N/A'}")
+            log_warning(f"generate_audio_wav: DEBUG - self.data has 'demodulated': {self.data and 'demodulated' in self.data if self.data else 'N/A'}")
+            self.processingProgress.emit("Sem dados demodulados para gerar áudio. Demodule os dados primeiro.")
+            return None
+            
+        try:
+            # Importar bibliotecas necessárias
+            import os
+            import math
+            from scipy import signal
+            from scipy.io import wavfile
+            
+            self.processingProgress.emit("Processando sinal para áudio...")
+            
+            # Obter dados do sinal demodulado
+            signal_in = np.asarray(data_source['demodulated'], dtype=np.float64)
+            
+            # Determinar taxa de amostragem original
+            if 'sample_frequency_effective' in data_source:
+                fs_orig = float(data_source['sample_frequency_effective'])
+            elif 'sample_frequency' in data_source and 'decimation' in data_source:
+                fs_orig = float(data_source['sample_frequency']) / float(data_source['decimation'])
+            else:
+                log_warning("generate_audio_wav: Não foi possível determinar a taxa de amostragem original, usando padrão")
+                fs_orig = 1.953125e6  # valor padrão (125MHz/64)
+                
+            log_debug(f"generate_audio_wav: Taxa de amostragem original: {fs_orig} Hz")
+            
+            # Parâmetros de conversão (baseados no convert_to_wav_gui.py)
+            target_rate = 44100  # Hz
+            hp_cutoff = 20.0     # Hz
+            lp_cutoff = 20000.0  # Hz
+            
+            # Filtro passa-alta (20 Hz) – Butterworth de 4ª ordem
+            log_debug("generate_audio_wav: Aplicando filtro passa-alta")
+            sos = signal.butter(N=4, Wn=hp_cutoff, btype="highpass", fs=fs_orig, output="sos")
+            signal_hp = signal.sosfiltfilt(sos, signal_in)
+            
+            # Filtro passa-baixa (20 kHz) – Butterworth de 4ª ordem
+            log_debug("generate_audio_wav: Aplicando filtro passa-baixa")
+            sos = signal.butter(N=4, Wn=lp_cutoff, btype="lowpass", fs=fs_orig, output="sos")
+            signal_lp = signal.sosfiltfilt(sos, signal_hp)
+            
+            # Reamostragem para target_rate
+            log_debug("generate_audio_wav: Reamostrando sinal")
+            self.processingProgress.emit("Reamostrando sinal para taxa de áudio...")
+            
+            # Calcular fatores inteiros up/down para resample_poly
+            fs_orig_int = int(round(fs_orig))  # garantir inteiro
+            if fs_orig_int == 0:
+                raise ValueError("Taxa de amostragem original inválida (0 Hz)")
+                
+            g = math.gcd(target_rate, fs_orig_int)
+            up = target_rate // g
+            down = fs_orig_int // g
+            
+            # Se ainda estiverem muito grandes, limitar valores mantendo a razão
+            max_factor = 1000  # limite arbitrário para evitar coeficientes enormes
+            while down > max_factor:
+                up = (up + 1) // 2
+                down = (down + 1) // 2
+                
+            log_debug(f"generate_audio_wav: Fatores de reamostragem: up={up}, down={down}")
+            signal_resampled = signal.resample_poly(signal_lp, up, down)
+            
+            # Normalização para [-1, 1]
+            log_debug("generate_audio_wav: Normalizando sinal")
+            max_abs = np.max(np.abs(signal_resampled))
+            if max_abs == 0:
+                norm_signal = signal_resampled
+            else:
+                norm_signal = signal_resampled / max_abs
+                
+            # Converter para int16
+            pcm16 = np.int16(norm_signal * 32767)
+            
+            # Determinar nome do arquivo
+            root_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+            
+            # Tentar usar metadados para nome do arquivo
+            metadata = data_source.get('metadata', {})
+            if metadata and 'timestamp' in metadata:
+                timestamp = metadata['timestamp']
+                base_name = f"demodulado_{timestamp}"
+            else:
+                # Usar timestamp atual se não tiver metadados
+                import datetime
+                timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+                base_name = f"demodulado_{timestamp}"
+                
+            wav_name = f"{base_name}_audio.wav"
+            wav_path = os.path.join(root_dir, wav_name)
+            
+            # Salvar arquivo WAV
+            log_debug(f"generate_audio_wav: Salvando em {wav_path}")
+            self.processingProgress.emit("Salvando arquivo WAV...")
+            wavfile.write(wav_path, target_rate, pcm16)
+            
+            log_info(f"Arquivo de áudio WAV gerado com sucesso: {wav_path}")
+            self.processingProgress.emit(f"Arquivo WAV salvo: {os.path.basename(wav_path)}")
+            
+            # Emitir sinal de conclusão
+            self.audioGenerated.emit(wav_path)
+            
+            return wav_path
+            
+        except Exception as e:
+            log_error(f"Erro ao gerar arquivo de áudio: {str(e)}")
+            self.processingProgress.emit(f"Erro ao gerar áudio: {str(e)}")
             return None 

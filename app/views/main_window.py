@@ -8,6 +8,8 @@ from PyQt5.QtCore import Qt, QSize
 from app.views.panels.acquisition_panel import AcquisitionPanel
 from app.views.panels.metadata_panel import MetadataPanel
 from app.views.panels.analysis_panel import AnalysisPanel
+from app.views.panels.audio_analysis_panel import AudioAnalysisPanel
+from app.views.panels.ultra_hear_panel import UltraHearPanel
 from app.views.panels.log_panel import LogPanel
 from app.utils.resources import get_icon, toggle_theme
 
@@ -51,6 +53,12 @@ class MainWindow(QMainWindow):
         # Aba de Análise
         self.analysis_panel = AnalysisPanel()
         
+        # Aba de Análise de Áudio
+        self.audio_analysis_panel = AudioAnalysisPanel()
+        
+        # Aba Ultra-Hear
+        self.ultra_hear_panel = UltraHearPanel()
+        
         # Aba de Logs
         self.log_panel = LogPanel()
         
@@ -58,6 +66,8 @@ class MainWindow(QMainWindow):
         self.tabs.addTab(self.metadata_panel, "Metadados")
         self.tabs.addTab(self.acquisition_panel, "Aquisição")
         self.tabs.addTab(self.analysis_panel, "Análise")
+        self.tabs.addTab(self.audio_analysis_panel, "Análise de Áudio")
+        self.tabs.addTab(self.ultra_hear_panel, "Ultra-Hear")
         self.tabs.addTab(self.log_panel, "Logs")
         
         # Barra de status
@@ -83,6 +93,18 @@ class MainWindow(QMainWindow):
         self.action_analysis.setStatusTip("Analisar dados")
         self.action_analysis.triggered.connect(lambda: self.switch_to_tab(2))
         self.toolbar.addAction(self.action_analysis)
+        
+        # Ação para análise de áudio
+        self.action_audio_analysis = QAction(get_icon("analysis"), "Análise de Áudio", self)
+        self.action_audio_analysis.setStatusTip("Análise dedicada de áudio")
+        self.action_audio_analysis.triggered.connect(lambda: self.switch_to_tab(3))
+        self.toolbar.addAction(self.action_audio_analysis)
+        
+        # Ação para Ultra-Hear
+        self.action_ultra_hear = QAction(get_icon("analysis"), "Ultra-Hear", self)
+        self.action_ultra_hear.setStatusTip("Análise de frequências ultrassônicas")
+        self.action_ultra_hear.triggered.connect(lambda: self.switch_to_tab(4))
+        self.toolbar.addAction(self.action_ultra_hear)
         
         self.toolbar.addSeparator()
         
@@ -117,7 +139,7 @@ class MainWindow(QMainWindow):
         # Ação para visualizar logs
         self.action_logs = QAction(get_icon("logs"), "Logs", self)
         self.action_logs.setStatusTip("Visualizar logs da aplicação")
-        self.action_logs.triggered.connect(lambda: self.switch_to_tab(3))
+        self.action_logs.triggered.connect(lambda: self.switch_to_tab(5))
         self.toolbar.addAction(self.action_logs)
         
         # Ação para alternar tema
@@ -220,7 +242,7 @@ class MainWindow(QMainWindow):
         Muda para a aba especificada
         
         Args:
-            index: Índice da aba (0 = Aquisição, 1 = Metadados, 2 = Análise, 3 = Logs)
+            index: Índice da aba (0 = Metadados, 1 = Aquisição, 2 = Análise, 3 = Análise de Áudio, 4 = Logs)
         """
         if 0 <= index < self.tabs.count():
             self.tabs.setCurrentIndex(index) 
