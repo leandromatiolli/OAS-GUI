@@ -17,7 +17,9 @@ if os.path.dirname(os.path.abspath(__file__)) not in sys.path:
 from app.views.main_window import MainWindow
 from app.controllers.acquisition_controller import AcquisitionController
 from app.controllers.processing_controller import ProcessingController
+from app.controllers.audio_controller import AudioController
 from app.controllers.file_controller import FileController
+from app.controllers.ultra_hear_controller import UltraHearController
 from app.models.hardware.redpitaya_client import RedPitayaClient
 # Importar módulo de recursos
 from app.utils.resources import apply_stylesheet
@@ -89,6 +91,8 @@ class Application:
         self.acquisition_controller = AcquisitionController()
         self.processing_controller = ProcessingController()
         self.file_controller = FileController()
+        self.audio_controller = AudioController()
+        self.ultra_hear_controller = UltraHearController()
     
     def init_window(self):
         """Inicializa a janela principal"""
@@ -134,6 +138,23 @@ class Application:
         # Conexão para geração de espectrograma
         self.window.analysis_panel.spectrogramRequested.connect(self.processing_controller.generate_spectrogram)
         self.processing_controller.spectrogramGenerated.connect(self.on_spectrogram_generated)
+        
+        # Conexões do controlador de áudio
+        self.window.audio_analysis_panel.audioFileSelected.connect(self.audio_controller.load_audio_file)
+        self.window.audio_analysis_panel.generateAudioRequested.connect(self.audio_controller.generate_audio)
+        self.window.audio_analysis_panel.playAudioRequested.connect(self.on_play_audio_from_audio_panel)
+        self.audio_controller.audioLoaded.connect(self.on_audio_file_loaded)
+        self.audio_controller.audioGenerated.connect(self.on_audio_generated_from_audio_panel)
+        self.audio_controller.audioError.connect(self.on_audio_error)
+        self.audio_controller.spectrumCalculated.connect(self.on_spectrum_calculated_for_audio)
+        
+        # Conexões do controlador Ultra-Hear
+        self.window.ultra_hear_panel.audioFileSelected.connect(self.ultra_hear_controller.load_audio_file)
+        self.window.ultra_hear_panel.processUltrasonicRequested.connect(self.ultra_hear_controller.process_ultrasonic_audio)
+        self.window.ultra_hear_panel.playProcessedAudioRequested.connect(self.on_play_ultra_hear_audio)
+        self.ultra_hear_controller.dataLoaded.connect(self.on_ultra_hear_data_loaded)
+        self.ultra_hear_controller.processingFinished.connect(self.on_ultra_hear_processing_finished)
+        self.ultra_hear_controller.processingError.connect(self.on_ultra_hear_error)
     
     def initialize_state(self):
         """Inicializa o estado da aplicação"""
@@ -626,6 +647,8 @@ class Application:
             log_error(f"Erro ao exibir espectrograma: {str(e)}")
             self.window.show_status_message(f"Erro ao exibir espectrograma: {str(e)}")
             
+
+            
     def diagnose_filtered_data(self, data):
         """
         Diagnóstico detalhado dos dados de filtro passa-banda
@@ -677,7 +700,96 @@ class Application:
     
     def on_files_selected(self, file_list):
         """Slot para carregar múltiplos arquivos selecionados na análise"""
-        self.window.analysis_panel.load_selected_file_from_list(file_list)
+        # Carregar o primeiro arquivo através do file_controller para garantir 
+        # que os dados sejam passados corretamente para o processing_controller
+        if file_list:
+            log_info(f"Carregando arquivo selecionado: {file_list[0]}")
+            self.file_controller.load_file(file_list[0])
+            
+            # Se há múltiplos arquivos, também usar o método original para exibição múltipla
+            if len(file_list) > 1:
+                log_info(f"Carregando visualização múltipla para {len(file_list)} arquivos")
+                self.window.analysis_panel.load_selected_file_from_list(file_list)
+    
+    def on_audio_file_loaded(self, data):
+        """Manipula o carregamento de arquivo na aba de análise de áudio"""
+        log_info("Arquivo carregado na aba de análise de áudio")
+        
+        # Atualizar o painel de áudio
+        self.window.audio_analysis_panel.on_audio_loaded(data)
+        
+        # Calcular espectro automaticamente
+        self.audio_controller.calculate_spectrum()
+    
+    def on_audio_generated_from_audio_panel(self, audio_path):
+        """Manipula a geração de áudio na aba de análise de áudio"""
+        log_info(f"Áudio gerado na aba de análise de áudio: {audio_path}")
+        
+        # Atualizar o painel de áudio
+        self.window.audio_analysis_panel.on_audio_generated(audio_path)
+    
+    def on_play_audio_from_audio_panel(self):
+        """Manipula a reprodução de áudio na aba de análise de áudio"""
+        audio_path = self.audio_controller.get_current_audio_path()
+        if audio_path:
+            self.play_audio_file(audio_path)
+        else:
+            log_warning("Nenhum arquivo de áudio disponível para reprodução")
+    
+    def on_audio_error(self, error_message):
+        """Manipula erros do controlador de áudio"""
+        log_error(f"Erro no controlador de áudio: {error_message}")
+        self.window.audio_analysis_panel.on_audio_error(error_message)
+    
+    def on_spectrum_calculated_for_audio(self, frequencies, magnitudes):
+        """Manipula o cálculo de espectro para a aba de análise de áudio"""
+        log_debug("Espectro calculado para aba de análise de áudio")
+        self.window.audio_analysis_panel.show_spectrum(frequencies, magnitudes)
+    
+    def play_audio_file(self, audio_path):
+        """Reproduz um arquivo de áudio usando o reprodutor padrão do sistema"""
+        try:
+            import os
+            import subprocess
+            import platform
+            
+            log_info(f"Reproduzindo arquivo de áudio: {audio_path}")
+            
+            system = platform.system()
+            if system == "Windows":
+                os.startfile(audio_path)
+            elif system == "Darwin":  # macOS
+                subprocess.run(["open", audio_path])
+            else:  # Linux
+                subprocess.run(["xdg-open", audio_path])
+                
+        except Exception as e:
+            error_msg = f"Erro ao reproduzir arquivo de áudio: {str(e)}"
+            log_error(error_msg)
+            self.window.show_error_message("Erro de Reprodução", error_msg)
+    
+    def on_ultra_hear_data_loaded(self, data):
+        """Manipula o carregamento de dados no Ultra-Hear"""
+        log_info("Dados carregados no Ultra-Hear")
+        self.window.ultra_hear_panel.on_data_loaded(data)
+    
+    def on_ultra_hear_processing_finished(self, result):
+        """Manipula o fim do processamento Ultra-Hear"""
+        log_info("Processamento Ultra-Hear concluído")
+        self.window.ultra_hear_panel.on_processing_finished(result)
+    
+    def on_ultra_hear_error(self, error_message):
+        """Manipula erros do Ultra-Hear"""
+        log_error(f"Erro no Ultra-Hear: {error_message}")
+        self.window.ultra_hear_panel.on_error(error_message)
+    
+    def on_play_ultra_hear_audio(self):
+        """Reproduz o áudio processado pelo Ultra-Hear"""
+        audio_path = self.ultra_hear_controller.get_current_audio_path()
+        if audio_path:
+            self.play_audio_file(audio_path)
+        else:
+            log_warning("Nenhum arquivo de áudio Ultra-Hear disponível para reprodução")
     
     def run(self):
         """

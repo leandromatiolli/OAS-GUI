@@ -683,6 +683,8 @@ class AnalysisPanel(QWidget):
         log_info("Aplicando filtro passa-banda manualmente")
         self.bandpassFilterChanged.emit(True, self.low_freq_spinbox.value(), self.high_freq_spinbox.value(), self.order_spinbox.value()) 
 
+
+
     def show_metadata(self, metadata):
         """
         Exibe os metadados do arquivo
