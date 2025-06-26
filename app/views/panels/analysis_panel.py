@@ -840,6 +840,8 @@ class AnalysisPanel(QWidget):
         
         # Após carregar todos, plotar espectros múltiplos e mostrar metadados
         if self.multiple_demodulated_data:
+            # Plotar todos os sinais demodulados sobrepostos
+            self.plot_demodulated_multiple()
             self.plot_spectrum_multiple()
             self.show_metadata_multiple(self.multiple_metadata)
 
@@ -959,3 +961,62 @@ class AnalysisPanel(QWidget):
         demod_files = list(sorted(set(demod_files), key=lambda x: os.path.getmtime(os.path.join(self.current_dir, x)), reverse=True))
         for file in demod_files:
             self.file_list.addItem(file) 
+
+    def plot_demodulated_multiple(self):
+        """Plota os sinais demodulados de todos os arquivos carregados simultaneamente."""
+        import numpy as np
+
+        if not getattr(self, 'multiple_demodulated_data', None):
+            return
+
+        ax = self.demodulated_canvas.axes
+        ax.clear()
+
+        colors = ['blue', 'red', 'green', 'orange', 'purple', 'brown', 'cyan', 'magenta']
+        alphas = [1.0, 0.6, 0.6, 0.6, 0.6, 0.6, 0.6, 0.6]
+
+        max_points = 10000  # limitar pontos para visualização
+
+        for idx, data in enumerate(self.multiple_demodulated_data):
+            demod = data.get('demodulated')
+            if demod is None:
+                continue
+
+            # Recuperar eixo de tempo ou calcular
+            if 't' in data:
+                t = np.asarray(data['t'])
+            else:
+                # Determinar fs
+                if 'sample_frequency' in data and 'decimation' in data:
+                    fs = data['sample_frequency'] / data['decimation']
+                elif 'sample_frequency_effective' in data:
+                    fs = data['sample_frequency_effective']
+                else:
+                    fs = 1.0  # fallback
+                t = np.arange(len(demod)) / fs
+
+            # Reduzir pontos se necessário
+            if len(t) > max_points:
+                step = len(t) // max_points
+                t_plot = t[::step]
+                d_plot = demod[::step]
+            else:
+                t_plot = t
+                d_plot = demod
+
+            label = f"Arquivo {idx + 1}"
+            ax.plot(t_plot, d_plot, color=colors[idx % len(colors)], alpha=alphas[idx % len(alphas)], label=label)
+
+        ax.set_xlabel('Tempo (s)')
+        ax.set_ylabel('Fase (rad)')
+        ax.set_title('Sinais Demodulados (Múltiplos Arquivos)')
+        ax.grid(True)
+        ax.legend()
+
+        self.demodulated_canvas.draw()
+
+        # Garantir que a aba correta está selecionada (índice 2 = Demodulado)
+        try:
+            self.analysis_tabs.setCurrentIndex(2)
+        except Exception:
+            pass 
