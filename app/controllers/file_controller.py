@@ -16,6 +16,7 @@ class FileController(QObject):
     fileError = pyqtSignal(str)  # Erro ao carregar arquivo
     calibrationStatusChanged = pyqtSignal(bool, str)  # Status da calibração (disponível, nome do arquivo)
     calibrationListUpdated = pyqtSignal(list)  # Lista de calibrações disponíveis
+    calibrationDataLoaded = pyqtSignal(object) # new signal for calibration data
     
     def __init__(self, parent=None):
         """
@@ -66,6 +67,12 @@ class FileController(QObject):
                     self.current_calibration_file = calibration_files[0]
                     has_calibration = DataStore.has_valid_calibration(self.current_calibration_file)
             
+            if has_calibration:
+                # Load data and emit
+                calib_data = self.load_calibration_data(self.current_calibration_file)
+                if calib_data:
+                    self.calibrationDataLoaded.emit(calib_data)
+
             self.calibrationStatusChanged.emit(has_calibration, self.current_calibration_file)
         except Exception as e:
             self.fileError.emit(f"Erro ao verificar calibração: {str(e)}")
@@ -98,7 +105,9 @@ class FileController(QObject):
             
             # Carregar a calibração
             calibration_data = self.load_calibration_data(calibration_file)
-            
+            if calibration_data:
+                self.calibrationDataLoaded.emit(calibration_data)
+
             # Atualizar status
             self.calibrationStatusChanged.emit(calibration_data is not None, calibration_file)
             
@@ -123,6 +132,25 @@ class FileController(QObject):
             
         except Exception as e:
             self.fileError.emit(f"Erro ao carregar arquivo: {str(e)}")
+    
+    @pyqtSlot(str)
+    def set_calibration_directory(self, directory: str):
+        """
+        Define o diretório de calibração e o salva nas configurações
+        
+        Args:
+            directory: Caminho para o diretório de calibração
+        """
+        try:
+            config = DataStore.load_config()
+            config['calibration_directory'] = directory
+            DataStore.save_config(config)
+            
+            # Atualizar a lista de calibrações
+            self.refresh_calibration_list()
+            
+        except Exception as e:
+            self.fileError.emit(f"Erro ao definir diretório de calibração: {str(e)}")
     
     def load_calibration_data(self, filename: Optional[str] = None) -> Optional[Dict[str, Any]]:
         """

@@ -99,6 +99,7 @@ class Application:
         # Conexões do controlador de aquisição
         self.window.acquisition_panel.acquisitionRequested.connect(self.on_acquisition_requested)
         self.window.acquisition_panel.calibrationFileSelected.connect(self.file_controller.set_current_calibration)
+        self.window.acquisition_panel.calibrationFolderChanged.connect(self.file_controller.set_calibration_directory)
         self.acquisition_controller.acquisitionStarted.connect(self.on_acquisition_started)
         self.acquisition_controller.acquisitionFinished.connect(self.on_acquisition_finished)
         self.acquisition_controller.calibrationFinished.connect(self.on_calibration_finished)
@@ -113,6 +114,7 @@ class Application:
         self.file_controller.fileError.connect(self.on_file_error)
         self.file_controller.calibrationStatusChanged.connect(self.window.acquisition_panel.update_calibration_status)
         self.file_controller.calibrationListUpdated.connect(self.window.acquisition_panel.update_calibration_list)
+        self.file_controller.calibrationDataLoaded.connect(self.processing_controller.set_calibration_data)
         
         # Conexões do controlador de processamento
         self.window.analysis_panel.demodulateRequested.connect(self.processing_controller.demodulate_data)
@@ -143,24 +145,21 @@ class Application:
             log_warning("Hardware de aquisição não disponível")
             self.window.show_status_message("Hardware de aquisição não disponível")
         
+        # Carregar configuração da pasta de calibração
+        config = DataStore.load_config()
+        calib_folder = config.get('calibration_directory')
+        if not calib_folder:
+            # If not set, use default path from user request
+            calib_folder = 'data/Calibrações'
+            # Let's save it back to config
+            config['calibration_directory'] = calib_folder
+            DataStore.save_config(config)
+
+        self.window.acquisition_panel.set_calibration_folder(calib_folder)
+
         # Carregar lista de arquivos
         self.file_controller.refresh_file_list()
         
-        # Carregar lista de calibrações disponíveis
-        calibration_files = DataStore.get_available_calibration_files()
-        self.window.acquisition_panel.update_calibration_list(calibration_files)
-        
-        # Se houver calibrações, carregar a primeira disponível
-        if calibration_files:
-            calibration_data = self.file_controller.load_calibration_data(calibration_files[0])
-            if calibration_data:
-                log_info(f"Arquivo de calibração encontrado e carregado: {calibration_files[0]}")
-                self.processing_controller.set_calibration_data(calibration_data)
-            else:
-                log_info("Nenhum arquivo de calibração válido encontrado")
-        else:
-            log_info("Nenhum arquivo de calibração encontrado")
-    
     def on_acquisition_requested(self, params):
         """
         Manipula o evento de solicitação de aquisição
