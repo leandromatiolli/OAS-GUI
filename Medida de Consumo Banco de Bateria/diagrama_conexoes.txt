@@ -1,0 +1,117 @@
+DIAGRAMA DE CONEXÕES - SISTEMA DE MONITORAMENTO DE BATERIA LI-ION 3S
+=====================================================================
+
+BANCO DE BATERIAS LI-ION 3S (12.6V)
+    |
+    | (Tensão total da bateria)
+    |
+    +----[DIVISOR DE TENSÃO]----+
+    |   R1 = 20kΩ              |
+    |   R2 = 10kΩ              |
+    |   Vout = Vin * 0.33      |
+    +---------------------------+
+    |
+    | (Tensão reduzida ~4.2V)
+    |
+    +----[ARDUINO A0] (Medição tensão bateria)
+    |
+    |
+    +----[SHUNT DE CORRENTE 100mΩ]----+
+    |                                  |
+    | (Corrente total da bateria)      |
+    |                                  |
+    +----[ARDUINO A1] (Medição corrente)
+    |
+    |
+    +----[REGULADOR 5V]----+
+    |                      |
+    | (Tensão regulada)    |
+    |                      |
+    +----[RESISTOR CARGA 10Ω]----+
+    |                            |
+    | (Carga dissipativa)        |
+    |                            |
+    +----[ARDUINO A2] (Medição tensão resistor)
+    |
+    |
+    +----[GND] (Terra comum)
+
+DETALHES DAS CONEXÕES:
+=====================
+
+1. DIVISOR DE TENSÃO PARA BATERIA:
+   - Entrada: 12.6V (bateria 3S)
+   - Saída: ~4.2V (seguro para Arduino)
+   |   R1 = 20kΩ, R2 = 10kΩ
+   |   Vout = Vin * R2/(R1+R2) = Vin * 0.33
+
+2. SHUNT DE CORRENTE:
+   - Resistência: 100mΩ
+   - Corrente máxima: 5A (dissipação 2.5W)
+   - Tensão no shunt: V = I * 0.1Ω
+   - Para 1A: V = 0.1V
+
+3. REGULADOR DE TENSÃO:
+   - Entrada: 12.6V (bateria)
+   - Saída: 5V (estável)
+   - Corrente máxima: conforme especificação do regulador
+
+4. RESISTOR DE CARGA:
+   - Resistência: 10Ω
+   - Tensão: 5V (do regulador)
+   - Corrente: I = 5V/10Ω = 0.5A
+   - Potência: P = 5V * 0.5A = 2.5W
+
+5. CONEXÕES ARDUINO:
+   - A0: Tensão da bateria (após divisor)
+   - A1: Tensão no shunt de corrente
+   - A2: Tensão no resistor de carga
+   - GND: Terra comum
+   - 5V: Alimentação (se necessário)
+
+CÁLCULOS IMPORTANTES:
+====================
+
+1. Tensão da Bateria:
+   Vbat = (leitura_A0 / 1023) * 5V * 3.0
+
+2. Corrente da Bateria:
+   Ibat = (leitura_A1 / 1023) * 5V / 0.1Ω
+
+3. Tensão no Resistor:
+   Vres = (leitura_A2 / 1023) * 5V
+
+4. Corrente no Resistor:
+   Ires = Vres / 10Ω
+
+5. Potência da Bateria:
+   Pbat = Vbat * Ibat
+
+6. Potência no Resistor:
+   Pres = Vres * Ires
+
+7. Capacidade Utilizada:
+   Cap = ∫ Ibat dt (integração numérica)
+
+8. Energia Total:
+   E = ∫ Pbat dt (integração numérica)
+
+CONSIDERAÇÕES DE SEGURANÇA:
+===========================
+
+1. SEMPRE desconecte a alimentação antes de fazer modificações
+2. Use resistores com potência adequada (2W ou mais)
+3. Monitore a temperatura dos componentes
+4. Verifique todas as conexões antes de energizar
+5. Use multímetro para confirmar tensões antes de conectar ao Arduino
+6. Não exceda 5V nas entradas analógicas do Arduino
+
+CALIBRAÇÃO:
+===========
+
+1. Medir tensão real da bateria com multímetro
+2. Ajustar R1 e R2 do divisor se necessário
+3. Medir tensão no shunt com corrente conhecida
+4. Ajustar constante RESISTOR_SHUNT no firmware
+5. Verificar tensão no resistor de carga
+6. Ajustar DIVISOR_TENSAO_BAT se necessário 

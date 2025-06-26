@@ -1,0 +1,8 @@
+{
+    "capacidade_total": 10400.0,
+    "tensao_nominal": 7.4,
+    "resistor_carga": 120.0,
+    "resistor_shunt": 1.2,
+    "r1_divisor": 19500.0,
+    "r2_divisor": 9700.0
+}
