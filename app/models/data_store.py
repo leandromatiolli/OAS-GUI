@@ -179,9 +179,13 @@ class DataStore:
         if filename is None:
             filename = DataStore.DEFAULT_CALIBRATION_FILE
             
-        # Obter diretório das configurações
-        directory = DataStore.load_config().get('save_directory')
+        # Obter diretório de calibração das configurações
+        directory = DataStore.load_config().get('calibration_directory')
         
+        # Se não houver diretório, salvar no diretório de dados padrão.
+        if not directory:
+             directory = DataStore.load_config().get('save_directory')
+
         # Garantir que o diretório existe
         if directory:
             os.makedirs(directory, exist_ok=True)
@@ -247,15 +251,27 @@ class DataStore:
         """
         calibration_files = []
         
-        # Procurar arquivos de calibração com padrão calibracao_*.pkl
-        calibration_files.extend(glob.glob("calibracao_*.pkl"))
+        # Obter diretório de calibração das configurações
+        config = DataStore.load_config()
+        calib_dir = config.get('calibration_directory')
+
+        # Se não houver diretório configurado, não procurar por arquivos.
+        if not calib_dir or not os.path.isdir(calib_dir):
+            return []
+
+        # Procurar arquivos de calibração com padrão calibracao_*.pkl no diretório
+        search_path = os.path.join(calib_dir, "calibracao_*.pkl")
+        calibration_files.extend(glob.glob(search_path))
         
-        # Incluir o arquivo padrão de calibração se existir
-        if os.path.exists(DataStore.DEFAULT_CALIBRATION_FILE):
-            calibration_files.append(DataStore.DEFAULT_CALIBRATION_FILE)
+        # Incluir o arquivo padrão de calibração se existir no diretório
+        default_calib_path = os.path.join(calib_dir, DataStore.DEFAULT_CALIBRATION_FILE)
+        if os.path.exists(default_calib_path):
+            if default_calib_path not in calibration_files:
+                calibration_files.append(default_calib_path)
         
         # Ordenar por data de modificação (mais recente primeiro)
-        calibration_files.sort(key=os.path.getmtime, reverse=True)
+        if calibration_files:
+            calibration_files.sort(key=os.path.getmtime, reverse=True)
         
         return calibration_files
     

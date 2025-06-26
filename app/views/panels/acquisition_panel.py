@@ -13,6 +13,7 @@ class AcquisitionPanel(QWidget):
     # Sinais
     acquisitionRequested = pyqtSignal(dict)  # Emitido quando o usuário solicita aquisição
     calibrationFileSelected = pyqtSignal(str)  # Emitido quando um arquivo de calibração é selecionado
+    calibrationFolderChanged = pyqtSignal(str)
     
     def __init__(self, parent=None):
         """
@@ -71,6 +72,16 @@ class AcquisitionPanel(QWidget):
         # Grupo de configurações de calibração
         self.calibration_group = QGroupBox("Configurações de Calibração")
         calibration_form = QFormLayout()
+        
+        # Botão para selecionar a pasta de calibrações
+        calib_folder_layout = QHBoxLayout()
+        self.calib_folder_label = QLabel("Nenhuma pasta selecionada")
+        self.calib_folder_label.setToolTip("Pasta contendo os arquivos de calibração")
+        self.select_calib_folder_button = QPushButton("Selecionar Pasta")
+        self.select_calib_folder_button.clicked.connect(self.select_calibration_folder)
+        calib_folder_layout.addWidget(self.calib_folder_label, 1)
+        calib_folder_layout.addWidget(self.select_calib_folder_button)
+        calibration_form.addRow("Pasta de Calibração:", calib_folder_layout)
         
         # Adicionar checkbox de calibração
         self.calibration_check = QCheckBox("Modo Calibração")
@@ -158,6 +169,26 @@ class AcquisitionPanel(QWidget):
             self.effective_rate_label.setStyleSheet("color: red;")
         else:
             self.effective_rate_label.setStyleSheet("")
+    
+    def select_calibration_folder(self):
+        """Abre um diálogo para selecionar a pasta de calibrações"""
+        current_dir = self.calib_folder_label.text()
+        if not os.path.isdir(current_dir):
+            current_dir = os.getcwd() # default to current dir if not set
+            
+        directory = QFileDialog.getExistingDirectory(self, "Selecione a Pasta de Calibrações", current_dir)
+        if directory:
+            self.set_calibration_folder(directory) # use a new method
+            self.calibrationFolderChanged.emit(directory)
+
+    def set_calibration_folder(self, folder_path: str):
+        """Atualiza a label da pasta de calibração"""
+        if folder_path and os.path.isdir(folder_path):
+            self.calib_folder_label.setText(folder_path)
+            self.calib_folder_label.setStyleSheet("")
+        else:
+            self.calib_folder_label.setText("Nenhuma pasta selecionada")
+            self.calib_folder_label.setStyleSheet("color: orange;")
     
     def update_calibration_mode(self, state):
         """
@@ -250,47 +281,42 @@ class AcquisitionPanel(QWidget):
             channels.append(2)
         
         if not channels:
-            QMessageBox.warning(self, "Erro", "Selecione pelo menos um canal")
+            QMessageBox.warning(self, "Canais não selecionados", "Por favor, selecione pelo menos um canal.")
             return
         
-        # Verificar se ambos os canais estão selecionados para calibração
+        # Verificar se é uma calibração
         is_calibration = self.calibration_check.isChecked()
-        if is_calibration and len(channels) < 2:
-            QMessageBox.warning(self, "Erro", "A calibração requer ambos os canais (1 e 2)")
-            return
         
-        # Se estiver em modo de calibração, verificar nome do arquivo
-        calibration_file = None
-        if is_calibration:
-            calibration_name = self.calib_name_edit.text().strip()
-            if not calibration_name:
-                QMessageBox.warning(self, "Erro", "Forneça um nome para o arquivo de calibração")
-                return
-            calibration_file = f"{calibration_name}.pkl"
-        else:
-            # Se não estiver em modo de calibração, verificar se há calibração selecionada
-            if self.calib_combo.currentIndex() > 0:
-                calibration_file = self.calib_combo.currentData()
-        
-        # Emitir sinal com os parâmetros de aquisição
+        # Obter parâmetros
         params = {
             'ip': ip,
             'duration': duration,
-            'sample_rate': sample_rate,
             'decimation': decimation,
+            'sample_rate': sample_rate,
             'channels': channels,
-            'is_calibration': is_calibration,
-            'calibration_file': calibration_file
+            'is_calibration': is_calibration
         }
         
+        # Adicionar nome do arquivo de calibração se estiver no modo de calibração
+        if is_calibration:
+            calib_name = self.calib_name_edit.text().strip()
+            if not calib_name:
+                QMessageBox.warning(self, "Nome de arquivo inválido", "Por favor, insira um nome para o arquivo de calibração.")
+                return
+            params['calibration_file'] = f"{calib_name}.pkl"
+            
         self.acquisitionRequested.emit(params)
-    
+        
+    def get_acquisition_params(self):
+        """Retorna os parâmetros de aquisição atuais"""
+        return self.request_acquisition() # Reutiliza a lógica para obter os parâmetros
+        
     def set_enabled(self, enabled):
         """
-        Habilita ou desabilita o painel
+        Habilita ou desabilita os controles do painel
         
         Args:
-            enabled: Estado de habilitação
+            enabled: True para habilitar, False para desabilitar
         """
         self.acquisition_group.setEnabled(enabled)
         self.calibration_group.setEnabled(enabled)
