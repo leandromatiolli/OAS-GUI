@@ -1,18 +1,19 @@
+#include <avr/sleep.h>
+#include <avr/power.h>
 #include <SoftwareSerial.h>
 
 const int LORA_RX_PIN = 10;
 const int LORA_TX_PIN = 11;
 const int LORA_M0_PIN = 3;
 const int LORA_M1_PIN = 4;
-const int LORA_AUX_PIN = 2;
+const int LORA_AUX_PIN = 2; // Interrupção externa 0
 const int STATUS_LED_PIN = LED_BUILTIN;
 const int MOSFET_PIN = 7;
 
 SoftwareSerial loraSerial(LORA_RX_PIN, LORA_TX_PIN);
 
 enum EstadoSistema { DESLIGADO, LIGADO };
-volatile bool auxPulseDetected = false;
-volatile int auxPulseCount = 0;
+volatile bool acordar = false;
 EstadoSistema estadoAtual = DESLIGADO;
 unsigned long ultimoComando = 0;
 
@@ -32,50 +33,25 @@ void setup() {
   estadoAtual = DESLIGADO;
   pinMode(LORA_AUX_PIN, INPUT_PULLUP);
   loraSerial.begin(9600);
-  attachInterrupt(digitalPinToInterrupt(LORA_AUX_PIN), onAuxPulse, FALLING);
-  Serial.println(F("Sistema pronto!"));
+  attachInterrupt(digitalPinToInterrupt(LORA_AUX_PIN), wakeUp, FALLING);
+  Serial.println(F("Sistema pronto em modo baixo consumo!"));
 }
 
 void loop() {
-  if (auxPulseDetected) {
-    Serial.print(F("PULSO #"));
-    Serial.println(auxPulseCount);
-    delay(100);
-    processarComandos();
-    auxPulseDetected = false;
+  // Dorme se não precisa acordar
+  if (!acordar) {
+    Serial.println(F("Dormindo..."));
+    delay(100); // Para garantir que o Serial envie antes de dormir
+    dormir();
+    // Quando acordar, acordar=true
+    Serial.println(F("Acordou!"));
   }
-  static unsigned long lastCheck = 0;
-  if (millis() - lastCheck > 2000) {
-    lastCheck = millis();
-    if (loraSerial.available() > 0) {
-      Serial.println(F("Dados encontrados!"));
-      processarComandos();
-    }
-  }
-  manterEstado();
-  static unsigned long lastStatus = 0;
-  if (millis() - lastStatus > 10000) {
-    lastStatus = millis();
-    Serial.println(F("--- STATUS ---"));
-    Serial.print(F("Estado: "));
-    Serial.println(estadoAtual == LIGADO ? F("LIGADO") : F("DESLIGADO"));
-    Serial.print(F("LED: "));
-    Serial.println(digitalRead(STATUS_LED_PIN) ? F("HIGH") : F("LOW"));
-    Serial.print(F("MOSFET: "));
-    Serial.println(digitalRead(MOSFET_PIN) ? F("HIGH") : F("LOW"));
-    Serial.print(F("Pulsos: "));
-    Serial.println(auxPulseCount);
-    Serial.println(F("--- FIM ---"));
-  }
-  delay(50);
-}
+  acordar = false;
 
-void onAuxPulse() {
-  auxPulseCount++;
-  auxPulseDetected = true;
-}
+  // Processa comandos LoRa
+  processarComandos();
 
-void manterEstado() {
+  // Mantém o estado do MOSFET/LED
   if (estadoAtual == LIGADO) {
     digitalWrite(STATUS_LED_PIN, HIGH);
     digitalWrite(MOSFET_PIN, HIGH);
@@ -85,32 +61,36 @@ void manterEstado() {
   }
 }
 
+void dormir() {
+  set_sleep_mode(SLEEP_MODE_PWR_DOWN);
+  sleep_enable();
+  noInterrupts();
+  EIFR = bit(INTF0); // Limpa flag de interrupção externa 0
+  interrupts();
+  sleep_cpu();
+  sleep_disable();
+}
+
+void wakeUp() {
+  acordar = true;
+}
+
 void processarComandos() {
   while (loraSerial.available() > 0) {
     char comando = loraSerial.read();
-    Serial.print(F("Comando: 0x"));
-    Serial.print(comando, HEX);
-    Serial.print(F(" ('"));
-    Serial.print(comando);
-    Serial.println(F("')"));
+    Serial.print(F("Comando: "));
+    Serial.println(comando);
     unsigned long agora = millis();
-    if (agora - ultimoComando < 1000) {
-      Serial.println(F("IGNORADO - muito próximo"));
-      continue;
-    }
+    if (agora - ultimoComando < 1000) continue;
+    ultimoComando = agora;
     if (comando == 'L') {
-      Serial.println(F(">>> COMANDO LIGAR"));
       estadoAtual = LIGADO;
-      ultimoComando = agora;
-      Serial.println(F("=== LED E MOSFET DEVEM FICAR ACESOS ==="));
+      Serial.println(F("MOSFET/LED ligados, Arduino ficará acordado."));
     } else if (comando == 'D') {
-      Serial.println(F(">>> COMANDO DESLIGAR"));
       estadoAtual = DESLIGADO;
-      ultimoComando = agora;
-      Serial.println(F("=== LED E MOSFET DEVEM FICAR APAGADOS ==="));
-    } else {
-      Serial.print(F("Comando desconhecido: "));
-      Serial.println(comando);
+      Serial.println(F("MOSFET/LED desligados, Arduino voltará a dormir."));
+      delay(200); // Pequeno delay para garantir desligamento
+      acordar = false; // Vai dormir no próximo loop
     }
   }
 } 
