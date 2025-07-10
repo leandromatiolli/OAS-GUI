@@ -14,6 +14,8 @@ class AcquisitionPanel(QWidget):
     acquisitionRequested = pyqtSignal(dict)  # Emitido quando o usuário solicita aquisição
     calibrationFileSelected = pyqtSignal(str)  # Emitido quando um arquivo de calibração é selecionado
     calibrationFolderChanged = pyqtSignal(str)
+    loraLigarRequested = pyqtSignal(str)  # Emitido quando o usuário solicita ligar equipamento LoRa
+    loraDesligarRequested = pyqtSignal(str)  # Emitido quando o usuário solicita desligar equipamento LoRa
     
     def __init__(self, parent=None):
         """
@@ -127,6 +129,43 @@ class AcquisitionPanel(QWidget):
         self.acquisition_group.setLayout(acquisition_form)
         layout.addWidget(self.acquisition_group)
         layout.addWidget(self.calibration_group)
+        
+        # Grupo de controles LoRa
+        self.lora_group = QGroupBox("Controle Remoto LoRa")
+        lora_form = QFormLayout()
+        
+        # Seleção de porta serial
+        port_layout = QHBoxLayout()
+        self.lora_port_combo = QComboBox()
+        self.lora_port_combo.setToolTip("Selecione a porta serial do módulo LoRa")
+        self.refresh_lora_ports_button = QPushButton("↻")
+        self.refresh_lora_ports_button.setToolTip("Atualizar lista de portas")
+        self.refresh_lora_ports_button.setMaximumWidth(25)
+        self.refresh_lora_ports_button.clicked.connect(self.refresh_lora_ports)
+        port_layout.addWidget(self.lora_port_combo, 1)
+        port_layout.addWidget(self.refresh_lora_ports_button)
+        lora_form.addRow("Porta Serial:", port_layout)
+        
+        # Botões de controle
+        lora_buttons_layout = QHBoxLayout()
+        self.lora_ligar_button = QPushButton("Ligar Equipamento")
+        self.lora_ligar_button.setStyleSheet("background-color: lightgreen")
+        self.lora_ligar_button.clicked.connect(self.ligar_equipamento_lora)
+        lora_buttons_layout.addWidget(self.lora_ligar_button)
+        
+        self.lora_desligar_button = QPushButton("Desligar Equipamento")
+        self.lora_desligar_button.setStyleSheet("background-color: #ff7f7f")
+        self.lora_desligar_button.clicked.connect(self.desligar_equipamento_lora)
+        lora_buttons_layout.addWidget(self.lora_desligar_button)
+        lora_form.addRow("Controle:", lora_buttons_layout)
+        
+        # Status do equipamento
+        self.lora_status_label = QLabel("Status: Desconhecido")
+        self.lora_status_label.setStyleSheet("color: orange;")
+        lora_form.addRow("Status:", self.lora_status_label)
+        
+        self.lora_group.setLayout(lora_form)
+        layout.addWidget(self.lora_group)
         
         # Botões de aquisição
         button_layout = QHBoxLayout()
@@ -320,4 +359,58 @@ class AcquisitionPanel(QWidget):
         """
         self.acquisition_group.setEnabled(enabled)
         self.calibration_group.setEnabled(enabled)
-        self.acquire_button.setEnabled(enabled) 
+        self.acquire_button.setEnabled(enabled)
+    
+    # Métodos para controle LoRa
+    def refresh_lora_ports(self):
+        """Atualiza a lista de portas seriais disponíveis para LoRa"""
+        # Este método será conectado ao controlador LoRa
+        # Por enquanto, apenas emite um sinal para solicitar atualização
+        self.loraLigarRequested.emit("refresh_ports")
+    
+    def ligar_equipamento_lora(self):
+        """Solicita ligar o equipamento via LoRa"""
+        port_name = self.lora_port_combo.currentText()
+        if not port_name or "Nenhuma" in port_name:
+            QMessageBox.warning(self, "Porta não selecionada", "Por favor, selecione uma porta serial para o LoRa.")
+            return
+        
+        self.loraLigarRequested.emit(port_name)
+    
+    def desligar_equipamento_lora(self):
+        """Solicita desligar o equipamento via LoRa"""
+        port_name = self.lora_port_combo.currentText()
+        if not port_name or "Nenhuma" in port_name:
+            QMessageBox.warning(self, "Porta não selecionada", "Por favor, selecione uma porta serial para o LoRa.")
+            return
+        
+        self.loraDesligarRequested.emit(port_name)
+    
+    def update_lora_ports(self, ports):
+        """
+        Atualiza a lista de portas seriais disponíveis
+        
+        Args:
+            ports: Lista de nomes de portas seriais
+        """
+        self.lora_port_combo.clear()
+        if not ports:
+            self.lora_port_combo.addItem("Nenhuma porta encontrada")
+        else:
+            for port in ports:
+                self.lora_port_combo.addItem(port)
+    
+    def update_lora_status(self, status):
+        """
+        Atualiza o status do equipamento LoRa
+        
+        Args:
+            status: String com o status do equipamento
+        """
+        self.lora_status_label.setText(f"Status: {status}")
+        if "LIGADO" in status:
+            self.lora_status_label.setStyleSheet("color: green;")
+        elif "DESLIGADO" in status:
+            self.lora_status_label.setStyleSheet("color: red;")
+        else:
+            self.lora_status_label.setStyleSheet("color: orange;") 

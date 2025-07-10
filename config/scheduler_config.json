@@ -1,0 +1,12 @@
+{
+  "measurements": [
+    {
+      "time": "11:08",
+      "duration": 5.0,
+      "enabled": true,
+      "last_execution": "2025-07-08T11:08:12.470227"
+    }
+  ],
+  "calibration_interval_hours": 24,
+  "last_calibration": null
+}

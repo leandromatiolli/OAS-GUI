@@ -20,6 +20,7 @@ from app.controllers.processing_controller import ProcessingController
 from app.controllers.audio_controller import AudioController
 from app.controllers.file_controller import FileController
 from app.controllers.ultra_hear_controller import UltraHearController
+from app.controllers.lora_controller import LoraController
 from app.models.hardware.redpitaya_client import RedPitayaClient
 # Importar módulo de recursos
 from app.utils.resources import apply_stylesheet
@@ -93,6 +94,7 @@ class Application:
         self.file_controller = FileController()
         self.audio_controller = AudioController()
         self.ultra_hear_controller = UltraHearController()
+        self.lora_controller = LoraController()
     
     def init_window(self):
         """Inicializa a janela principal"""
@@ -155,6 +157,12 @@ class Application:
         self.ultra_hear_controller.dataLoaded.connect(self.on_ultra_hear_data_loaded)
         self.ultra_hear_controller.processingFinished.connect(self.on_ultra_hear_processing_finished)
         self.ultra_hear_controller.processingError.connect(self.on_ultra_hear_error)
+        
+        # Conexões do controlador LoRa
+        self.window.acquisition_panel.loraLigarRequested.connect(self.on_lora_ligar_requested)
+        self.window.acquisition_panel.loraDesligarRequested.connect(self.on_lora_desligar_requested)
+        self.lora_controller.loraStatusChanged.connect(self.window.acquisition_panel.update_lora_status)
+        # Removido: self.lora_controller.loraError.connect(self.on_lora_error)
     
     def initialize_state(self):
         """Inicializa o estado da aplicação"""
@@ -180,6 +188,11 @@ class Application:
 
         # Carregar lista de arquivos
         self.file_controller.refresh_file_list()
+        
+        # Inicializar lista de portas LoRa
+        ports = self.lora_controller.get_available_ports()
+        self.window.acquisition_panel.update_lora_ports(ports)
+        log_info("Lista de portas LoRa inicializada")
         
     def on_acquisition_requested(self, params):
         """
@@ -790,6 +803,48 @@ class Application:
             self.play_audio_file(audio_path)
         else:
             log_warning("Nenhum arquivo de áudio Ultra-Hear disponível para reprodução")
+    
+    # Métodos para controle LoRa
+    def on_lora_ligar_requested(self, port_name):
+        """
+        Manipula a solicitação para ligar equipamento via LoRa
+        
+        Args:
+            port_name: Nome da porta serial
+        """
+        if port_name == "refresh_ports":
+            # Atualizar lista de portas
+            ports = self.lora_controller.get_available_ports()
+            self.window.acquisition_panel.update_lora_ports(ports)
+            log_info("Lista de portas LoRa atualizada")
+        else:
+            # Ligar equipamento
+            log_info(f"Solicitação para ligar equipamento via LoRa na porta {port_name}")
+            self.window.show_status_message(f"Ligando equipamento via LoRa...")
+            success = self.lora_controller.ligar_equipamento(port_name)
+            if success:
+                log_info("Equipamento ligado com sucesso via LoRa")
+                self.window.show_status_message("Equipamento ligado via LoRa")
+            else:
+                log_warning("Falha ao ligar equipamento via LoRa")
+    
+    def on_lora_desligar_requested(self, port_name):
+        """
+        Manipula a solicitação para desligar equipamento via LoRa
+        
+        Args:
+            port_name: Nome da porta serial
+        """
+        log_info(f"Solicitação para desligar equipamento via LoRa na porta {port_name}")
+        self.window.show_status_message(f"Desligando equipamento via LoRa...")
+        success = self.lora_controller.desligar_equipamento(port_name)
+        if success:
+            log_info("Equipamento desligado com sucesso via LoRa")
+            self.window.show_status_message("Equipamento desligado via LoRa")
+        else:
+            log_warning("Falha ao desligar equipamento via LoRa")
+    
+
     
     def run(self):
         """

@@ -229,8 +229,21 @@ void processarComandos() {
       
       if (estadoAtual == DESLIGADO) {
         estadoAtual = LIGADO;
+        
+        // Liga LED e MOSFET com debug específico
         digitalWrite(STATUS_LED_PIN, HIGH);
         digitalWrite(MOSFET_PIN, HIGH);
+        
+        // Força o estado do pino MOSFET para garantir ativação
+        pinMode(MOSFET_PIN, OUTPUT);
+        digitalWrite(MOSFET_PIN, HIGH);
+        
+        // Debug específico dos pinos
+        Serial.print(F("🔍 Status LED (D13): "));
+        Serial.println(digitalRead(STATUS_LED_PIN) ? F("HIGH") : F("LOW"));
+        Serial.print(F("🔍 Status MOSFET (D7): "));
+        Serial.println(digitalRead(MOSFET_PIN) ? F("HIGH") : F("LOW"));
+        
         deveDormir = false; // Fica acordado
         
         Serial.println(F("✅ MOSFET e LED LIGADOS"));
@@ -239,6 +252,11 @@ void processarComandos() {
         loraSerial.println(F("ACK_LIGA"));
       } else {
         Serial.println(F("⚠️ Já estava ligado"));
+        // Verifica estado atual dos pinos mesmo se já estava ligado
+        Serial.print(F("🔍 Status LED (D13): "));
+        Serial.println(digitalRead(STATUS_LED_PIN) ? F("HIGH") : F("LOW"));
+        Serial.print(F("🔍 Status MOSFET (D7): "));
+        Serial.println(digitalRead(MOSFET_PIN) ? F("HIGH") : F("LOW"));
       }
     }
     // Processa comando DESLIGAR
@@ -247,8 +265,17 @@ void processarComandos() {
       
       if (estadoAtual == LIGADO) {
         estadoAtual = DESLIGADO;
+        
+        // Desliga LED e MOSFET com debug específico
         digitalWrite(STATUS_LED_PIN, LOW);
         digitalWrite(MOSFET_PIN, LOW);
+        
+        // Debug específico dos pinos
+        Serial.print(F("🔍 Status LED (D13): "));
+        Serial.println(digitalRead(STATUS_LED_PIN) ? F("HIGH") : F("LOW"));
+        Serial.print(F("🔍 Status MOSFET (D7): "));
+        Serial.println(digitalRead(MOSFET_PIN) ? F("HIGH") : F("LOW"));
+        
         deveDormir = true; // Vai dormir
         
         Serial.println(F("✅ MOSFET e LED DESLIGADOS"));
