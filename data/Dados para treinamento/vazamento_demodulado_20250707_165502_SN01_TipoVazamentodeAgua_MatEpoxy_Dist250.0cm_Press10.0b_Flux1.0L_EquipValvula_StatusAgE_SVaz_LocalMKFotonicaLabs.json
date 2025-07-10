@@ -1,0 +1,21 @@
+{
+    "sensor_sn": "01",
+    "test_type": "Vazamento de Água",
+    "material": "Epoxy",
+    "location": "MKFotonica Labs",
+    "pressure": 10.0,
+    "pressure_unit": "bar",
+    "flow": 1.0,
+    "flow_unit": "L/min",
+    "distance": 250.0,
+    "distance_unit": "cm",
+    "equipment_type": "Válvula",
+    "equipment_status": [
+        "Água Estática",
+        "Sem Vazamento"
+    ],
+    "comments": "teste de ruido eletrico no redpitaya com fonte original",
+    "timestamp": "20250707_165502",
+    "save_directory": "C:/Users/leand/OneDrive/Empresa 2/Lab/OAS-GUI/data/Dados para treinamento",
+    "is_calibration": false
+}
