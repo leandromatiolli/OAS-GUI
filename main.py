@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 """
 OAS - Interface de Aquisição e Análise
-Programa principal para detecção e análise de vazamentos
+Programa principal para detecção e análise de vazamentos ...
 """
 import sys
 import os
