@@ -34,7 +34,7 @@ class AcquisitionPanel(QWidget):
         layout = QVBoxLayout(self)
         
         # Grupo de status do sensor
-        self.sensor_status_group = QGroupBox("Status do Sensor")
+        self.sensor_status_group = QGroupBox("Conexão com o Sensor")
         sensor_layout = QHBoxLayout()
         
         # Status da conexão
