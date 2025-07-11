@@ -288,7 +288,7 @@ class DataStore:
             Dicionário contendo os dados carregados
         """
         # Verificar se o arquivo é comprimido baseado na extensão
-        is_compressed = filename.endswith(('.gz', '.zip')) or 'pkl.zip' in filename
+        is_compressed = filename.endswith(('.gz', '.zip')) or 'pkl.gz' in filename
 
         try:
             if is_compressed:
@@ -340,12 +340,12 @@ class DataStore:
         pkl_files.extend(glob.glob("vazamento_continuo_*.pkl"))
 
         # Procurar arquivos .pkl.zip (comprimidos)
-        pkl_files.extend(glob.glob("vazamento_sensor_*.pkl.zip"))
-        pkl_files.extend(glob.glob("vazamento_continuo_*.pkl.zip"))
+        pkl_files.extend(glob.glob("vazamento_sensor_*.pkl.gz"))
+        pkl_files.extend(glob.glob("vazamento_continuo_*.pkl.gz"))
         
         if include_all:
             pkl_files.extend(glob.glob("vazamento_demodulado_*.pkl"))
-            pkl_files.extend(glob.glob("vazamento_demodulado_*.pkl.zip"))
+            pkl_files.extend(glob.glob("vazamento_demodulado_*.pkl.gz"))
         
         # Ordenar por data de modificação (mais recente primeiro)
         pkl_files.sort(key=os.path.getmtime, reverse=True)
