@@ -7,6 +7,7 @@ import os
 from app.models.hardware.redpitaya_client import RedPitayaClient
 from app.models.data_store import DataStore
 from typing import Dict, Any, Optional
+from OAS_Acquire_Continuous import bring_up_scpi_server
 
 class AcquisitionThread(QThread):
     """Thread para aquisição de dados sem congelar a interface"""
@@ -94,6 +95,7 @@ class AcquisitionController(QObject):
     acquisitionProgress = pyqtSignal(str)
     acquisitionError = pyqtSignal(str)
     calibrationFinished = pyqtSignal(dict)  # Sinal específico para calibração concluída
+    sensorConnected = pyqtSignal(bool, str, str)  # Sinal para status de conexão do sensor (connected, ip, error_message)
     
     def __init__(self, parent=None):
         """
@@ -188,4 +190,21 @@ class AcquisitionController(QObject):
             self.calibrationFinished.emit(data)
         else:
             # Emitir sinal normal para aquisição concluída
-            self.acquisitionFinished.emit(data) 
+            self.acquisitionFinished.emit(data)
+    
+    @pyqtSlot(str)
+    def connect_to_sensor(self, ip: str):
+        """
+        Conecta ao sensor Red Pitaya
+        
+        Args:
+            ip: Endereço IP do sensor
+        """
+        try:
+            # Tentar estabelecer conexão com o servidor SCPI
+            bring_up_scpi_server(ip)
+            self.sensorConnected.emit(True, ip, "")
+        except Exception as e:
+            error_message = f"Falha na conexão: {str(e)}"
+            self.sensorConnected.emit(False, ip, error_message)
+        

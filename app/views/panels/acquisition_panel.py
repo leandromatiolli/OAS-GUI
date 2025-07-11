@@ -16,6 +16,7 @@ class AcquisitionPanel(QWidget):
     calibrationFolderChanged = pyqtSignal(str)
     loraLigarRequested = pyqtSignal(str)  # Emitido quando o usuário solicita ligar equipamento LoRa
     loraDesligarRequested = pyqtSignal(str)  # Emitido quando o usuário solicita desligar equipamento LoRa
+    sensorConnectRequested = pyqtSignal(str)  # Emitido quando o usuário solicita conectar ao sensor
     
     def __init__(self, parent=None):
         """
@@ -32,13 +33,32 @@ class AcquisitionPanel(QWidget):
         # Layout principal
         layout = QVBoxLayout(self)
         
+        # Grupo de status do sensor
+        self.sensor_status_group = QGroupBox("Status do Sensor")
+        sensor_layout = QHBoxLayout()
+        
+        # Status da conexão
+        sensor_layout.addWidget(QLabel("Status:"))
+        self.sensor_status_label = QLabel("Desconectado")
+        self.sensor_status_label.setStyleSheet("color: red;")
+        sensor_layout.addWidget(self.sensor_status_label)
+        
+        # IP do sensor
+        sensor_layout.addWidget(QLabel("IP RedPitaya:"))
+        self.ip_edit = QLineEdit("rp-f0b916.local")
+        sensor_layout.addWidget(self.ip_edit)
+        
+        # Botão para conectar ao sensor
+        self.connect_sensor_button = QPushButton("Conectar ao Sensor")
+        self.connect_sensor_button.clicked.connect(self.connect_to_sensor)
+        sensor_layout.addWidget(self.connect_sensor_button)
+        
+        self.sensor_status_group.setLayout(sensor_layout)
+        layout.addWidget(self.sensor_status_group)
+        
         # Grupo de configurações de aquisição
         self.acquisition_group = QGroupBox("Configurações de Aquisição")
         acquisition_form = QFormLayout()
-        
-        # IP do RedPitaya
-        self.ip_edit = QLineEdit("rp-f0b916.local")
-        acquisition_form.addRow("IP RedPitaya:", self.ip_edit)
         
         # Duração da aquisição
         self.duration_spin = QDoubleSpinBox()
@@ -413,4 +433,37 @@ class AcquisitionPanel(QWidget):
         elif "DESLIGADO" in status:
             self.lora_status_label.setStyleSheet("color: red;")
         else:
-            self.lora_status_label.setStyleSheet("color: orange;") 
+            self.lora_status_label.setStyleSheet("color: orange;")
+    
+    def connect_to_sensor(self):
+        """Solicita conexão ao sensor Red Pitaya"""
+        ip = self.ip_edit.text()
+        if not ip:
+            QMessageBox.warning(self, "IP inválido", "Por favor, insira um IP válido para o Red Pitaya.")
+            return
+        
+        self.sensorConnectRequested.emit(ip)
+    
+    def update_sensor_status(self, connected=False, ip=None, error_message=None):
+        """
+        Atualiza o status da conexão com o sensor
+        
+        Args:
+            connected: True se conectado, False se desconectado
+            ip: IP do sensor, se disponível
+            error_message: Mensagem de erro, se houve erro na conexão
+        """
+        if connected:
+            self.sensor_status_label.setText("Conectado")
+            self.sensor_status_label.setStyleSheet("color: green;")
+            self.connect_sensor_button.setText("Reconectar ao Sensor")
+            self.connect_sensor_button.setStyleSheet("background-color: lightblue;")
+        else:
+            if error_message:
+                self.sensor_status_label.setText(f"Erro: {error_message}")
+                self.sensor_status_label.setStyleSheet("color: red;")
+            else:
+                self.sensor_status_label.setText("Desconectado")
+                self.sensor_status_label.setStyleSheet("color: red;")
+            self.connect_sensor_button.setText("Conectar ao Sensor")
+            self.connect_sensor_button.setStyleSheet("")

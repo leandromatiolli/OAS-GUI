@@ -135,9 +135,6 @@ def acquire_continuous_data(ip_address, duration=5, sample_rate=125e6, decimatio
     print(f"- Taxa de amostragem efetiva: {effective_sample_rate/1e6:.2f} MHz")
     print(f"- Fator de decimação: {decimation}")
     
-    # Inicializar o servidor SCPI
-    bring_up_scpi_server(ip_address)
-    
     # Configurar a aquisição
     dig = setup_continuous_acquisition(ip_address, decimation=decimation, 
                                      waveform_len=waveform_len, ch=channels)

@@ -106,11 +106,13 @@ class Application:
         self.window.acquisition_panel.acquisitionRequested.connect(self.on_acquisition_requested)
         self.window.acquisition_panel.calibrationFileSelected.connect(self.file_controller.set_current_calibration)
         self.window.acquisition_panel.calibrationFolderChanged.connect(self.file_controller.set_calibration_directory)
+        self.window.acquisition_panel.sensorConnectRequested.connect(self.acquisition_controller.connect_to_sensor)
         self.acquisition_controller.acquisitionStarted.connect(self.on_acquisition_started)
         self.acquisition_controller.acquisitionFinished.connect(self.on_acquisition_finished)
         self.acquisition_controller.calibrationFinished.connect(self.on_calibration_finished)
         self.acquisition_controller.acquisitionProgress.connect(self.window.show_status_message)
         self.acquisition_controller.acquisitionError.connect(self.on_acquisition_error)
+        self.acquisition_controller.sensorConnected.connect(self.on_sensor_connected)
         
         # Conexões do controlador de arquivos
         self.window.analysis_panel.fileSelected.connect(self.on_files_selected)
@@ -386,6 +388,25 @@ class Application:
         self.window.acquisition_panel.set_enabled(True)
         self.window.show_error_message("Erro na Aquisição", message)
         self.window.show_status_message("Erro na aquisição")
+    
+    def on_sensor_connected(self, connected, ip, error_message):
+        """
+        Manipula o evento de conexão do sensor
+        
+        Args:
+            connected: True se conectado, False se desconectado
+            ip: IP do sensor
+            error_message: Mensagem de erro, se houver
+        """
+        if connected:
+            log_info(f"Sensor conectado com sucesso: {ip}")
+            self.window.show_status_message(f"Sensor conectado: {ip}")
+        else:
+            log_error(f"Erro ao conectar sensor {ip}: {error_message}")
+            self.window.show_status_message(f"Erro na conexão do sensor: {error_message}")
+        
+        # Atualizar status do sensor no painel
+        self.window.acquisition_panel.update_sensor_status(connected, ip, error_message)
     
     def on_file_loaded(self, data):
         """
