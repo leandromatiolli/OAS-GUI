@@ -86,21 +86,32 @@ class AnalysisPanel(QWidget):
         # Layout para os controles de processamento
         processing_layout = QHBoxLayout()
         
-        # Grupo para média móvel
-        moving_avg_group = QGroupBox("Média Móvel")
-        moving_avg_layout = QFormLayout()
-        
+
+
+        # Grupo variados
+
+        variety_group = QGroupBox("Variados")
+        variety_group_layout = QFormLayout()
+        variety_group.setLayout(variety_group_layout)
+        processing_layout.addWidget(variety_group)
+
+        ## Linha para média móvel
+        moving_avg_layout = QHBoxLayout()
         self.moving_avg_checkbox = QCheckBox("Ativar")
+        moving_avg_layout.addWidget(self.moving_avg_checkbox)
         self.window_size_spinbox = QSpinBox()
         self.window_size_spinbox.setRange(2, 101)
         self.window_size_spinbox.setSingleStep(1)
         self.window_size_spinbox.setValue(10)
         self.window_size_spinbox.setEnabled(False)
-        
-        moving_avg_layout.addRow(self.moving_avg_checkbox)
-        moving_avg_layout.addRow("Janela:", self.window_size_spinbox)
-        moving_avg_group.setLayout(moving_avg_layout)
-        processing_layout.addWidget(moving_avg_group)
+        moving_avg_layout.addWidget(self.window_size_spinbox)
+        variety_group_layout.addRow("Média Movel: ", moving_avg_layout)
+
+        ## Linha salvar demodulado automaticamente
+
+        self.autosave_demodulated_checkbox = QCheckBox()
+        self.autosave_demodulated_checkbox.setChecked(False)
+        variety_group_layout.addRow("Salvar Demodulado Automaticamente: ", self.autosave_demodulated_checkbox)
         
         # Grupo para filtro passa-banda
         bandpass_group = QGroupBox("Filtro Passa-Banda")

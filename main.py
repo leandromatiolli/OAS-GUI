@@ -356,7 +356,7 @@ class Application:
             self.window.show_status_message("Realizando processamento automático...")
             success = self.processing_controller.auto_demodulate(data)
             
-            if success:
+            if self.window.analysis_panel.autosave_demodulated_checkbox.isChecked() and success:
                 try:
                     filename = self.processing_controller.save_demodulated_data()
                     log_info(f"Dados processados salvos com sucesso em {filename}")
@@ -364,8 +364,7 @@ class Application:
                 except Exception as e:
                     log_error(f"Erro ao salvar dados processados: {str(e)}")
                     self.window.show_status_message(f"Erro ao salvar dados processados: {str(e)}")
-            else:
-                log_warning("Processamento automático não teve sucesso")
+
         except Exception as e:
             log_error(f"Erro no processamento automático: {str(e)}")
             self.window.show_status_message(f"Erro no processamento automático: {str(e)}")
