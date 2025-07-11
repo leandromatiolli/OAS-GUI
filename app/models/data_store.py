@@ -5,6 +5,7 @@ import os
 import glob
 import numpy as np
 import pickle
+import gzip
 from datetime import datetime
 from typing import Dict, List, Tuple, Optional, Union, Any
 import json
@@ -135,12 +136,12 @@ class DataStore:
                     break
         # Montar string de labels abreviados
         label_str = f"_{field_abbr['sensor_sn']}{sensor_sn}_{field_abbr['test_type']}{test_type}_{field_abbr['material']}{material}_{field_abbr['distance']}{distance}cm_{field_abbr['pressure']}{pressure}b_{field_abbr['flow']}{flow}L_{field_abbr['equipment_type']}{equipment_type}_{field_abbr['equipment_status']}{status_str}_{field_abbr['location']}{location}{vazamento_info}"
-        filename = f"{prefix}_{timestamp}{label_str}.pkl"
+        filename = f"{prefix}_{timestamp}{label_str}.pkl.gz"
         if 'metadata' not in data:
             data['metadata'] = {}
         data['metadata']['timestamp'] = timestamp
         filepath = os.path.join(directory, filename)
-        with open(filepath, 'wb') as f:
+        with gzip.open(filepath, 'wb', compresslevel=1) as f:
             pickle.dump(data, f)
         # Salvar metadados em JSON
         metadata_filename = os.path.splitext(filepath)[0] + '.json'
@@ -286,8 +287,23 @@ class DataStore:
         Returns:
             Dicionário contendo os dados carregados
         """
-        with open(filename, 'rb') as f:
-            data = pickle.load(f)
+        # Verificar se o arquivo é comprimido baseado na extensão
+        is_compressed = filename.endswith(('.gz', '.zip')) or 'pkl.zip' in filename
+
+        try:
+            if is_compressed:
+                with gzip.open(filename, 'rb') as f:
+                    data = pickle.load(f)
+            else:
+                with open(filename, 'rb') as f:
+                    data = pickle.load(f)
+        except Exception as e:
+            # Se falhar com gzip, tentar sem compressão
+            if is_compressed:
+                with open(filename, 'rb') as f:
+                    data = pickle.load(f)
+            else:
+                raise e
             
         # Converter para dicionário se não for
         if not isinstance(data, dict):
@@ -322,9 +338,14 @@ class DataStore:
         # Procurar arquivos .pkl
         pkl_files.extend(glob.glob("vazamento_sensor_*.pkl"))
         pkl_files.extend(glob.glob("vazamento_continuo_*.pkl"))
+
+        # Procurar arquivos .pkl.zip (comprimidos)
+        pkl_files.extend(glob.glob("vazamento_sensor_*.pkl.zip"))
+        pkl_files.extend(glob.glob("vazamento_continuo_*.pkl.zip"))
         
         if include_all:
             pkl_files.extend(glob.glob("vazamento_demodulado_*.pkl"))
+            pkl_files.extend(glob.glob("vazamento_demodulado_*.pkl.zip"))
         
         # Ordenar por data de modificação (mais recente primeiro)
         pkl_files.sort(key=os.path.getmtime, reverse=True)
