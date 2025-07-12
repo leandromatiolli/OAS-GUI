@@ -60,14 +60,28 @@ class AcquisitionPanel(QWidget):
         self.acquisition_group = QGroupBox("Configurações de Aquisição")
         acquisition_form = QFormLayout()
         
-        # Duração da aquisição
+        ## Duração da aquisição
         self.duration_spin = QDoubleSpinBox()
         self.duration_spin.setRange(0.1, 60.0)
         self.duration_spin.setValue(5.0)
         self.duration_spin.setSingleStep(0.5)
-        acquisition_form.addRow("Duração (s):", self.duration_spin)
+        #duration_layout = QHBoxLayout()
+        #duration_layout.addWidget(QLabel("Duração (s):"))
+        #duration_layout.addWidget(self.duration_spin)
         
-        # Decimação
+        ## Aquisição em série
+        self.series_acquisition_checkbox = QCheckBox("Aquisição em série")
+
+        # parametro de tempo
+        time_params = QHBoxLayout()
+        #time_params.addWidget(duration_layout)
+        time_params.addWidget(QLabel("Duração (s):"))
+        time_params.addWidget(self.duration_spin)
+        time_params.addWidget(self.series_acquisition_checkbox)
+        time_params.addWidget(QLabel(""), stretch=1)  # Spacer with em
+        acquisition_form.addRow(time_params)
+        
+        ## Decimação
         self.decimation_combo = QComboBox()
         for i in range(0, 17):  # Potências de 2 de 1 a 2^16
             self.decimation_combo.addItem(f"{2**i}", 2**i)
@@ -75,12 +89,12 @@ class AcquisitionPanel(QWidget):
         self.decimation_combo.currentIndexChanged.connect(self.update_effective_rate)
         acquisition_form.addRow("Decimação:", self.decimation_combo)
         
-        # Taxa de amostragem efetiva
+        ## Taxa de amostragem efetiva
         self.effective_rate_label = QLabel()
         acquisition_form.addRow("Taxa efetiva:", self.effective_rate_label)
         self.update_effective_rate()  # Inicializa o rótulo
         
-        # Canais
+        ## Canais
         self.ch1_check = QCheckBox("Canal 1")
         self.ch1_check.setChecked(True)
         self.ch2_check = QCheckBox("Canal 2")
@@ -89,6 +103,7 @@ class AcquisitionPanel(QWidget):
         channels_layout = QHBoxLayout()
         channels_layout.addWidget(self.ch1_check)
         channels_layout.addWidget(self.ch2_check)
+        channels_layout.addWidget(QLabel(""), stretch=1)
         acquisition_form.addRow("Canais:", channels_layout)
         
         # Grupo de configurações de calibração
@@ -209,11 +224,11 @@ class AcquisitionPanel(QWidget):
         
         # Formatação inteligente baseada no valor
         if effective_rate >= 1e6:
-            formatted = f"{effective_rate/1e6:.2f} MHz"
+            formatted = f"{effective_rate/1e6:.2f} MSps"
         elif effective_rate >= 1e3:
-            formatted = f"{effective_rate/1e3:.2f} kHz"
+            formatted = f"{effective_rate/1e3:.2f} kSps"
         else:
-            formatted = f"{effective_rate:.2f} Hz"
+            formatted = f"{effective_rate:.2f} Sps"
         
         # Exibir e calcular Nyquist
         nyquist = effective_rate / 2
