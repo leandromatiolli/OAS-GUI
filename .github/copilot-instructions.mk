@@ -1,0 +1,1 @@
+ - Only suggest code that is compatible with windows and linux.
