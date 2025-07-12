@@ -3,11 +3,9 @@ Módulo controlador para aquisição de dados
 """
 from PyQt5.QtCore import QObject, pyqtSignal, pyqtSlot, QThread
 import os
-
-from app.models.hardware.redpitaya_client import RedPitayaClient
 from app.models.data_store import DataStore
 from typing import Dict, Any, Optional
-from OAS_Acquire_Continuous import bring_up_scpi_server
+from OAS_Acquire_Continuous import bring_up_scpi_server, acquire_data
 
 class AcquisitionThread(QThread):
     """Thread para aquisição de dados sem congelar a interface"""
@@ -61,20 +59,20 @@ class AcquisitionThread(QThread):
                 updated_metadata['calibration_file'] = self.calibration_file
             
             # Adquirir dados usando o cliente RedPitaya
-            data = RedPitayaClient.acquire_data(
+            data = acquire_data(
                 self.ip, 
-                duration=self.duration,
-                sample_rate=self.sample_rate,
-                decimation=self.decimation,
-                channels=self.channels,
-                metadata=updated_metadata
+                self.duration,
+                self.sample_rate,
+                self.decimation,
+                self.channels,
             )
             
             # Adicionar flag de calibração aos dados
             data['is_calibration'] = self.is_calibration
             if self.calibration_file:
                 data['calibration_file'] = self.calibration_file
-            
+            data['metadata'] = updated_metadata
+
             # Se for calibração, salvar com o nome específico fornecido
             if self.is_calibration:
                 self.progress.emit(f"Salvando dados de calibração como {self.calibration_file}...")
@@ -126,10 +124,6 @@ class AcquisitionController(QObject):
             params: Dicionário com os parâmetros de aquisição
             metadata: Metadados opcionais para incluir nos dados
         """
-        # Verificar se a aquisição está disponível
-        if not RedPitayaClient.is_available():
-            self.acquisitionError.emit("Hardware não disponível")
-            return
             
         # Verificar se já existe uma aquisição em andamento
         if self.acquisition_thread and self.acquisition_thread.isRunning():

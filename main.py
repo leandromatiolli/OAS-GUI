@@ -21,7 +21,6 @@ from app.controllers.audio_controller import AudioController
 from app.controllers.file_controller import FileController
 from app.controllers.ultra_hear_controller import UltraHearController
 from app.controllers.lora_controller import LoraController
-from app.models.hardware.redpitaya_client import RedPitayaClient
 # Importar módulo de recursos
 from app.utils.resources import apply_stylesheet
 # Importar módulo de logging
@@ -168,14 +167,7 @@ class Application:
     
     def initialize_state(self):
         """Inicializa o estado da aplicação"""
-        # Verificar disponibilidade de hardware
-        hardware_available = RedPitayaClient.is_available()
-        self.window.acquisition_panel.set_enabled(hardware_available)
-        
-        if not hardware_available:
-            log_warning("Hardware de aquisição não disponível")
-            self.window.show_status_message("Hardware de aquisição não disponível")
-        
+                
         # Carregar configuração da pasta de calibração
         config = DataStore.load_config()
         calib_folder = config.get('calibration_directory')
