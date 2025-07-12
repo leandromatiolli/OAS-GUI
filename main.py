@@ -112,6 +112,8 @@ class Application:
         self.acquisition_controller.acquisitionProgress.connect(self.window.show_status_message)
         self.acquisition_controller.acquisitionError.connect(self.on_acquisition_error)
         self.acquisition_controller.sensorConnected.connect(self.on_sensor_connected)
+        self.acquisition_controller.acquisitionDataAcquired.connect(self.on_new_data)
+
         
         # Conexões do controlador de arquivos
         self.window.analysis_panel.fileSelected.connect(self.on_files_selected)
@@ -283,14 +285,14 @@ class Application:
                 "Não foi possível processar os dados de calibração. Verifique o log para mais detalhes."
             )
     
-    def on_acquisition_finished(self, data):
+    def on_new_data(self, data):
         """
-        Manipula o evento de conclusão de aquisição
+        Manipula o evento de novos dados
         
         Args:
             data: Dados adquiridos
         """
-        log_info("Aquisição concluída com sucesso")
+        log_info("Novos dados")
         self.window.acquisition_panel.set_enabled(True)
         self.window.show_status_message("Aquisição concluída")
         
@@ -344,7 +346,7 @@ class Application:
         
         # ETAPA 2: Processar dados automaticamente
         try:
-            log_info("Iniciando processamento automático...")
+            log_debug("Iniciando processamento automático...")
             self.window.show_status_message("Realizando processamento automático...")
             success = self.processing_controller.auto_demodulate(data)
             

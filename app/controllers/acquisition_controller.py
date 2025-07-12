@@ -11,6 +11,7 @@ class AcquisitionThread(QThread):
     """Thread para aquisição de dados sem congelar a interface"""
     finished = pyqtSignal(dict)  # Sinal emitido quando a aquisição termina
     progress = pyqtSignal(str)   # Sinal para atualizar o status
+    data_acquired = pyqtSignal(str)       # Sinal de dados adquiridos
     error = pyqtSignal(str)      # Sinal para reportar erros
 
     def __init__(self, 
@@ -19,9 +20,6 @@ class AcquisitionThread(QThread):
                  sample_rate, 
                  decimation, 
                  channels, 
-                 is_calibration=False, 
-                 calibration_file=None, 
-                 metadata=None,
                  is_series=False
                  ):
         """
@@ -33,9 +31,6 @@ class AcquisitionThread(QThread):
             sample_rate: Taxa de amostragem em Hz
             decimation: Fator de decimação
             channels: Lista de canais para adquirir (1 ou 2)
-            is_calibration: Se é uma aquisição para calibração
-            calibration_file: Nome do arquivo de calibração a ser usado ou salvo
-            metadata: Metadados opcionais para incluir nos dados
         """
         super().__init__()
         self.ip = ip
@@ -43,53 +38,31 @@ class AcquisitionThread(QThread):
         self.sample_rate = sample_rate
         self.decimation = decimation
         self.channels = channels
-        self.is_calibration = is_calibration
-        self.calibration_file = calibration_file
-        self.metadata = metadata or {}
+        self.is_series = is_series  # Flag para indicar se é uma série de aquisições
 
     def run(self):
         """Executa a aquisição em thread separada"""
         try:
             self.progress.emit("Iniciando aquisição...")
-            
-            # Atualizar metadados com flag de calibração
-            updated_metadata = self.metadata.copy()
-            updated_metadata['is_calibration'] = self.is_calibration
-            if self.calibration_file:
-                updated_metadata['calibration_file'] = self.calibration_file
-            
-            # Adquirir dados usando o cliente RedPitaya
-            data = acquire_data(
-                self.ip, 
-                self.duration,
-                self.sample_rate,
-                self.decimation,
-                self.channels,
-            )
-            
-            # Adicionar flag de calibração aos dados
-            data['is_calibration'] = self.is_calibration
-            if self.calibration_file:
-                data['calibration_file'] = self.calibration_file
-            data['metadata'] = updated_metadata
+            i = 0
+            while True:
+                self.progress.emit(f"Adquirindo dados {i:4d}")
+                i += 1
+                # Adquirir dados usando o cliente RedPitaya
+                data = acquire_data(
+                    self.ip, 
+                    self.duration,
+                    self.sample_rate,
+                    self.decimation,
+                    self.channels,
+                )
+                # Emitir sinal com os dados
+                self.data_acquired.emit(data)
 
-            # Se for calibração, salvar com o nome específico fornecido
-            if self.is_calibration:
-                self.progress.emit(f"Salvando dados de calibração como {self.calibration_file}...")
-                prefix = os.path.splitext(self.calibration_file)[0] if self.calibration_file else "calibracao"
-            else:
-                self.progress.emit("Salvando dados...")
-                prefix = "vazamento_continuo"
-                
-            # Salvar dados usando o DataStore
-            save_directory = None
-            if 'metadata' in data and isinstance(data['metadata'], dict):
-                save_directory = data['metadata'].get('save_directory')
-            filename = DataStore.save_data(data, prefix=prefix, directory=save_directory)
-            self.progress.emit(f"Dados salvos em {filename}")
+                if not self.is_series or self.isInterruptionRequested():
+                    break
             
-            # Emitir sinal de conclusão com os dados
-            self.finished.emit(data)
+            self.finished.emit("finished")
             
         except Exception as e:
             self.error.emit(f"Erro na aquisição: {str(e)}")
@@ -101,6 +74,7 @@ class AcquisitionController(QObject):
     acquisitionStarted = pyqtSignal()
     acquisitionFinished = pyqtSignal(dict)
     acquisitionProgress = pyqtSignal(str)
+    acquisitionDataAcquired = pyqtSignal(str)
     acquisitionError = pyqtSignal(str)
     calibrationFinished = pyqtSignal(dict)  # Sinal específico para calibração concluída
     sensorConnected = pyqtSignal(bool, str, str)  # Sinal para status de conexão do sensor (connected, ip, error_message)
@@ -153,6 +127,7 @@ class AcquisitionController(QObject):
         
         # Conectar sinais
         self.acquisition_thread.progress.connect(self.handle_progress)
+        self.acquisition_thread.data_acquired.connect(self.handle_data_acquired)
         self.acquisition_thread.error.connect(self.handle_error)
         self.acquisition_thread.finished.connect(self.handle_finished)
         
@@ -161,14 +136,17 @@ class AcquisitionController(QObject):
         self.acquisitionStarted.emit()
         
     @pyqtSlot(str)
-    def handle_progress(self, message: str):
+    def handle_progress(self, message):
         """
         Manipula as mensagens de progresso da aquisição
         
         Args:
-            message: Mensagem de progresso
+            message: Mensagem de progresso (str) ou dados adquiridos (dict)
         """
-        self.acquisitionProgress.emit(message)
+        if isinstance(message, str):
+            self.acquisitionProgress.emit(message)
+        elif isinstance(message, dict):
+            self.acquisitionNewData.emit(message)
         
     @pyqtSlot(str)
     def handle_error(self, message: str):
@@ -196,6 +174,16 @@ class AcquisitionController(QObject):
             # Emitir sinal normal para aquisição concluída
             self.acquisitionFinished.emit(data)
     
+    @pyqtSlot(dict)
+    def handle_data_acquired(self, data: Dict[str, Any]):
+        """
+        Manipula a dados adquiridos
+        
+        Args:
+            data: Dados adquiridos
+        """
+        self.acquisitionDataAcquired.emit(data)
+
     @pyqtSlot(str)
     def connect_to_sensor(self, ip: str):
         """

@@ -371,7 +371,7 @@ class AnalysisPanel(QWidget):
             self,
             "Selecionar arquivos de dados",
             "",
-            "Arquivos pickle (*.pkl.gz)"
+            "Arquivos pickle (*.pkl, *.pkl.gz) "
         )
         
         if file_paths:
@@ -961,7 +961,7 @@ class AnalysisPanel(QWidget):
         self.file_list.clear()
         # Procurar apenas arquivos demodulados na pasta selecionada
         demod_files = [f for f in os.listdir(self.current_dir)
-                       if f.startswith("vazamento_demodulado_") and f.endswith('.pkl')]
+                       if f.startswith("vazamento_demodulado_") and (f.endswith('.pkl') or f.endswith('.pkl.gz'))]
         # Remover duplicatas
         demod_files = list(sorted(set(demod_files), key=lambda x: os.path.getmtime(os.path.join(self.current_dir, x)), reverse=True))
         for file in demod_files:
