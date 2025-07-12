@@ -65,16 +65,12 @@ class AcquisitionPanel(QWidget):
         self.duration_spin.setRange(0.1, 60.0)
         self.duration_spin.setValue(5.0)
         self.duration_spin.setSingleStep(0.5)
-        #duration_layout = QHBoxLayout()
-        #duration_layout.addWidget(QLabel("Duração (s):"))
-        #duration_layout.addWidget(self.duration_spin)
         
         ## Aquisição em série
         self.series_acquisition_checkbox = QCheckBox("Aquisição em série")
 
         # parametro de tempo
         time_params = QHBoxLayout()
-        #time_params.addWidget(duration_layout)
         time_params.addWidget(QLabel("Duração (s):"))
         time_params.addWidget(self.duration_spin)
         time_params.addWidget(self.series_acquisition_checkbox)
