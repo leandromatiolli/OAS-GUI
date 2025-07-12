@@ -814,27 +814,19 @@ class AnalysisPanel(QWidget):
 
     def load_selected_file_from_list(self, file_list):
         """Carrega múltiplos arquivos a partir de uma lista de caminhos e plota espectros"""
-        import pickle
-        import numpy as np
-        from scipy.signal import get_window
         self.multiple_demodulated_data = []
         self.multiple_metadata = []  # Lista para armazenar metadados de todos os arquivos
         
         for filename in file_list:
             try:
-                with open(filename, 'rb') as f:
-                    data = pickle.load(f)
-                # Converter para dict se necessário
-                if not isinstance(data, dict):
-                    temp_dict = {}
-                    for key in dir(data):
-                        if not key.startswith('__') and not callable(getattr(data, key)):
-                            temp_dict[key] = getattr(data, key)
-                    data = temp_dict
+                data = DataStore.load_data(filename)  # Carregar dados usando DataStore
                 if 'demodulated' in data:
                     self.multiple_demodulated_data.append(data)
                     # Coletar metadados do arquivo
-                    metadata = data.get('metadata', {})
+                    if 'metadata' in data.keys():
+                        metadata = data.get('metadata', {})
+                    else:
+                        metadata = {k: v for k, v in data.items() if k not in ['waveforms', 'demodulated']}
                     metadata['filename'] = filename  # Adicionar nome do arquivo aos metadados
                     self.multiple_metadata.append(metadata)
                     
