@@ -371,7 +371,7 @@ class AnalysisPanel(QWidget):
             self,
             "Selecionar arquivos de dados",
             "",
-            "Arquivos pickle (*.pkl)"
+            "Arquivos pickle (*.pkl.gz)"
         )
         
         if file_paths:
@@ -575,7 +575,7 @@ class AnalysisPanel(QWidget):
             import pickle
             temp_dir = os.path.join(os.getcwd(), 'temp')
             os.makedirs(temp_dir, exist_ok=True)
-            temp_file = os.path.join(temp_dir, 'last_filtered_data.pkl')
+            temp_file = os.path.join(temp_dir, 'last_filtered_data.pkl.gz')
             with open(temp_file, 'wb') as f:
                 pickle.dump({'t': t, 'filtered': filtered, 'params': filter_params}, f)
             log_debug(f"show_filtered: Dados salvos em {temp_file}")
@@ -965,7 +965,7 @@ class AnalysisPanel(QWidget):
         self.refresh_file_list_in_dir()
     
     def refresh_file_list_in_dir(self):
-        """Atualiza a lista de arquivos demodulados (.pkl) na pasta atual de análise, sem duplicatas e só o nome do arquivo"""
+        """Atualiza a lista de arquivos demodulados (.pkl.gz) na pasta atual de análise, sem duplicatas e só o nome do arquivo"""
         self.file_list.clear()
         # Procurar apenas arquivos demodulados na pasta selecionada
         demod_files = [f for f in os.listdir(self.current_dir)
