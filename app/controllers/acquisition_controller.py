@@ -15,7 +15,17 @@ class AcquisitionThread(QThread):
     progress = pyqtSignal(str)   # Sinal para atualizar o status
     error = pyqtSignal(str)      # Sinal para reportar erros
 
-    def __init__(self, ip, duration, sample_rate, decimation, channels, is_calibration=False, calibration_file=None, metadata=None):
+    def __init__(self, 
+                 ip, 
+                 duration, 
+                 sample_rate, 
+                 decimation, 
+                 channels, 
+                 is_calibration=False, 
+                 calibration_file=None, 
+                 metadata=None,
+                 is_series=False
+                 ):
         """
         Inicializa a thread de aquisição
         

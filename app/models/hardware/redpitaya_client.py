@@ -7,7 +7,7 @@ from typing import Dict, List, Tuple, Optional, Union, Any
 # Importar bibliotecas para comunicação com RedPitaya
 try:
     import redpitaya_scpi as scpi
-    from OAS_Acquire_Continuous import bring_up_scpi_server, acquire_continuous_data, save_data
+    from OAS_Acquire_Continuous import bring_up_scpi_server, acquire_data, save_data
     HARDWARE_AVAILABLE = True
 except ImportError:
     HARDWARE_AVAILABLE = False
@@ -46,7 +46,7 @@ class RedPitayaClient:
             raise RuntimeError("Hardware não disponível")
             
         # Adquirir dados
-        data = acquire_continuous_data(
+        data = acquire_data(
             ip, 
             duration=duration,
             sample_rate=sample_rate,

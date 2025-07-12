@@ -114,7 +114,7 @@ def tear_down(dig):
     dig.tx_txt('ACQ:AXI:SOUR2:ENable OFF')
     dig.close()
 
-def acquire_continuous_data(ip_address, duration=5, sample_rate=125e6, decimation=1, channels=[1,2]):
+def acquire_data(ip_address, duration=5, sample_rate=125e6, decimation=1, channels=[1,2]):
     """Adquire dados continuamente por um período específico"""
     # Calcular tamanho da forma de onda baseado na duração e taxa de amostragem
     effective_sample_rate = sample_rate / decimation
@@ -216,7 +216,7 @@ def main():
     
     # Adquirir dados de forma contínua
     print("Iniciando aquisição contínua de dados do sensor de vazamento...")
-    data = acquire_continuous_data(IP_ADDRESS, duration=DURATION, 
+    data = acquire_data(IP_ADDRESS, duration=DURATION, 
                                  sample_rate=SAMPLE_RATE, 
                                  decimation=DECIMATION,
                                  channels=CHANNELS)
