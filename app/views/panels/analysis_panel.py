@@ -42,7 +42,7 @@ class AnalysisPanel(QWidget):
         layout = QVBoxLayout(self)
         
         # Widget para selecionar arquivo
-        file_selection = QHBoxLayout()
+        
         self.file_list = QListWidget()
         self.file_list.setSelectionMode(QListWidget.MultiSelection)
         self.file_list.setMinimumWidth(400)
@@ -60,17 +60,28 @@ class AnalysisPanel(QWidget):
         self.use_save_dir_button.clicked.connect(self.on_use_save_dir_clicked)
         self.current_dir = DataStore.load_config().get('save_directory', os.getcwd())
         self.dir_label = QLabel(self.current_dir)
-        
-        file_selection.addWidget(QLabel("Arquivo(s):"))
-        file_selection.addWidget(self.file_list)
-        file_selection.addWidget(self.refresh_button)
-        file_selection.addWidget(self.browse_button)
-        file_selection.addWidget(self.load_button)
-        file_selection.addWidget(self.select_dir_button)
-        file_selection.addWidget(self.use_save_dir_button)
-        file_selection.addWidget(self.dir_label)
-        
-        layout.addLayout(file_selection)
+
+        file_buttons_group = QWidget()
+        file_buttons_layout = QHBoxLayout()
+        file_buttons_layout.addWidget(self.refresh_button)
+        file_buttons_layout.addWidget(self.browse_button)
+        file_buttons_layout.addWidget(self.load_button)
+        file_buttons_layout.addWidget(self.select_dir_button)
+        file_buttons_layout.addWidget(self.use_save_dir_button)
+        file_buttons_group.setLayout(file_buttons_layout)
+
+        file_right_group = QWidget()
+        file_right_layout = QVBoxLayout()
+        file_right_group.setLayout(file_right_layout)
+        file_right_layout.addWidget(self.dir_label)
+        file_right_layout.addWidget(file_buttons_group)
+       
+        file_selection_group = QGroupBox("Arquivo(s):")
+        file_selection_layout = QHBoxLayout()
+        file_selection_group.setLayout(file_selection_layout)
+        file_selection_layout.addWidget(self.file_list)
+        file_selection_layout.addWidget(file_right_group)
+        layout.addWidget(file_selection_group)
 
         # Área de metadados
         metadata_group = QGroupBox("Metadados do Arquivo")
@@ -112,6 +123,15 @@ class AnalysisPanel(QWidget):
         self.autosave_demodulated_checkbox = QCheckBox()
         self.autosave_demodulated_checkbox.setChecked(False)
         variety_group_layout.addRow("Salvar Demodulado Automaticamente: ", self.autosave_demodulated_checkbox)
+        
+        ## Exibir medida automaticamente
+        self.autoshow_waveform = QCheckBox("")
+        variety_group_layout.addRow("Exibir dados automaticamente: ", self.autoshow_waveform)
+        
+        ## Demodular dados automaticamente
+        self.autodemodulate = QCheckBox("")
+        variety_group_layout.addRow("Demodular dados automaticamente: ", self.autodemodulate)
+        
         
         # Grupo para filtro passa-banda
         bandpass_group = QGroupBox("Filtro Passa-Banda")
@@ -912,6 +932,15 @@ class AnalysisPanel(QWidget):
             ax.grid(True, which='both', linestyle='--', alpha=0.7)
             ax.legend()
             canvas.draw()
+
+    def plot_calibration_data(self, calibration_data):
+                        
+        self.show_raw_data(calibration_data['t'], 
+                           calibration_data['waveforms'], 
+                           calibration_data['channels'])
+        self.show_ellipse(calibration_data['waveforms'], 
+                         calibration_data['ellipse_params'])
+        
 
     def show_metadata_multiple(self, metadata_list):
         """

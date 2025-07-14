@@ -35,9 +35,6 @@ class FileController(QObject):
             files = DataStore.get_available_files()
             self.fileListUpdated.emit(files)
             
-            # Atualizar também a lista de calibrações
-            self.refresh_calibration_list()
-            
         except Exception as e:
             self.fileError.emit(f"Erro ao listar arquivos: {str(e)}")
     
@@ -49,7 +46,7 @@ class FileController(QObject):
             self.calibrationListUpdated.emit(calibration_files)
             
             # Verificar status da calibração atual
-            self.check_calibration_status()
+            #self.check_calibration_status()
         except Exception as e:
             self.fileError.emit(f"Erro ao listar calibrações: {str(e)}")
     
@@ -69,7 +66,7 @@ class FileController(QObject):
             
             if has_calibration:
                 # Load data and emit
-                calib_data = self.load_calibration_data(self.current_calibration_file)
+                calib_data = DataStore.load_data(self.current_calibration_file)
                 if calib_data:
                     self.calibrationDataLoaded.emit(calib_data)
 
@@ -170,7 +167,7 @@ class FileController(QObject):
             if not calibration_file:
                 return None
                 
-            return DataStore.load_calibration_data(calibration_file)
+            return DataStore.load_data(calibration_file)
         except Exception as e:
             self.fileError.emit(f"Erro ao carregar calibração: {str(e)}")
             return None

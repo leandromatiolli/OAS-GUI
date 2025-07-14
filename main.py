@@ -108,11 +108,12 @@ class Application:
         self.window.acquisition_panel.sensorConnectRequested.connect(self.acquisition_controller.connect_to_sensor)
         self.acquisition_controller.acquisitionStarted.connect(self.on_acquisition_started)
         self.acquisition_controller.acquisitionFinished.connect(self.on_acquisition_finished)
-        self.acquisition_controller.calibrationFinished.connect(self.on_calibration_finished)
+        #self.acquisition_controller.calibrationFinished.connect(self.on_calibration_finished)
         self.acquisition_controller.acquisitionProgress.connect(self.window.show_status_message)
         self.acquisition_controller.acquisitionError.connect(self.on_acquisition_error)
         self.acquisition_controller.sensorConnected.connect(self.on_sensor_connected)
         self.acquisition_controller.acquisitionDataAcquired.connect(self.on_new_data)
+        
 
         
         # Conexões do controlador de arquivos
@@ -127,6 +128,7 @@ class Application:
         
         # Conexões do controlador de processamento
         self.window.analysis_panel.demodulateRequested.connect(self.processing_controller.demodulate_data)
+        self.processing_controller.plotCalibrationDataRequested.connect(self.window.analysis_panel.plot_calibration_data)
         self.processing_controller.demodulationStarted.connect(self.on_demodulation_started)
         self.processing_controller.demodulationFinished.connect(self.on_demodulation_finished)
         self.processing_controller.demodulationError.connect(self.on_demodulation_error)
@@ -225,65 +227,45 @@ class Application:
         # Obter metadados
         metadata = self.window.metadata_panel.get_metadata()
         
+        if params['is_series']:
+            log_info("Iniciando aquisição em série")
+            self.window.acquisition_panel.acquire_button.setText("Parar Aquisição")
+            self.window.acquisition_panel.acquire_button.setStyleSheet("background-color: red")
+            self.window.acquisition_panel.acquire_button.clicked.connect(self.stop_acquisition)
+            
+
         # Iniciar aquisição
         self.acquisition_controller.start_acquisition(params, metadata)
     
     def on_acquisition_started(self):
         """Manipula o evento de início de aquisição"""
         log_info("Aquisição iniciada")
-        self.window.acquisition_panel.set_enabled(False)
+        #self.window.acquisition_panel.set_enabled(False)
         self.window.show_status_message("Aquisição em andamento...")
     
-    def on_calibration_finished(self, data):
-        """
-        Manipula o evento de conclusão de calibração
+    def stop_acquisition(self):
         
-        Args:
-            data: Dados de calibração adquiridos
-        """
-        log_info("Calibração concluída, processando dados de calibração...")
+        self.window.acquisition_panel.acquire_button.setText("Adquirir Dados")
+        self.window.acquisition_panel.acquire_button.setStyleSheet("background-color: blue")
+        self.window.acquisition_panel.acquire_button.clicked.connect(self.request_acquisition)
+
+
+    def on_acquisition_finished(self, message):
+        log_info("Aquisição concluída")
         self.window.acquisition_panel.set_enabled(True)
-        self.window.show_status_message("Processando dados de calibração...")
-        
-        # Verificar se temos nome de arquivo específico
-        calibration_file = data.get('calibration_file')
-        if calibration_file:
-            log_info(f"Usando arquivo de calibração especificado: {calibration_file}")
-        
-        # Processar os dados de calibração
-        success = self.processing_controller.process_calibration_data(data)
-        
-        if success:
-            log_info("Calibração processada com sucesso")
-            self.window.show_status_message("Calibração concluída com sucesso")
-            
-            # Atualizar lista de calibrações e status
-            self.file_controller.refresh_calibration_list()
-            
-            # Mudar para a aba de análise
-            self.window.switch_to_tab(2)
-            
-            # Exibir os dados brutos da calibração
-            if 'waveforms' in data and 't' in data:
-                channels = data.get('channels', [1, 2])
-                waveforms = data['waveforms']
-                self.window.analysis_panel.show_raw_data(data['t'], waveforms, channels)
+
+        if self.processing_controller.data['is_calibration']:
+            calibration_file = self.processing_controller.data.get('calibration_file')
+            self.processing_controller.calibration_data = self.processing_controller.data
+            # Processar os dados de calibração
+            self.processing_controller.set_calibration_data(self.processing_controller.calibration_data)
+
+            # Salvar dados de calibração
+            log_info(f"Salvando arquivo de calibração: {calibration_file or 'padrão'}...")
+            DataStore.save_calibration_data(self.processing_controller.calibration_data, calibration_file)
+
+
                 
-                # Verificar se temos dois canais para a elipse
-                if waveforms.shape[0] >= 2:
-                    ellipse_params = data.get('ellipse_params')
-                    if not ellipse_params and self.processing_controller.has_calibration_data():
-                        ellipse_params = self.processing_controller.calibration_data['ellipse_params']
-                    
-                    if ellipse_params:
-                        log_info("Exibindo elipse da calibração")
-                        self.window.analysis_panel.show_ellipse(waveforms, ellipse_params)
-        else:
-            log_error("Falha no processamento da calibração")
-            self.window.show_error_message(
-                "Erro de Calibração",
-                "Não foi possível processar os dados de calibração. Verifique o log para mais detalhes."
-            )
     
     def on_new_data(self, data):
         """
@@ -293,14 +275,40 @@ class Application:
             data: Dados adquiridos
         """
         log_info("Novos dados")
-        self.window.acquisition_panel.set_enabled(True)
         self.window.show_status_message("Aquisição concluída")
         
-        # Armazenar dados no controlador de processamento desde o início
+        data['metadata'] = self.window.metadata_panel.get_metadata()
         self.processing_controller.set_data(data)
         
-        # Mudar para a aba de análise
-        self.window.switch_to_tab(2)
+        
+        self.file_controller
+
+        
+        directory = self.window.analysis_panel.dir_label.text()
+        log_debug(f"Salvando dados adquiridos no diretório: {directory}")
+        DataStore.save_data(data, prefix="", directory=directory)
+
+        if self.window.analysis_panel.autoshow_waveform.isChecked():
+            self.window.acquisition_panel.set_enabled(True)
+            self.window.switch_to_tab(2) 
+            # Selecionar a aba de dados brutos no painel de análise
+            self.window.analysis_panel.analysis_tabs.setCurrentIndex(0)
+
+            if 'waveforms' in data and 't' in data:
+                channels = data.get('channels', [1, 2])
+                log_info(f"Exibindo dados brutos: canais {channels}")
+                
+                # Obter formas de onda processadas (com ou sem média móvel)
+                waveforms = self.processing_controller.get_waveforms_for_processing()
+                self.window.analysis_panel.show_raw_data(data['t'], waveforms, channels)
+                
+                # Verificar se temos dois canais para a elipse
+                if waveforms.shape[0] >= 2:
+                    ellipse_params = data.get('ellipse_params', None)
+                    log_info("Exibindo elipse")
+                    self.window.analysis_panel.show_ellipse(waveforms, ellipse_params)
+            else:
+                log_warning("Não foi possível exibir dados brutos: waveforms ou vetor de tempo ausentes")
         
         # ETAPA 1: Mostrar dados brutos adquiridos
         try:
@@ -321,54 +329,39 @@ class Application:
             else:
                 log_warning("- Canais: não encontrado")
             
-            if 'waveforms' in data and 't' in data:
-                channels = data.get('channels', [1, 2])
-                log_info(f"Exibindo dados brutos: canais {channels}")
-                
-                # Obter formas de onda processadas (com ou sem média móvel)
-                waveforms = self.processing_controller.get_waveforms_for_processing()
-                self.window.analysis_panel.show_raw_data(data['t'], waveforms, channels)
-                
-                # Verificar se temos dois canais para a elipse
-                if waveforms.shape[0] >= 2:
-                    ellipse_params = data.get('ellipse_params', None)
-                    log_info("Exibindo elipse")
-                    self.window.analysis_panel.show_ellipse(waveforms, ellipse_params)
-            else:
-                log_warning("Não foi possível exibir dados brutos: waveforms ou vetor de tempo ausentes")
-                
-            # Selecionar a aba de dados brutos no painel de análise
-            self.window.analysis_panel.analysis_tabs.setCurrentIndex(0)
             
         except Exception as e:
             log_error(f"Erro ao exibir dados brutos: {str(e)}")
             self.window.show_status_message(f"Erro ao exibir dados brutos: {str(e)}")
         
         # ETAPA 2: Processar dados automaticamente
-        try:
-            log_debug("Iniciando processamento automático...")
-            self.window.show_status_message("Realizando processamento automático...")
-            success = self.processing_controller.auto_demodulate(data)
-            
-            if self.window.analysis_panel.autosave_demodulated_checkbox.isChecked() and success:
-                try:
-                    filename = self.processing_controller.save_demodulated_data()
-                    log_info(f"Dados processados salvos com sucesso em {filename}")
-                    self.window.show_status_message(f"Dados processados salvos em {filename}")
-                except Exception as e:
-                    log_error(f"Erro ao salvar dados processados: {str(e)}")
-                    self.window.show_status_message(f"Erro ao salvar dados processados: {str(e)}")
+        if self.window.analysis_panel.autodemodulate.isChecked():
+            try:
+                log_debug("Iniciando processamento automático...")
+                # Armazenar dados no controlador de processamento desde o início
+                self.window.show_status_message("Realizando processamento automático...")
+                demodulated_succeed = self.processing_controller.auto_demodulate(data)
 
-        except Exception as e:
-            log_error(f"Erro no processamento automático: {str(e)}")
-            self.window.show_status_message(f"Erro no processamento automático: {str(e)}")
-        
+            except Exception as e:
+                log_error(f"Erro no processamento automático: {str(e)}")
+                self.window.show_status_message(f"Erro no processamento automático: {str(e)}")
+            
+        if self.window.analysis_panel.autosave_demodulated_checkbox.isChecked() and demodulated_succeed:
+            try:
+                filename = self.processing_controller.save_demodulated_data()
+                log_info(f"Dados processados salvos com sucesso em {filename}")
+                self.window.show_status_message(f"Dados processados salvos em {filename}")
+            except Exception as e:
+                log_error(f"Erro ao salvar dados processados: {str(e)}")
+                self.window.show_status_message(f"Erro ao salvar dados processados: {str(e)}")
+    
         # ETAPA 3: Atualizar lista de arquivos
-        try:
-            log_debug("Atualizando lista de arquivos...")
-            self.file_controller.refresh_file_list()
-        except Exception as e:
-            log_error(f"Erro ao atualizar lista de arquivos: {str(e)}")
+        if not self.window.acquisition_panel.series_acquisition_checkbox.isChecked():   
+            try:
+                log_debug("Atualizando lista de arquivos...")
+                self.file_controller.refresh_file_list()
+            except Exception as e:
+                log_error(f"Erro ao atualizar lista de arquivos: {str(e)}")
     
     def on_acquisition_error(self, message):
         """

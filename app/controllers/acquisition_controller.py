@@ -9,9 +9,9 @@ from OAS_Acquire_Continuous import bring_up_scpi_server, acquire_data
 
 class AcquisitionThread(QThread):
     """Thread para aquisição de dados sem congelar a interface"""
-    finished = pyqtSignal(dict)  # Sinal emitido quando a aquisição termina
+    finished = pyqtSignal(str)  # Sinal emitido quando a aquisição termina
     progress = pyqtSignal(str)   # Sinal para atualizar o status
-    data_acquired = pyqtSignal(str)       # Sinal de dados adquiridos
+    data_acquired = pyqtSignal(dict)       # Sinal de dados adquiridos
     error = pyqtSignal(str)      # Sinal para reportar erros
 
     def __init__(self, 
@@ -72,9 +72,9 @@ class AcquisitionController(QObject):
     
     # Sinais
     acquisitionStarted = pyqtSignal()
-    acquisitionFinished = pyqtSignal(dict)
+    acquisitionFinished = pyqtSignal(str)
     acquisitionProgress = pyqtSignal(str)
-    acquisitionDataAcquired = pyqtSignal(str)
+    acquisitionDataAcquired = pyqtSignal(dict)
     acquisitionError = pyqtSignal(str)
     calibrationFinished = pyqtSignal(dict)  # Sinal específico para calibração concluída
     sensorConnected = pyqtSignal(bool, str, str)  # Sinal para status de conexão do sensor (connected, ip, error_message)
@@ -105,11 +105,11 @@ class AcquisitionController(QObject):
             return
         
         # Verificar se é uma aquisição para calibração
-        is_calibration = params.get('is_calibration', False)
-        calibration_file = params.get('calibration_file')
+        self.is_calibration = params.get('is_calibration', False)
+        self.calibration_file = params.get('calibration_file')
         
         # Verificar se temos dois canais para calibração
-        if is_calibration and len(params['channels']) < 2:
+        if self.is_calibration and len(params['channels']) < 2:
             self.acquisitionError.emit("A calibração requer ambos os canais (1 e 2)")
             return
             
@@ -120,9 +120,7 @@ class AcquisitionController(QObject):
             params['sample_rate'], 
             params['decimation'], 
             params['channels'],
-            is_calibration,
-            calibration_file,
-            metadata
+            is_series=False
         )
         
         # Conectar sinais
@@ -158,21 +156,21 @@ class AcquisitionController(QObject):
         """
         self.acquisitionError.emit(message)
         
-    @pyqtSlot(dict)
-    def handle_finished(self, data: Dict[str, Any]):
+    @pyqtSlot(str)
+    def handle_finished(self, message: str):
         """
         Manipula a conclusão da aquisição
         
         Args:
             data: Dados adquiridos
         """
-        # Verificar se é uma aquisição de calibração
-        if data.get('is_calibration', False):
-            # Emitir sinal específico para calibração concluída
-            self.calibrationFinished.emit(data)
-        else:
-            # Emitir sinal normal para aquisição concluída
-            self.acquisitionFinished.emit(data)
+        # # Verificar se é uma aquisição de calibração
+        # if data.get('is_calibration', False):
+        #     # Emitir sinal específico para calibração concluída
+        #     self.calibrationFinished.emit(data)
+        # else:
+        #     # Emitir sinal normal para aquisição concluída
+        self.acquisitionFinished.emit("finished")
     
     @pyqtSlot(dict)
     def handle_data_acquired(self, data: Dict[str, Any]):
@@ -182,6 +180,8 @@ class AcquisitionController(QObject):
         Args:
             data: Dados adquiridos
         """
+        data['is_calibration'] = self.is_calibration
+        data['calibration_file'] = self.calibration_file
         self.acquisitionDataAcquired.emit(data)
 
     @pyqtSlot(str)

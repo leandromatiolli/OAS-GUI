@@ -218,12 +218,7 @@ class DataStore:
             return None
             
         try:
-            with open(calibration_file, 'rb') as f:
-                calibration_data = pickle.load(f)
-                
-            # Verificar se é um arquivo de calibração válido
-            if not calibration_data.get('is_calibration', False) or 'ellipse_params' not in calibration_data:
-                return None
+            calibration_data = DataStore.load_data(calibration_file)
                 
             return calibration_data
         except Exception:
@@ -261,8 +256,12 @@ class DataStore:
             return []
 
         # Procurar arquivos de calibração com padrão calibracao_*.pkl no diretório
-        search_path = os.path.join(calib_dir, "calibracao_*.pkl")
+        search_path = os.path.join(calib_dir, "*.pkl")
         calibration_files.extend(glob.glob(search_path))
+        
+        # Also search for compressed calibration files
+        search_path_gz = os.path.join(calib_dir, "*.pkl.gz")
+        calibration_files.extend(glob.glob(search_path_gz))
         
         # Incluir o arquivo padrão de calibração se existir no diretório
         default_calib_path = os.path.join(calib_dir, DataStore.DEFAULT_CALIBRATION_FILE)

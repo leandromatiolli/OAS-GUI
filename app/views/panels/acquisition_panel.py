@@ -342,6 +342,8 @@ class AcquisitionPanel(QWidget):
         duration = self.duration_spin.value()
         decimation = self.decimation_combo.currentData()
         sample_rate = 125e6  # Taxa fixa do Red Pitaya
+
+        is_series = self.series_acquisition_checkbox.isChecked()
         
         # Verificar canais selecionados
         channels = []
@@ -364,7 +366,8 @@ class AcquisitionPanel(QWidget):
             'decimation': decimation,
             'sample_rate': sample_rate,
             'channels': channels,
-            'is_calibration': is_calibration
+            'is_calibration': is_calibration,
+            'is_series' : is_series
         }
         
         # Adicionar nome do arquivo de calibração se estiver no modo de calibração
