@@ -383,6 +383,16 @@ class AcquisitionPanel(QWidget):
     def get_acquisition_params(self):
         """Retorna os parâmetros de aquisição atuais"""
         return self.request_acquisition() # Reutiliza a lógica para obter os parâmetros
+    
+    # def stop_acquisition(self):
+    #     # Request interruption of the acquisition thread
+    #     self.acquisition_controller.stop_acquisition()
+        
+    #     # Update UI
+    #     self.acquire_button.setText("Adquirir Dados")
+    #     self.acquire_button.setStyleSheet("background-color: blue")
+    #     self.acquire_button.clicked.connect(self.request_acquisition)
+
         
     def set_enabled(self, enabled):
         """

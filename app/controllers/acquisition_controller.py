@@ -120,7 +120,7 @@ class AcquisitionController(QObject):
             params['sample_rate'], 
             params['decimation'], 
             params['channels'],
-            is_series=False
+            params['is_series']
         )
         
         # Conectar sinais
@@ -199,4 +199,10 @@ class AcquisitionController(QObject):
         except Exception as e:
             error_message = f"Falha na conexão: {str(e)}"
             self.sensorConnected.emit(False, ip, error_message)
-        
+
+    def stop_acquisition(self):
+        """
+        Para a aquisição em andamento solicitando interrupção da thread
+        """
+        if self.acquisition_thread and self.acquisition_thread.isRunning():
+            self.acquisition_thread.requestInterruption()

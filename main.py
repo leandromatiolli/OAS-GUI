@@ -231,6 +231,7 @@ class Application:
             log_info("Iniciando aquisição em série")
             self.window.acquisition_panel.acquire_button.setText("Parar Aquisição")
             self.window.acquisition_panel.acquire_button.setStyleSheet("background-color: red")
+            self.window.acquisition_panel.acquire_button.clicked.disconnect(self.window.acquisition_panel.request_acquisition)
             self.window.acquisition_panel.acquire_button.clicked.connect(self.stop_acquisition)
             
 
@@ -244,10 +245,15 @@ class Application:
         self.window.show_status_message("Aquisição em andamento...")
     
     def stop_acquisition(self):
+        # Request interruption of the acquisition thread
+        log_info("Solicitando interrupção da thread de aquisição")
+        self.acquisition_controller.stop_acquisition()
         
+        # Update UI
         self.window.acquisition_panel.acquire_button.setText("Adquirir Dados")
-        self.window.acquisition_panel.acquire_button.setStyleSheet("background-color: blue")
-        self.window.acquisition_panel.acquire_button.clicked.connect(self.request_acquisition)
+        self.window.acquisition_panel.acquire_button.setStyleSheet("")
+        self.window.acquisition_panel.acquire_button.clicked.disconnect(self.stop_acquisition)
+        self.window.acquisition_panel.acquire_button.clicked.connect(self.window.acquisition_panel.request_acquisition)
 
 
     def on_acquisition_finished(self, message):
