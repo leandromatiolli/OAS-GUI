@@ -901,6 +901,8 @@ def set_all_input_values(root_widget: QtWidgets, config: dict):
                 widget.addItem(value)
         elif isinstance(widget, QtWidgets.QCheckBox):
             widget.setChecked(bool(value))
+        elif isinstance(widget, QtWidgets.QLabel):
+            widget.setText(str(value))
 
 
     traverse_widgets(root_widget, set_values)
@@ -926,21 +928,12 @@ def get_all_input_values(self) -> dict:
             values[object_name] = widget.value()
         elif isinstance(widget, QtWidgets.QComboBox):
             values[object_name] = widget.currentText()
-            # {
-            #     "text": widget.currentText(),
-            #     "index": widget.currentIndex(),
-            #     "items": [widget.itemText(i) for i in range(widget.count())]
-            # }
         elif isinstance(widget, QtWidgets.QCheckBox):
             values[object_name] = widget.isChecked()
-    
-    # Apply to input widgets only
-    input_types = [QtWidgets.QLineEdit, QtWidgets.QDoubleSpinBox, QtWidgets.QComboBox, QtWidgets.QCheckBox,
-                   QtWidgets.QPlainTextEdit, QtWidgets.QSpinBox, QtWidgets.QTextEdit, QtWidgets.QRadioButton, QtWidgets.QSlider,
-                   QtWidgets.QDial, QtWidgets.QScrollBar, QtWidgets.QListWidget, QtWidgets.QTreeWidget, QtWidgets.QDateEdit, QtWidgets.QTimeEdit, QtWidgets.QDateTimeEdit,
-                   QtWidgets.QLabel]
+        elif isinstance(widget, QtWidgets.QLabel):
+            values[object_name] = widget.text()
 
-    traverse_widgets(self, collect_values, input_types, recursive=True)
+    traverse_widgets(self, collect_values, recursive=True)
     
     return values
 

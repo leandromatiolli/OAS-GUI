@@ -60,6 +60,9 @@ class AnalysisPanel(QWidget):
         self.use_save_dir_button.clicked.connect(self.on_use_save_dir_clicked)
         self.current_dir = DataStore.load_config().get('save_directory', os.getcwd())
         self.dir_label = QLabel(self.current_dir)
+        self.dir_label.setToolTip("Pasta para salvar os dado adquiridos")
+        self.dir_label.setObjectName("save_directory")
+
 
         file_buttons_group = QWidget()
         file_buttons_layout = QHBoxLayout()
