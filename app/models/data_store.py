@@ -16,7 +16,11 @@ class DataStore:
     
     # Constantes
     DEFAULT_CALIBRATION_FILE = "calibracao_sistema.pkl"
-    CONFIG_FILE = "config/data_store_config.json"
+    CONFIG_FILE = "config.json"
+    DEFAULT_CONFIG = {
+        "save_directory": os.curdir,
+        "calibration_directory": os.curdir,
+    }
     
     @staticmethod
     def save_config(config: Dict[str, Any]) -> None:
@@ -27,7 +31,7 @@ class DataStore:
             config: Dicionário com as configurações
         """
         # Criar diretório se não existir
-        os.makedirs(os.path.dirname(DataStore.CONFIG_FILE), exist_ok=True)
+        #os.makedirs(os.path.dirname(DataStore.CONFIG_FILE), exist_ok=True)
         
         # Salvar configurações
         with open(DataStore.CONFIG_FILE, 'w', encoding='utf-8') as f:
@@ -43,7 +47,7 @@ class DataStore:
         """
         # Se o arquivo não existe, retornar configurações padrão
         if not os.path.exists(DataStore.CONFIG_FILE):
-            return {}
+            return DataStore.DEFAULT_CONFIG
             
         # Carregar configurações
         try:

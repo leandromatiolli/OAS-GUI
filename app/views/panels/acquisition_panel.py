@@ -46,6 +46,7 @@ class AcquisitionPanel(QWidget):
         # IP do sensor
         sensor_layout.addWidget(QLabel("IP RedPitaya:"))
         self.ip_edit = QLineEdit("rp-f0b916.local")
+        self.ip_edit.setObjectName("ip_edit")
         sensor_layout.addWidget(self.ip_edit)
         
         # Botão para conectar ao sensor
@@ -62,12 +63,14 @@ class AcquisitionPanel(QWidget):
         
         ## Duração da aquisição
         self.duration_spin = QDoubleSpinBox()
+        self.duration_spin.setObjectName("acquisition_duration")       
         self.duration_spin.setRange(0.1, 60.0)
         self.duration_spin.setValue(5.0)
         self.duration_spin.setSingleStep(0.5)
         
         ## Aquisição em série
         self.series_acquisition_checkbox = QCheckBox("Aquisição em série")
+        self.series_acquisition_checkbox.setObjectName("series_acquisition")
 
         # parametro de tempo
         time_params = QHBoxLayout()
@@ -79,6 +82,7 @@ class AcquisitionPanel(QWidget):
         
         ## Decimação
         self.decimation_combo = QComboBox()
+        self.decimation_combo.setObjectName("decimation")
         for i in range(0, 17):  # Potências de 2 de 1 a 2^16
             self.decimation_combo.addItem(f"{2**i}", 2**i)
         self.decimation_combo.setCurrentIndex(6)  # 2^6 = 64
@@ -93,9 +97,11 @@ class AcquisitionPanel(QWidget):
         ## Canais
         self.ch1_check = QCheckBox("Canal 1")
         self.ch1_check.setChecked(True)
+        self.ch1_check.setObjectName("channel_1")
         self.ch2_check = QCheckBox("Canal 2")
         self.ch2_check.setChecked(True)
-        
+        self.ch2_check.setObjectName("channel_2")
+
         channels_layout = QHBoxLayout()
         channels_layout.addWidget(self.ch1_check)
         channels_layout.addWidget(self.ch2_check)
@@ -109,6 +115,7 @@ class AcquisitionPanel(QWidget):
         # Botão para selecionar a pasta de calibrações
         calib_folder_layout = QHBoxLayout()
         self.calib_folder_label = QLabel("Nenhuma pasta selecionada")
+        self.calib_folder_label.setObjectName("calibration_folder")
         self.calib_folder_label.setToolTip("Pasta contendo os arquivos de calibração")
         self.select_calib_folder_button = QPushButton("Selecionar Pasta")
         self.select_calib_folder_button.clicked.connect(self.select_calibration_folder)
@@ -125,6 +132,7 @@ class AcquisitionPanel(QWidget):
         # Campo para nome de arquivo de calibração
         self.calib_name_layout = QHBoxLayout()
         self.calib_name_edit = QLineEdit("calibracao_sensor")
+        self.calib_name_edit.setObjectName("calibration_file_name")
         self.calib_name_edit.setPlaceholderText("Nome do arquivo de calibração")
         self.calib_name_layout.addWidget(self.calib_name_edit)
         
@@ -136,6 +144,7 @@ class AcquisitionPanel(QWidget):
         # Lista suspensa com calibrações disponíveis
         self.calib_selection_layout = QHBoxLayout()
         self.calib_combo = QComboBox()
+        self.calib_combo.setObjectName("calibration_file")
         self.calib_combo.setToolTip("Selecione um arquivo de calibração para usar")
         self.calib_combo.currentIndexChanged.connect(self.on_calibration_selected)
         self.calib_selection_layout.addWidget(self.calib_combo, 1)
@@ -168,6 +177,7 @@ class AcquisitionPanel(QWidget):
         # Seleção de porta serial
         port_layout = QHBoxLayout()
         self.lora_port_combo = QComboBox()
+        self.lora_port_combo.setObjectName("lora_port")
         self.lora_port_combo.setToolTip("Selecione a porta serial do módulo LoRa")
         self.refresh_lora_ports_button = QPushButton("↻")
         self.refresh_lora_ports_button.setToolTip("Atualizar lista de portas")

@@ -6,8 +6,10 @@ Programa principal para detecção e análise de vazamentos ...
 import sys
 import os
 import traceback
+import PyQt5.QtWidgets as QtWidgets
 from PyQt5.QtWidgets import QApplication, QMessageBox
 import numpy as np
+from app.utils.config import traverse_widgets
 
 # Certificar-se de que os pacotes estão no path
 if os.path.dirname(os.path.abspath(__file__)) not in sys.path:
@@ -79,6 +81,8 @@ class Application:
         
         # Inicializar estado
         self.initialize_state()
+
+        self.app.aboutToQuit.connect(self.on_about_to_quit)
     
     def setup_logging(self):
         """Configurar sistema de logging"""
@@ -174,14 +178,9 @@ class Application:
                 
         # Carregar configuração da pasta de calibração
         config = DataStore.load_config()
-        calib_folder = config.get('calibration_directory')
-        if not calib_folder:
-            # If not set, use default path from user request
-            calib_folder = 'data/Calibrações'
-            # Let's save it back to config
-            config['calibration_directory'] = calib_folder
-            DataStore.save_config(config)
 
+
+        calib_folder = config.get('calibration_directory')
         self.window.acquisition_panel.set_calibration_folder(calib_folder)
 
         # Carregar lista de arquivos
@@ -191,6 +190,7 @@ class Application:
         ports = self.lora_controller.get_available_ports()
         self.window.acquisition_panel.update_lora_ports(ports)
         log_info("Lista de portas LoRa inicializada")
+        set_all_input_values(self.window, config)
         
     def on_acquisition_requested(self, params):
         """
@@ -857,6 +857,16 @@ class Application:
         else:
             log_warning("Falha ao desligar equipamento via LoRa")
     
+    def on_about_to_quit(self):
+        """
+        Manipula o evento de fechamento da aplicação
+        """
+        log_info("Aplicação OAS-GUI está sendo fechada")
+        
+        config = get_all_input_values(self.window)
+        DataStore.save_config(config)
+        print(config)
+
 
     
     def run(self):
@@ -869,6 +879,70 @@ class Application:
         log_info("Iniciando aplicação OAS-GUI")
         self.window.show()
         return self.app.exec_()
+    
+def set_all_input_values(root_widget: QtWidgets, config: dict):
+
+    def set_values(widget):
+        object_name = widget.objectName()
+        if not object_name or object_name not in config:
+            return
+        
+        value = config[object_name]
+        
+        if isinstance(widget, QtWidgets.QLineEdit):
+            widget.setText(value)
+        elif isinstance(widget, QtWidgets.QDoubleSpinBox):
+            widget.setValue(float(value))
+        elif isinstance(widget, QtWidgets.QComboBox):
+            index = widget.findText(value)
+            if index != -1:
+                widget.setCurrentIndex(index)
+            else:
+                widget.addItem(value)
+        elif isinstance(widget, QtWidgets.QCheckBox):
+            widget.setChecked(bool(value))
+
+
+    traverse_widgets(root_widget, set_values)
+    
+def get_all_input_values(self) -> dict:
+    """
+    Get all input values from the panel using widget traversal
+    
+    Returns:
+        Dictionary with widget object names as keys and their values
+    """
+    values = {}
+    
+    def collect_values(widget):
+
+        object_name = widget.objectName()
+        if not object_name:
+            return
+            
+        if isinstance(widget, QtWidgets.QLineEdit):
+            values[object_name] = widget.text()
+        elif isinstance(widget, QtWidgets.QDoubleSpinBox):
+            values[object_name] = widget.value()
+        elif isinstance(widget, QtWidgets.QComboBox):
+            values[object_name] = widget.currentText()
+            # {
+            #     "text": widget.currentText(),
+            #     "index": widget.currentIndex(),
+            #     "items": [widget.itemText(i) for i in range(widget.count())]
+            # }
+        elif isinstance(widget, QtWidgets.QCheckBox):
+            values[object_name] = widget.isChecked()
+    
+    # Apply to input widgets only
+    input_types = [QtWidgets.QLineEdit, QtWidgets.QDoubleSpinBox, QtWidgets.QComboBox, QtWidgets.QCheckBox,
+                   QtWidgets.QPlainTextEdit, QtWidgets.QSpinBox, QtWidgets.QTextEdit, QtWidgets.QRadioButton, QtWidgets.QSlider,
+                   QtWidgets.QDial, QtWidgets.QScrollBar, QtWidgets.QListWidget, QtWidgets.QTreeWidget, QtWidgets.QDateEdit, QtWidgets.QTimeEdit, QtWidgets.QDateTimeEdit,
+                   QtWidgets.QLabel]
+
+    traverse_widgets(self, collect_values, input_types, recursive=True)
+    
+    return values
 
 def main():
     """Função principal"""
