@@ -25,6 +25,7 @@ class MetadataPanel(QWidget):
         super().__init__(parent)
         self.config_file = "config/metadata_options.json"
         self.last_state_file = "config/last_metadata_state.json"
+        self.metadata_template_file = "metadata_template.json"
         self.setup_ui()
         self.load_options()
         self.load_last_state()
@@ -37,121 +38,142 @@ class MetadataPanel(QWidget):
         # Grupo principal de metadados
         metadata_group = QGroupBox("Informações para Treinamento de IA")
         metadata_form = QFormLayout()
+        self.metadata_form = metadata_form
         
-        # Número de série do sensor
-        self.sensor_sn_edit = QLineEdit()
-        metadata_form.addRow("SN do Sensor:", self.sensor_sn_edit)
+        # # Número de série do sensor
+        # self.sensor_sn_edit = QLineEdit()
+        # metadata_form.addRow("SN do Sensor:", self.sensor_sn_edit)
         
-        # Tipo de teste
-        self.test_type_combo = QComboBox()
-        self.test_type_combo.addItems([
-            "Vazamento de Água", 
-            "Vazamento de Ar", 
-            "Vazamento de Gás", 
-            "Descarga Elétrica", 
-            "Ruído Mecânico", 
-            "Controle (Sem Vazamento)", 
-            "Outro"
-        ])
-        metadata_form.addRow("Tipo de Teste:", self.test_type_combo)
+        # # Tipo de teste
+        # self.test_type_combo = QComboBox()
+        # self.test_type_combo.addItems([
+        #     "Vazamento de Água", 
+        #     "Vazamento de Ar", 
+        #     "Vazamento de Gás", 
+        #     "Descarga Elétrica", 
+        #     "Ruído Mecânico", 
+        #     "Controle (Sem Vazamento)", 
+        #     "Outro"
+        # ])
+        # metadata_form.addRow("Tipo de Teste:", self.test_type_combo)
         
-        # Material do sensor
-        self.material_combo = QComboBox()
-        self.material_combo.addItems([
-            "PVC", 
-            "Aço", 
-            "Cobre", 
-            "Polietileno", 
-            "Polipropileno", 
-            "Ferro Fundido", 
-            "Outro"
-        ])
-        metadata_form.addRow("Material:", self.material_combo)
+        # # Material do sensor
+        # self.material_combo = QComboBox()
+        # self.material_combo.addItems([
+        #     "PVC", 
+        #     "Aço", 
+        #     "Cobre", 
+        #     "Polietileno", 
+        #     "Polipropileno", 
+        #     "Ferro Fundido", 
+        #     "Outro"
+        # ])
+        # metadata_form.addRow("Material:", self.material_combo)
         
-        # Localização
-        self.location_edit = QLineEdit()
-        metadata_form.addRow("Localização:", self.location_edit)
+        # # Localização
+        # self.location_edit = QLineEdit()
+        # metadata_form.addRow("Localização:", self.location_edit)
         
-        # Pressão
-        self.pressure_spin = QDoubleSpinBox()
-        self.pressure_spin.setRange(0.0, 100.0)
-        self.pressure_spin.setValue(0.0)
-        self.pressure_spin.setSuffix(" bar")
-        metadata_form.addRow("Pressão:", self.pressure_spin)
+        # # Pressão
+        # self.pressure_spin = QDoubleSpinBox()
+        # self.pressure_spin.setRange(0.0, 100.0)
+        # self.pressure_spin.setValue(0.0)
+        # self.pressure_spin.setSuffix(" bar")
+        # metadata_form.addRow("Pressão:", self.pressure_spin)
         
-        # Fluxo
-        self.flow_spin = QDoubleSpinBox()
-        self.flow_spin.setRange(0.0, 100.0)
-        self.flow_spin.setValue(0.0)
-        self.flow_spin.setSuffix(" L/min")
-        metadata_form.addRow("Fluxo:", self.flow_spin)
+        # # Fluxo
+        # self.flow_spin = QDoubleSpinBox()
+        # self.flow_spin.setRange(0.0, 100.0)
+        # self.flow_spin.setValue(0.0)
+        # self.flow_spin.setSuffix(" L/min")
+        # metadata_form.addRow("Fluxo:", self.flow_spin)
         
-        # Distância
-        self.distance_spin = QDoubleSpinBox()
-        self.distance_spin.setRange(0.0, 1000.0)
-        self.distance_spin.setValue(0.0)
-        self.distance_spin.setSuffix(" cm")
-        metadata_form.addRow("Distância:", self.distance_spin)
+        # # Distância
+        # self.distance_spin = QDoubleSpinBox()
+        # self.distance_spin.setRange(0.0, 1000.0)
+        # self.distance_spin.setValue(0.0)
+        # self.distance_spin.setSuffix(" cm")
+        # metadata_form.addRow("Distância:", self.distance_spin)
         
-        # Botão para carregar fotos do setup
-        self.setup_photo_button = QPushButton("Carregar Fotos")
-        self.setup_photo_button.clicked.connect(self.load_setup_photos)
-        metadata_form.addRow("Foto do Setup:", self.setup_photo_button)
+        # # Botão para carregar fotos do setup
+        # self.setup_photo_button = QPushButton("Carregar Fotos")
+        # self.setup_photo_button.clicked.connect(self.load_setup_photos)
+        # metadata_form.addRow("Foto do Setup:", self.setup_photo_button)
         
-        # Lista de fotos carregadas
-        self.setup_photos_label = QLabel("Nenhuma foto carregada")
-        metadata_form.addRow("Fotos:", self.setup_photos_label)
+        # # Lista de fotos carregadas
+        # self.setup_photos_label = QLabel("Nenhuma foto carregada")
+        # metadata_form.addRow("Fotos:", self.setup_photos_label)
 
-        # Comentários
-        self.comments_edit = QTextEdit()
-        self.comments_edit.setAcceptRichText(False)  # Desabilitar formatação rica
-        self.comments_edit.setPlaceholderText("Digite seus comentários aqui...")
-        self.comments_edit.setAlignment(Qt.AlignLeft | Qt.AlignTop)
-        self.comments_edit.setMinimumHeight(400)
-        metadata_form.addRow("Comentários:", self.comments_edit)
+        # # Comentários
+        # self.comments_edit = QTextEdit()
+        # self.comments_edit.setAcceptRichText(False)  # Desabilitar formatação rica
+        # self.comments_edit.setPlaceholderText("Digite seus comentários aqui...")
+        # self.comments_edit.setAlignment(Qt.AlignLeft | Qt.AlignTop)
+        # self.comments_edit.setMinimumHeight(400)
+        # metadata_form.addRow("Comentários:", self.comments_edit)
 
-        # Labels Personalizados
-        self.custom_labels_edit = QTextEdit()
-        self.custom_labels_edit.setAcceptRichText(False)
-        self.custom_labels_edit.setPlaceholderText('Exemplo:\n{"nome": "Temperatura", "valor": 25.3, "unidade": "C"}\n{"nome": "RPM", "valor": 1500, "unidade": "rpm"}')
-        self.custom_labels_edit.setMinimumHeight(100)
-        metadata_form.addRow("Labels Personalizados:", self.custom_labels_edit)
-        # Texto explicativo
-        self.custom_labels_help = QLabel(
-            'Para criar novos labels, escreva um por linha no formato:\n'
-            '{"nome": "Temperatura", "valor": 25.3, "unidade": "C"}\n'
-            '{"nome": "RPM", "valor": 1500, "unidade": "rpm"}\n'
-            'Você pode adicionar quantos quiser. Eles serão salvos nos metadados e carregados na próxima vez.'
-        )
-        self.custom_labels_help.setWordWrap(True)
-        metadata_form.addRow("", self.custom_labels_help)
+        # # Labels Personalizados
+        # self.custom_labels_edit = QTextEdit()
+        # self.custom_labels_edit.setAcceptRichText(False)
+        # self.custom_labels_edit.setPlaceholderText('Exemplo:\n{"nome": "Temperatura", "valor": 25.3, "unidade": "C"}\n{"nome": "RPM", "valor": 1500, "unidade": "rpm"}')
+        # self.custom_labels_edit.setMinimumHeight(100)
+        # metadata_form.addRow("Labels Personalizados:", self.custom_labels_edit)
+        # # Texto explicativo
+        # self.custom_labels_help = QLabel(
+        #     'Para criar novos labels, escreva um por linha no formato:\n'
+        #     '{"nome": "Temperatura", "valor": 25.3, "unidade": "C"}\n'
+        #     '{"nome": "RPM", "valor": 1500, "unidade": "rpm"}\n'
+        #     'Você pode adicionar quantos quiser. Eles serão salvos nos metadados e carregados na próxima vez.'
+        # )
+        # self.custom_labels_help.setWordWrap(True)
+        # metadata_form.addRow("", self.custom_labels_help)
 
-        # Botão para selecionar pasta de salvamento
-        self.save_dir_button = QPushButton("Selecionar Pasta de Destino")
-        self.save_dir_button.clicked.connect(self.select_save_directory)
-        self.save_directory = DataStore.load_config().get('save_directory', os.getcwd())  # Carregar das configurações
-        self.save_dir_button.setText(self.save_directory)  # Mostrar pasta atual
-        metadata_form.addRow("Pasta de Destino:", self.save_dir_button)
+        # # Botão para selecionar pasta de salvamento
+        # self.save_dir_button = QPushButton("Selecionar Pasta de Destino")
+        # self.save_dir_button.clicked.connect(self.select_save_directory)
+        # self.save_directory = DataStore.load_config().get('save_directory', os.getcwd())  # Carregar das configurações
+        # self.save_dir_button.setText(self.save_directory)  # Mostrar pasta atual
+        # metadata_form.addRow("Pasta de Destino:", self.save_dir_button)
 
-        # Tipo de Equipamento
-        self.equipment_type_combo = QComboBox()
-        metadata_form.addRow("Tipo de Equipamento:", self.equipment_type_combo)
-        # Grupo de status do equipamento (checkboxes)
-        self.status_options = [
-            "Água Circulante", "Água Estática","Oxigênio Ligado", "Oxigênio Desligado", "Ligado", "Desligado",
-            "Válvula Aberta", "Válvula Fechada", "Com Vazamento", "Sem Vazamento"
-        ]
-        self.status_checkboxes = []
-        status_layout = QHBoxLayout()
-        for opt in self.status_options:
-            cb = QCheckBox(opt)
-            self.status_checkboxes.append(cb)
-            status_layout.addWidget(cb)
-        status_group = QGroupBox()
-        status_group.setLayout(status_layout)
-        metadata_form.addRow("Status do Equipamento:", status_group)
+        # # Tipo de Equipamento
+        # self.equipment_type_combo = QComboBox()
+        # metadata_form.addRow("Tipo de Equipamento:", self.equipment_type_combo)
+        # # Grupo de status do equipamento (checkboxes)
+        # self.status_options = [
+        #     "Água Circulante", "Água Estática","Oxigênio Ligado", "Oxigênio Desligado", "Ligado", "Desligado",
+        #     "Válvula Aberta", "Válvula Fechada", "Com Vazamento", "Sem Vazamento"
+        # ]
+        # self.status_checkboxes = []
+        # status_layout = QHBoxLayout()
+        # for opt in self.status_options:
+        #     cb = QCheckBox(opt)
+        #     self.status_checkboxes.append(cb)
+        #     status_layout.addWidget(cb)
+        # status_group = QGroupBox()
+        # status_group.setLayout(status_layout)
+        # metadata_form.addRow("Status do Equipamento:", status_group)
 
         metadata_group.setLayout(metadata_form)
+        
+        self.new_entry_layout = QHBoxLayout()
+        new_entry_label = QLineEdit()
+        new_entry_label.setPlaceholderText("Nome do novo metadado")
+        new_entry_type = QComboBox()
+        new_entry_type.addItems([
+            "text", 
+            "number", 
+            "filename", 
+            "material", 
+            "tipo de teste", 
+        ])
+        new_entry_button = QPushButton("Adicionar")
+        self.new_entry_layout.addWidget(new_entry_label)
+        self.new_entry_layout.addWidget(new_entry_type)  
+        self.new_entry_layout.addWidget(new_entry_button)
+        self.new_entry_layout.addWidget(QLabel(""), stretch=1)
+        metadata_form.addRow("Adicionar novo metadado:", self.new_entry_layout)
+        
+
         layout.addWidget(metadata_group)  
         
         # Informações adicionais
@@ -161,14 +183,71 @@ class MetadataPanel(QWidget):
         
         # Adicionar espaço vazio para expansão
         layout.addStretch(1)
+
+        new_entry_button.clicked.connect(self.add_custom_metadata)
+
+    def add_metadata_row(self, metadata_name: str, metadata_type, value: Any = None):
+        """
+        Adiciona uma nova linha de metadado ao formulário
         
+        Args:
+            metadata_name: Nome do metadado
+            widget: Widget correspondente ao metadado (QLineEdit, QComboBox, etc.)
+        """
+        if metadata_name:
+            # Create appropriate widget based on type
+            if metadata_type == "text":
+                widget = QLineEdit()
+            elif metadata_type == "number":
+                widget = QDoubleSpinBox()
+                widget.setRange(-999999.0, 999999.0)
+            elif metadata_type == "filename":
+                widget = QPushButton("Selecionar Arquivo")
+                # You might want to add click handler for file selection
+            else:  # material, tipo de teste, or other combo types
+                widget = QComboBox()
+                widget.setEditable(True)
+
+            row_count = self.metadata_form.rowCount()
+            metadata_layout = QHBoxLayout()
+            metadata_layout.addWidget(widget)
+            remove_metadata_button = QPushButton("Remover")
+            metadata_layout.addWidget(remove_metadata_button)
+            metadata_layout.addWidget(QLabel(""), stretch = 1)
+            self.metadata_form.insertRow(row_count - 1, metadata_name + ":", metadata_layout)
+        
+        if value is not None:
+            if isinstance(widget, QLineEdit):
+                widget.setText(str(value))
+            elif isinstance(widget, QDoubleSpinBox):
+                widget.setValue(float(value))
+            elif isinstance(widget, QComboBox):
+                index = widget.findText(str(value))
+                if index >= 0:
+                    widget.setCurrentIndex(index)
+
+    def add_custom_metadata(self):
+        # Get reference to the widgets from the layout
+        new_entry_label = self.new_entry_layout.itemAt(0).widget()
+        new_entry_type = self.new_entry_layout.itemAt(1).widget()
+
+        # Get the label name and type
+        metadata_name = new_entry_label.text().strip()
+        metadata_type = new_entry_type.currentText()
+
+        self.add_metadata_row(metadata_name, metadata_type)
+            
+        # Clear the input field
+        new_entry_label.clear()
+        
+    
     def load_options(self):
         """Carrega as opções disponíveis do arquivo de configuração"""
         try:
             if os.path.exists(self.config_file):
                 with open(self.config_file, 'r', encoding='utf-8') as f:
                     config = json.load(f)
-                    
+                                    
                 # Atualizar opções do tipo de teste
                 if 'test_types' in config:
                     self.test_type_combo.clear()
@@ -185,8 +264,29 @@ class MetadataPanel(QWidget):
                 self.equipment_type_combo.addItems(self.equipment_types)
         except Exception as e:
             print(f"Erro ao carregar opções: {str(e)}")
-            
+
+    def save_metadata(self):
+        """Salva os metadados atuais no arquivo de configuração"""
+
+        config = {}
+        for i in range(self.metadata_form.rowCount()-1):
+            metadata_name = self.metadata_form.itemAt(i).widget().text()
+            metadata_widget = self.metadata_form.itemAt(i+1).widget()
+            if isinstance(metadata_widget, [QLineEdit, QComboBox]):
+                config[metadata_name] = metadata_widget.text()
+            elif isinstance(metadata_widget, QDoubleSpinBox):
+                config[metadata_name] = metadata_widget.value()
+        try:
+            # Criar diretório se não existir
+            os.makedirs(os.path.dirname(self.metadata_template_file), exist_ok=True)
+            # Salvar os metadados no arquivo
+            with open(self.metadata_template_file, 'w', encoding='utf-8') as f:
+                json.dump(config, f, indent=4, ensure_ascii=False)
+        except Exception as e:
+            print(f"Erro ao salvar opções: {str(e)}")
+
     def save_options(self):
+        self.save_metadata()
         """Salva as opções atuais no arquivo de configuração"""
         try:
             # Criar diretório se não existir
