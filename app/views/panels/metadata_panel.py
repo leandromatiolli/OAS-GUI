@@ -11,8 +11,6 @@ import os
 import json
 from app.utils.debug_log import set_gui_log_handler, log_debug, log_info, log_warning, log_error
 
-from panel import widget
-
 from app.models.data_store import DataStore
 
 class MetadataPanel(QWidget):
