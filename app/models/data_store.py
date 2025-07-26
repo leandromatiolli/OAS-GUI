@@ -16,7 +16,7 @@ class DataStore:
     
     # Constantes
     DEFAULT_CALIBRATION_FILE = "calibracao_sistema.pkl"
-    CONFIG_FILE = "config.json"
+    CONFIG_FILE = "./config/last_state.json"
     DEFAULT_CONFIG = {
         "save_directory": os.curdir,
         "calibration_directory": os.curdir,

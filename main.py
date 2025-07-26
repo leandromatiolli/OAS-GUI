@@ -864,10 +864,10 @@ class Application:
         log_info("Aplicação OAS-GUI está sendo fechada")
         
         config = get_all_input_values(self.window)
+        metadata = self.window.metadata_panel.get_metadata()
+        self.window.metadata_panel.save_metadata_template()
+        config['metadata'] = metadata
         DataStore.save_config(config)
-        print(config)
-
-
     
     def run(self):
         """
@@ -884,11 +884,11 @@ def set_all_input_values(root_widget: QtWidgets, config: dict):
 
     def set_values(widget):
         object_name = widget.objectName()
-        if not object_name or object_name not in config:
+
+        if object_name not in config:
             return
         
         value = config[object_name]
-        
         if isinstance(widget, QtWidgets.QLineEdit):
             widget.setText(value)
         elif isinstance(widget, QtWidgets.QDoubleSpinBox):
@@ -919,19 +919,19 @@ def get_all_input_values(self) -> dict:
     def collect_values(widget):
 
         object_name = widget.objectName()
-        if not object_name:
+        if not object_name.startswith("mk_"):
             return
-            
+        key = object_name[3:]  # Remove "mk_" prefix
         if isinstance(widget, QtWidgets.QLineEdit):
-            values[object_name] = widget.text()
+            values[key] = widget.text()
         elif isinstance(widget, QtWidgets.QDoubleSpinBox):
-            values[object_name] = widget.value()
+            values[key] = widget.value()
         elif isinstance(widget, QtWidgets.QComboBox):
-            values[object_name] = widget.currentText()
+            values[key] = widget.currentText()
         elif isinstance(widget, QtWidgets.QCheckBox):
-            values[object_name] = widget.isChecked()
+            values[key] = widget.isChecked()
         elif isinstance(widget, QtWidgets.QLabel):
-            values[object_name] = widget.text()
+            values[key] = widget.text()
 
     traverse_widgets(self, collect_values, recursive=True)
     

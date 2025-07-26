@@ -61,7 +61,7 @@ class AnalysisPanel(QWidget):
         self.current_dir = DataStore.load_config().get('save_directory', os.getcwd())
         self.dir_label = QLabel(self.current_dir)
         self.dir_label.setToolTip("Pasta para salvar os dado adquiridos")
-        self.dir_label.setObjectName("save_directory")
+        self.dir_label.setObjectName("mk_save_directory")
 
 
         file_buttons_group = QWidget()
@@ -112,10 +112,10 @@ class AnalysisPanel(QWidget):
         ## Linha para média móvel
         moving_avg_layout = QHBoxLayout()
         self.moving_avg_checkbox = QCheckBox("Ativar")
-        self.moving_avg_checkbox.setObjectName("moving_avg_active")
+        self.moving_avg_checkbox.setObjectName("mk_moving_avg_active")
         moving_avg_layout.addWidget(self.moving_avg_checkbox)
         self.window_size_spinbox = QSpinBox()
-        self.window_size_spinbox.setObjectName("moving_avg_window_size")
+        self.window_size_spinbox.setObjectName("mk_moving_avg_window_size")
         self.window_size_spinbox.setRange(2, 101)
         self.window_size_spinbox.setSingleStep(1)
         self.window_size_spinbox.setValue(10)
@@ -127,17 +127,17 @@ class AnalysisPanel(QWidget):
 
         self.autosave_demodulated_checkbox = QCheckBox()
         self.autosave_demodulated_checkbox.setChecked(False)
-        self.autosave_demodulated_checkbox.setObjectName("autosave_demodulated")
+        self.autosave_demodulated_checkbox.setObjectName("mk_autosave_demodulated")
         variety_group_layout.addRow("Salvar Demodulado Automaticamente: ", self.autosave_demodulated_checkbox)
         
         ## Exibir medida automaticamente
         self.autoshow_waveform = QCheckBox("")
-        self.autoshow_waveform.setObjectName("autoshow_waveform")
+        self.autoshow_waveform.setObjectName("mk_autoshow_waveform")
         variety_group_layout.addRow("Exibir dados automaticamente: ", self.autoshow_waveform)
         
         ## Demodular dados automaticamente
         self.autodemodulate = QCheckBox("")
-        self.autodemodulate.setObjectName("autodemodulate")
+        self.autodemodulate.setObjectName("mk_autodemodulate")
         variety_group_layout.addRow("Demodular dados automaticamente: ", self.autodemodulate)
         
         
@@ -147,27 +147,27 @@ class AnalysisPanel(QWidget):
         
         self.bandpass_checkbox = QCheckBox("Ativar")
         self.low_freq_spinbox = QDoubleSpinBox()
-        self.low_freq_spinbox.setObjectName("band_pass_filter_low_freq")
+        self.low_freq_spinbox.setObjectName("mk_band_pass_filter_low_freq")
         self.low_freq_spinbox.setRange(0.1, 100000.0)
         self.low_freq_spinbox.setValue(50.0)
         self.low_freq_spinbox.setSuffix(" Hz")
         self.low_freq_spinbox.setEnabled(False)
         
         self.high_freq_spinbox = QDoubleSpinBox()
-        self.high_freq_spinbox.setObjectName("band_pass_filter_high_freq")
+        self.high_freq_spinbox.setObjectName("mk_band_pass_filter_high_freq")
         self.high_freq_spinbox.setRange(0.1, 100000.0)
         self.high_freq_spinbox.setValue(5000.0)
         self.high_freq_spinbox.setSuffix(" Hz")
         self.high_freq_spinbox.setEnabled(False)
         
         self.order_spinbox = QSpinBox()
-        self.order_spinbox.setObjectName("band_pass_filter_order")
+        self.order_spinbox.setObjectName("mk_band_pass_filter_order")
         self.order_spinbox.setRange(1, 10)
         self.order_spinbox.setValue(4)
         self.order_spinbox.setEnabled(False)
         
         self.apply_filter_button = QPushButton("Aplicar")   
-        self.apply_filter_button.setObjectName("apply_band_pass_filter")
+        self.apply_filter_button.setObjectName("mk_apply_band_pass_filter")
         self.apply_filter_button.setEnabled(False)
         
         bandpass_layout.addRow(self.bandpass_checkbox)
