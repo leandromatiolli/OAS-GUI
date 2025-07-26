@@ -70,6 +70,7 @@ class DataStore:
         Returns:
             Nome do arquivo onde os dados foram salvos
         """
+        data = {k: v for k, v in data.items() if k != 't'}
         def clean(s):
             # Remove acentos, espaços e caracteres especiais
             s = ''.join(c for c in unicodedata.normalize('NFD', str(s)) if unicodedata.category(c) != 'Mn')

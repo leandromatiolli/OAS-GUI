@@ -376,10 +376,10 @@ class Application:
         Args:
             message: Mensagem de erro
         """
-        log_error(f"Erro na aquisição: {message}")
+        log_error(f"main:{message}")
         self.window.acquisition_panel.set_enabled(True)
-        self.window.show_error_message("Erro na Aquisição", message)
-        self.window.show_status_message("Erro na aquisição")
+        #self.window.show_error_message("Erro na Aquisição", message)
+        self.window.show_status_message(message)
     
     def on_sensor_connected(self, connected, ip, error_message):
         """
