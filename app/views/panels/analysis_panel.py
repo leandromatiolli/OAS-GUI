@@ -146,6 +146,7 @@ class AnalysisPanel(QWidget):
         bandpass_layout = QFormLayout()
         
         self.bandpass_checkbox = QCheckBox("Ativar")
+        self.bandpass_checkbox.setObjectName("mk_apply_band_pass_filter")
         self.low_freq_spinbox = QDoubleSpinBox()
         self.low_freq_spinbox.setObjectName("mk_band_pass_filter_low_freq")
         self.low_freq_spinbox.setRange(0.1, 100000.0)
@@ -167,7 +168,6 @@ class AnalysisPanel(QWidget):
         self.order_spinbox.setEnabled(False)
         
         self.apply_filter_button = QPushButton("Aplicar")   
-        self.apply_filter_button.setObjectName("mk_apply_band_pass_filter")
         self.apply_filter_button.setEnabled(False)
         
         bandpass_layout.addRow(self.bandpass_checkbox)

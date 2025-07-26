@@ -883,12 +883,11 @@ class Application:
 def set_all_input_values(root_widget: QtWidgets, config: dict):
 
     def set_values(widget):
-        object_name = widget.objectName()
-
-        if object_name not in config:
+        object_name :str = widget.objectName()
+        if not object_name.startswith("mk_") and (object_name[3:] not in config):
             return
         
-        value = config[object_name]
+        value = config[object_name[3:]]
         if isinstance(widget, QtWidgets.QLineEdit):
             widget.setText(value)
         elif isinstance(widget, QtWidgets.QDoubleSpinBox):
@@ -926,12 +925,16 @@ def get_all_input_values(self) -> dict:
             values[key] = widget.text()
         elif isinstance(widget, QtWidgets.QDoubleSpinBox):
             values[key] = widget.value()
+        elif isinstance(widget, QtWidgets.QSpinBox):
+            values[key] = widget.value()
         elif isinstance(widget, QtWidgets.QComboBox):
             values[key] = widget.currentText()
         elif isinstance(widget, QtWidgets.QCheckBox):
             values[key] = widget.isChecked()
         elif isinstance(widget, QtWidgets.QLabel):
             values[key] = widget.text()
+        else:
+            print(f"Widget {object_name} não suportado para coleta de valores ({widget.__class__.__name__})")
 
     traverse_widgets(self, collect_values, recursive=True)
     
