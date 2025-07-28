@@ -152,6 +152,12 @@ class AcquisitionThread(QThread):
                 # Emitir sinal com os dados
                 self.data_acquired.emit(data)
 
+                if not self.is_series:
+                    # Se não for uma série, finalizar a aquisição
+                    self.finished.emit("finished")
+                    tear_down(self.dig)
+                    return
+
                 
             except Exception as e:
                 #print(traceback.format_exc())
