@@ -20,9 +20,6 @@
     "Comentario": [
         "text_area"
     ],
-    "Timestamp": [
-        "datetime"
-    ],
     "Material": [
         "combo",
         [
@@ -63,5 +60,8 @@
             "Tanque",
             "Outro"
         ]
+    ],
+    "asdf": [
+        "combo"
     ]
 }
