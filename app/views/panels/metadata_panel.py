@@ -196,9 +196,8 @@ class MetadataPanel(QWidget):
             # create a text edit window to add options
             #is there an option of QInputDialog that is textbox instead of line edit?
             options, ok = QInputDialog.getText(self, "Opções do Combo", "Insira as opções separadas por vírgula:")
-            print(ok)
             if ok and options:
-                options_list = [opt.strip() for opt in options.split(',')]
+                options_list = list(set([opt.strip() for opt in options.split(',')]))
                 self.metadata_template[metadata_name].append(options_list)
             elif not ok:
                 del self.metadata_template[metadata_name]
