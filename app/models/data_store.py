@@ -3,6 +3,7 @@ Módulo para gerenciamento e armazenamento de dados
 """
 import os
 import glob
+from app.utils.debug_log import log_debug
 import numpy as np
 import pickle
 import gzip
@@ -66,6 +67,7 @@ class DataStore:
             data: Dicionário contendo os dados
             directory: Diretório onde salvar o arquivo
         """
+        log_debug(f"Salvando dados adquiridos no diretório: {directory}")        
         data = data.copy()
         del data['t']
         # Salvar metadados em JSON
@@ -163,7 +165,7 @@ class DataStore:
         """
         # Obter diretório das configurações
         directory = DataStore.load_last_state().get('save_directory')
-        return DataStore.save_data(data, prefix="vazamento_demodulado", directory=directory)
+        return DataStore.save_data(data, directory=directory)
     
     @staticmethod
     def save_calibration_data(data: Dict[str, Any], filename: Optional[str] = None) -> str:

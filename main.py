@@ -280,16 +280,15 @@ class Application:
         Args:
             data: Dados adquiridos
         """
-        log_info("Novos dados")
+        log_info(f"Novos dados")
         self.window.show_status_message("Aquisição concluída")
         
         metadata = self.window.metadata_panel.get_metadata()
         data.update(metadata)
-        self.processing_controller.set_data(data)
         directory = self.window.analysis_panel.dir_label.text()
-        log_debug(f"Salvando dados adquiridos no diretório: {directory}")
         DataStore.save_data(data, directory=directory)
-
+        self.processing_controller.set_data(data)
+        
         if self.window.analysis_panel.autoshow_waveform.isChecked():
             self.window.acquisition_panel.set_enabled(True)
             self.window.switch_to_tab(2) 

@@ -273,11 +273,6 @@ class MetadataPanel(QWidget):
 
         except Exception as e:
             log_error(f"Erro ao carregar último estado: {str(e)}")
-            
-        for key, value in self.metadata.items():
-            pass
-            #self.set_widget_value(key, value)
-
 
 
     def save_metadata_template(self):
