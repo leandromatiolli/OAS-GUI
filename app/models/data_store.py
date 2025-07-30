@@ -58,19 +58,31 @@ class DataStore:
             return {}
     
     @staticmethod
-    def save_data(data: Dict[str, Any], prefix: str = "vazamento_continuo", directory: str = None) -> str:
+    def save_data(data: Dict[str, Any], directory: str = None) -> str:
         """
-        Salva dados em arquivo pickle
+        Salva dados em arquivo pickle comprimido com gzip
         
         Args:
             data: Dicionário contendo os dados
-            prefix: Prefixo para o nome do arquivo
             directory: Diretório onde salvar o arquivo
-            
-        Returns:
-            Nome do arquivo onde os dados foram salvos
         """
-        data = {k: v for k, v in data.items() if k != 't'}
+        data = data.copy()
+        del data['t']
+        #filename = DataStore.create_filename(data_without_t)
+        filename = data['timestamp']
+        filepath = os.path.join(directory, filename)
+        with gzip.open(filepath + '.pkl.gz', 'wb', compresslevel=1) as file:
+            pickle.dump(data, file)
+        # Salvar metadados em JSON
+        metadata: dict = data.pop('metadata')
+        del data['waveforms']
+        metadata.update(data)
+        with open(filepath + '.json', 'w', encoding='utf-8') as file:
+            json.dump(metadata, file, indent=4, ensure_ascii=True)
+        return
+    
+    @staticmethod
+    def create_filename(data: Dict):
         def clean(s):
             # Remove acentos, espaços e caracteres especiais
             s = ''.join(c for c in unicodedata.normalize('NFD', str(s)) if unicodedata.category(c) != 'Mn')
@@ -101,12 +113,8 @@ class DataStore:
             'equipment_status': 'Status',
             'location': 'Local',
         }
-        if directory is None:
-            directory = DataStore.load_config().get('save_directory')
-        if directory is None:
-            directory = os.getcwd()
-        os.makedirs(directory, exist_ok=True)
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        timestamp = data['timestamp']
+        #timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         metadata = data.get('metadata', {})
         # Extrair e abreviar campos
         sensor_sn = clean(metadata.get('sensor_sn', ''))
@@ -141,18 +149,9 @@ class DataStore:
                     break
         # Montar string de labels abreviados
         label_str = f"_{field_abbr['sensor_sn']}{sensor_sn}_{field_abbr['test_type']}{test_type}_{field_abbr['material']}{material}_{field_abbr['distance']}{distance}cm_{field_abbr['pressure']}{pressure}b_{field_abbr['flow']}{flow}L_{field_abbr['equipment_type']}{equipment_type}_{field_abbr['equipment_status']}{status_str}_{field_abbr['location']}{location}{vazamento_info}"
-        filename = f"{prefix}_{timestamp}{label_str}.pkl.gz"
-        if 'metadata' not in data:
-            data['metadata'] = {}
-        data['metadata']['timestamp'] = timestamp
-        filepath = os.path.join(directory, filename)
-        with gzip.open(filepath, 'wb', compresslevel=1) as f:
-            pickle.dump(data, f)
-        # Salvar metadados em JSON
-        metadata_filename = os.path.splitext(filepath)[0] + '.json'
-        with open(metadata_filename, 'w', encoding='utf-8') as fjson:
-            json.dump(data['metadata'], fjson, indent=4, ensure_ascii=False)
-        return filepath
+        filename = f"{timestamp}{label_str}.pkl.gz"
+
+        return filename
     
     @staticmethod
     def save_demodulated_data(data: Dict[str, Any]) -> str:
@@ -308,22 +307,11 @@ class DataStore:
                     data = pickle.load(f)
             else:
                 raise e
-            
-        # Converter para dicionário se não for
-        if not isinstance(data, dict):
-            temp_dict = {}
-            for key in dir(data):
-                if not key.startswith('__') and not callable(getattr(data, key)):
-                    temp_dict[key] = getattr(data, key)
-            data = temp_dict
-            
-        # Verificar se temos dados de tempo e criar se não existir
-        if 'waveforms' in data and 't' not in data:
-            if 'sample_frequency_effective' in data:
-                fs = data['sample_frequency_effective']
-                wf_len = data['waveforms'].shape[1]
-                data['t'] = np.arange(wf_len) / fs
-                
+
+        # create time vector
+        fs = data['sample_frequency_effective']
+        wf_len = data['waveforms'].shape[1]
+        data['t'] = np.arange(wf_len) / fs
         return data
     
     @staticmethod

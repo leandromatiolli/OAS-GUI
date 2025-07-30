@@ -11,9 +11,6 @@
     "Fluxo (L/min)": [
         "float"
     ],
-    "Distancia cm": [
-        "float"
-    ],
     "Fotos": [
         "filename"
     ],
@@ -60,5 +57,11 @@
             "Tanque",
             "Outro"
         ]
+    ],
+    "Distancia (cm)": [
+        "float"
+    ],
+    "sdf": [
+        "filename"
     ]
 }

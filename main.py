@@ -292,7 +292,7 @@ class Application:
         
         directory = self.window.analysis_panel.dir_label.text()
         log_debug(f"Salvando dados adquiridos no diretório: {directory}")
-        DataStore.save_data(data, prefix="", directory=directory)
+        DataStore.save_data(data, directory=directory)
 
         if self.window.analysis_panel.autoshow_waveform.isChecked():
             self.window.acquisition_panel.set_enabled(True)
@@ -411,12 +411,8 @@ class Application:
         self.window.show_status_message(f"Arquivo carregado")
         
         # Exibir metadados do arquivo
-        if 'metadata' in data:
-            log_debug(f"Exibindo metadados do arquivo: {data['metadata']}")
-            self.window.analysis_panel.show_metadata(data['metadata'])
-        else:
-            log_debug("Arquivo não contém metadados")
-            self.window.analysis_panel.show_metadata(None)
+        log_debug(f"Exibindo metadados do arquivo: {data['metadata']}")
+        self.window.analysis_panel.show_metadata(data['metadata'])
         
         # Atualizar controlador de processamento com os novos dados
         self.processing_controller.set_data(data)

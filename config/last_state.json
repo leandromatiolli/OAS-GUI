@@ -27,8 +27,18 @@
         "materials": "Epoxy",
         "test_types": "Vazamento de Gás",
         "equipment_types": "Válvula",
-        "Distancia cm": 1.0,
         "Comentario": "",
-        "timestamp": "20250726_145543"
+        "sample_frequency": 125000000.0,
+        "decimation": 128,
+        "sample_frequency_effective": 976562.5,
+        "acquisition_time": 0.536870912,
+        "channels": [
+            1,
+            2
+        ],
+        "is_calibration": false,
+        "calibration_file": null,
+        "timestamp": "2025-07-30 14:17:39",
+        "Distancia (cm)": 0.0
     }
 }

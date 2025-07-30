@@ -399,10 +399,11 @@ class AnalysisPanel(QWidget):
         
     def on_browse_clicked(self):
         """Abre um diálogo para selecionar arquivos manualmente (agora múltiplos)"""
+        
         file_paths, _ = QFileDialog.getOpenFileNames(
             self,
             "Selecionar arquivos de dados",
-            "",
+            self.dir_label.text(),
             "Arquivos pickle (*.pkl, *.pkl.gz) "
         )
         
