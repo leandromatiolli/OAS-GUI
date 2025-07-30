@@ -58,7 +58,7 @@ class AnalysisPanel(QWidget):
         self.select_dir_button.clicked.connect(self.on_select_dir_clicked)
         self.use_save_dir_button = QPushButton("Usar pasta de gravação")
         self.use_save_dir_button.clicked.connect(self.on_use_save_dir_clicked)
-        self.current_dir = DataStore.load_config().get('save_directory', os.getcwd())
+        self.current_dir = DataStore.load_last_state().get('save_directory', os.getcwd())
         self.dir_label = QLabel(self.current_dir)
         self.dir_label.setToolTip("Pasta para salvar os dado adquiridos")
         self.dir_label.setObjectName("mk_save_directory")
@@ -729,16 +729,16 @@ class AnalysisPanel(QWidget):
 
 
 
-    def show_metadata(self, metadata):
+    def show_metadata(self, data):
         """
         Exibe os metadados do arquivo
         
         Args:
             metadata: Dicionário com os metadados
         """
-        if not metadata:
-            self.metadata_text.setPlainText("Sem metadados disponíveis")
-            return
+        metadata = data.copy()
+        del metadata['waveforms']  # Remover dados de onda para evitar sobrecarga
+        del metadata['t']  # Remover vetor de tempo para evitar sobrecarga
             
         # Formatar texto
         metadata_str = ""
@@ -993,7 +993,7 @@ class AnalysisPanel(QWidget):
     
     def on_use_save_dir_clicked(self):
         """Usa a mesma pasta da gravação (configuração)"""
-        dir_path = DataStore.load_config().get('save_directory', os.getcwd())
+        dir_path = DataStore.load_last_state().get('save_directory', os.getcwd())
         self.current_dir = dir_path
         self.dir_label.setText(dir_path)
         self.refresh_file_list_in_dir()

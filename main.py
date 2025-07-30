@@ -177,7 +177,7 @@ class Application:
         """Inicializa o estado da aplicação"""
                 
         # Carregar configuração da pasta de calibração
-        config = DataStore.load_config()
+        config = DataStore.load_last_state()
 
 
         calib_folder = config.get('calibration_directory')
@@ -411,8 +411,7 @@ class Application:
         self.window.show_status_message(f"Arquivo carregado")
         
         # Exibir metadados do arquivo
-        log_debug(f"Exibindo metadados do arquivo: {data['metadata']}")
-        self.window.analysis_panel.show_metadata(data['metadata'])
+        self.window.analysis_panel.show_metadata(data)
         
         # Atualizar controlador de processamento com os novos dados
         self.processing_controller.set_data(data)
@@ -863,7 +862,7 @@ class Application:
         metadata = self.window.metadata_panel.get_metadata()
         self.window.metadata_panel.save_metadata_template()
         config['metadata'] = metadata
-        DataStore.save_config(config)
+        DataStore.save_last_state(config)
     
     def run(self):
         """

@@ -60,8 +60,5 @@
     ],
     "Distancia (cm)": [
         "float"
-    ],
-    "sdf": [
-        "filename"
     ]
 }

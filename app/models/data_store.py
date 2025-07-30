@@ -16,14 +16,14 @@ class DataStore:
     
     # Constantes
     DEFAULT_CALIBRATION_FILE = "calibracao_sistema.pkl"
-    CONFIG_FILE = "./config/last_state.json"
+    LAST_STATE_FILE = "./config/last_state.json"
     DEFAULT_CONFIG = {
         "save_directory": os.curdir,
         "calibration_directory": os.curdir,
     }
     
     @staticmethod
-    def save_config(config: Dict[str, Any]) -> None:
+    def save_last_state(config: Dict[str, Any]) -> None:
         """
         Salva as configurações em arquivo
         
@@ -31,14 +31,14 @@ class DataStore:
             config: Dicionário com as configurações
         """
         # Criar diretório se não existir
-        #os.makedirs(os.path.dirname(DataStore.CONFIG_FILE), exist_ok=True)
+        #os.makedirs(os.path.dirname(DataStore.LAST_STATE_FILE), exist_ok=True)
         
         # Salvar configurações
-        with open(DataStore.CONFIG_FILE, 'w', encoding='utf-8') as f:
+        with open(DataStore.LAST_STATE_FILE, 'w', encoding='utf-8') as f:
             json.dump(config, f, indent=4, ensure_ascii=False)
             
     @staticmethod
-    def load_config() -> Dict[str, Any]:
+    def load_last_state() -> Dict[str, Any]:
         """
         Carrega as configurações do arquivo
         
@@ -46,12 +46,12 @@ class DataStore:
             Dicionário com as configurações
         """
         # Se o arquivo não existe, retornar configurações padrão
-        if not os.path.exists(DataStore.CONFIG_FILE):
+        if not os.path.exists(DataStore.LAST_STATE_FILE):
             return DataStore.DEFAULT_CONFIG
             
         # Carregar configurações
         try:
-            with open(DataStore.CONFIG_FILE, 'r', encoding='utf-8') as f:
+            with open(DataStore.LAST_STATE_FILE, 'r', encoding='utf-8') as f:
                 return json.load(f)
         except Exception as e:
             print(f"Erro ao carregar configurações: {str(e)}")
@@ -68,15 +68,15 @@ class DataStore:
         """
         data = data.copy()
         del data['t']
+        # Salvar metadados em JSON
+        metadata: dict = data.pop('metadata')
+        data.update(metadata)
         #filename = DataStore.create_filename(data_without_t)
         filename = data['timestamp']
         filepath = os.path.join(directory, filename)
         with gzip.open(filepath + '.pkl.gz', 'wb', compresslevel=1) as file:
             pickle.dump(data, file)
-        # Salvar metadados em JSON
-        metadata: dict = data.pop('metadata')
         del data['waveforms']
-        metadata.update(data)
         with open(filepath + '.json', 'w', encoding='utf-8') as file:
             json.dump(metadata, file, indent=4, ensure_ascii=True)
         return
@@ -165,7 +165,7 @@ class DataStore:
             Nome do arquivo onde os dados foram salvos
         """
         # Obter diretório das configurações
-        directory = DataStore.load_config().get('save_directory')
+        directory = DataStore.load_last_state().get('save_directory')
         return DataStore.save_data(data, prefix="vazamento_demodulado", directory=directory)
     
     @staticmethod
@@ -185,11 +185,11 @@ class DataStore:
             filename = DataStore.DEFAULT_CALIBRATION_FILE
             
         # Obter diretório de calibração das configurações
-        directory = DataStore.load_config().get('calibration_directory')
+        directory = DataStore.load_last_state().get('calibration_directory')
         
         # Se não houver diretório, salvar no diretório de dados padrão.
         if not directory:
-             directory = DataStore.load_config().get('save_directory')
+             directory = DataStore.load_last_state().get('save_directory')
 
         # Garantir que o diretório existe
         if directory:
@@ -252,7 +252,7 @@ class DataStore:
         calibration_files = []
         
         # Obter diretório de calibração das configurações
-        config = DataStore.load_config()
+        config = DataStore.load_last_state()
         calib_dir = config.get('calibration_directory')
 
         # Se não houver diretório configurado, não procurar por arquivos.
