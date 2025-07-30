@@ -44,10 +44,6 @@ def log_debug(message):
     # Imprimir no terminal
     print(terminal_message, file=sys.stdout, end='')
     sys.stdout.flush()  # Forçar flush para garantir que apareça imediatamente
-    
-    # Enviar para a GUI se o manipulador estiver definido
-    if gui_log_handler:
-        gui_log_handler(formatted_message)
 
 def log_info(message):
     """
@@ -64,10 +60,6 @@ def log_info(message):
     # Imprimir no terminal
     print(terminal_message, file=sys.stdout, end='')
     sys.stdout.flush()  # Forçar flush para garantir que apareça imediatamente
-    
-    # Enviar para a GUI se o manipulador estiver definido
-    if gui_log_handler:
-        gui_log_handler(formatted_message)
 
 def log_warning(message):
     """
@@ -84,10 +76,6 @@ def log_warning(message):
     # Imprimir no terminal
     print(terminal_message, file=sys.stdout, end='')
     sys.stdout.flush()  # Forçar flush para garantir que apareça imediatamente
-    
-    # Enviar para a GUI se o manipulador estiver definido
-    if gui_log_handler:
-        gui_log_handler(formatted_message)
 
 def log_error(message):
     """
@@ -104,7 +92,3 @@ def log_error(message):
     # Imprimir no terminal
     print(terminal_message, file=sys.stderr, end='')
     sys.stderr.flush()  # Forçar flush para garantir que apareça imediatamente
-    
-    # Enviar para a GUI se o manipulador estiver definido
-    if gui_log_handler:
-        gui_log_handler(formatted_message) 
