@@ -185,7 +185,7 @@ class AnalysisPanel(QWidget):
         
         # Aba de dados brutos
         raw_tab = QWidget()
-        raw_layout = QVBoxLayout(raw_tab)
+        raw_layout = QHBoxLayout(raw_tab)
         self.raw_canvas = MplCanvas(self, width=9, height=5)
         self.raw_toolbar = NavigationToolbarCustom(self.raw_canvas, self)
         raw_layout.addWidget(self.raw_toolbar)
@@ -217,7 +217,7 @@ class AnalysisPanel(QWidget):
         
         # Aba de sinal demodulado
         demodulated_tab = QWidget()
-        demodulated_layout = QVBoxLayout(demodulated_tab)
+        demodulated_layout = QHBoxLayout(demodulated_tab)
         self.demodulated_canvas = MplCanvas(self, width=9, height=5)
         self.demodulated_toolbar = NavigationToolbarCustom(self.demodulated_canvas, self)
         demodulated_layout.addWidget(self.demodulated_toolbar)
@@ -226,7 +226,7 @@ class AnalysisPanel(QWidget):
         
         # Aba de sinal filtrado
         filtered_tab = QWidget()
-        filtered_layout = QVBoxLayout(filtered_tab)
+        filtered_layout = QHBoxLayout(filtered_tab)
         self.filtered_canvas = MplCanvas(self, width=9, height=5)
         self.filtered_toolbar = NavigationToolbarCustom(self.filtered_canvas, self)
         filtered_layout.addWidget(self.filtered_toolbar)
@@ -235,7 +235,7 @@ class AnalysisPanel(QWidget):
         
         # Aba de espectro (log)
         spectrum_tab = QWidget()
-        spectrum_layout = QVBoxLayout(spectrum_tab)
+        spectrum_layout = QHBoxLayout(spectrum_tab)
         self.spectrum_canvas = MplCanvas(self, width=9, height=5)
         self.spectrum_toolbar = NavigationToolbarCustom(self.spectrum_canvas, self)
         spectrum_layout.addWidget(self.spectrum_toolbar)
@@ -244,7 +244,7 @@ class AnalysisPanel(QWidget):
         
         # Nova aba de espectro (linear)
         spectrum_linear_tab = QWidget()
-        spectrum_linear_layout = QVBoxLayout(spectrum_linear_tab)
+        spectrum_linear_layout = QHBoxLayout(spectrum_linear_tab)
         self.spectrum_linear_canvas = MplCanvas(self, width=9, height=5)
         self.spectrum_linear_toolbar = NavigationToolbarCustom(self.spectrum_linear_canvas, self)
         spectrum_linear_layout.addWidget(self.spectrum_linear_toolbar)
@@ -253,7 +253,7 @@ class AnalysisPanel(QWidget):
         
         # Aba de espectrograma
         spectrogram_tab = QWidget()
-        spectrogram_layout = QVBoxLayout(spectrogram_tab)
+        spectrogram_layout = QHBoxLayout(spectrogram_tab)
         
         # Controles do espectrograma
         spectrogram_controls = QHBoxLayout()
@@ -504,9 +504,7 @@ class AnalysisPanel(QWidget):
                 
             self.raw_canvas.plot_timeseries(
                 t, waveforms, channels=channels,
-                title=titulo
             )
-            # Garantir que o gráfico seja atualizado
             self.raw_canvas.draw()
             log.debug("Gráfico de dados brutos atualizado com sucesso")
             # Certificar-se que a aba está visível
@@ -541,9 +539,7 @@ class AnalysisPanel(QWidget):
             self.ellipse_canvas.plot_scatter(
                 waveforms_plot[0], waveforms_plot[1],
                 xlabel='Canal 1', ylabel='Canal 2', 
-                title=titulo
             )
-            
             # Se temos parâmetros da elipse, plotar a elipse ajustada
             if ellipse_params is not None:
                 self.ellipse_canvas.plot_ellipse(
@@ -584,7 +580,6 @@ class AnalysisPanel(QWidget):
             self.demodulated_canvas.axes.plot(t_plot, demod_plot)
             self.demodulated_canvas.axes.set_xlabel('Tempo (s)')
             self.demodulated_canvas.axes.set_ylabel('Fase (rad)')
-            self.demodulated_canvas.axes.set_title(titulo)
             self.demodulated_canvas.axes.grid(True)
             self.demodulated_canvas.draw()
             log.debug("Sinal demodulado plotado com sucesso")
@@ -642,10 +637,11 @@ class AnalysisPanel(QWidget):
             line, = self.filtered_canvas.axes.plot(t_plot, filtered_plot)
             self.filtered_canvas.axes.set_xlabel('Tempo (s)')
             self.filtered_canvas.axes.set_ylabel('Fase (rad)')
-            self.filtered_canvas.axes.set_title(titulo)
+
+            #self.filtered_canvas.axes.set_title(titulo)
             self.filtered_canvas.axes.grid(True)
-            
             self.filtered_canvas.draw()
+            
             log.debug("show_filtered: Canvas atualizado")
                         
             def update_line_on_zoom(event):
