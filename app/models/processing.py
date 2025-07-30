@@ -142,10 +142,6 @@ class SignalProcessor:
         Returns:
             Parâmetros da elipse ajustada
         """
-        if not PROCESSING_AVAILABLE:
-            error_msg = "Processamento avançado não disponível"
-            log_error(error_msg)
-            raise RuntimeError(error_msg)
             
         # Verificar se temos dois canais
         if waveforms.shape[0] < 2:

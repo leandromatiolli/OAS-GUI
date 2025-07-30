@@ -234,3 +234,16 @@ class NavigationToolbarCustom(NavigationToolbar):
     # Lista de ícones a ocultar
     toolitems = [t for t in NavigationToolbar.toolitems if t[0] in 
                ('Home', 'Pan', 'Zoom', 'Save')] 
+    
+    def __init__(self, canvas, parent):
+        super().__init__(canvas, parent)
+        self.coordinate_label = None
+    
+    def set_coordinate_label(self, label):
+        """Set the QLabel to display coordinates"""
+        self.coordinate_label = label
+    
+    def set_message(self, s):
+        """Override to display coordinates in custom label"""
+        if self.coordinate_label is not None:
+            self.coordinate_label.setText(f"{s}")

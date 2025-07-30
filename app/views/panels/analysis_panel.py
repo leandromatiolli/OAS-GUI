@@ -194,11 +194,25 @@ class AnalysisPanel(QWidget):
         
         # Aba de elipse
         ellipse_tab = QWidget()
-        ellipse_layout = QVBoxLayout(ellipse_tab)
+        ellipse_layout = QHBoxLayout(ellipse_tab)
         self.ellipse_canvas = MplCanvas(self, width=9, height=5)
+        self.toolbars_and_buttons = QWidget()
+        ellipse_toolbars_and_buttons_layout = QVBoxLayout(self.toolbars_and_buttons)
+        
         self.ellipse_toolbar = NavigationToolbarCustom(self.ellipse_canvas, self)
-        ellipse_layout.addWidget(self.ellipse_toolbar)
+        ellipse_toolbars_and_buttons_layout.addWidget(self.ellipse_toolbar)
+        self.coordinate_label = QLabel("")
+        ellipse_toolbars_and_buttons_layout.addWidget(self.coordinate_label)
+        self.ellipse_toolbar.set_coordinate_label(self.coordinate_label)
+        self.fit_ellipse_button = QPushButton("Ajustar Elipse")
+        self.fit_ellipse_button.setFixedWidth(250)
+        ellipse_toolbars_and_buttons_layout.addWidget(self.fit_ellipse_button)
+        ellipse_toolbars_and_buttons_layout.addWidget(QLabel(''), stretch=1)
+        # align the button to the right
+        
+        ellipse_layout.addWidget(self.toolbars_and_buttons)
         ellipse_layout.addWidget(self.ellipse_canvas)
+        ellipse_layout.addWidget(QLabel(''), stretch=1)  # Spacer
         self.analysis_tabs.addTab(ellipse_tab, "Elipse")
         
         # Aba de sinal demodulado
@@ -948,9 +962,9 @@ class AnalysisPanel(QWidget):
 
     def plot_calibration_data(self, calibration_data):
                         
-        self.show_raw_data(calibration_data['t'], 
-                           calibration_data['waveforms'], 
-                           calibration_data['channels'])
+        # self.show_raw_data(calibration_data['t'], 
+        #                    calibration_data['waveforms'], 
+        #                    calibration_data['channels'])
         self.show_ellipse(calibration_data['waveforms'], 
                          calibration_data['ellipse_params'])
         

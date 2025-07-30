@@ -131,6 +131,7 @@ class Application:
         self.file_controller.calibrationDataLoaded.connect(self.processing_controller.set_calibration_data)
         
         # Conexões do controlador de processamento
+        self.window.analysis_panel.fit_ellipse_button.clicked.connect(self.processing_controller.set_loaded_data_as_calibration)
         self.window.analysis_panel.demodulateRequested.connect(self.processing_controller.demodulate_data)
         self.processing_controller.plotCalibrationDataRequested.connect(self.window.analysis_panel.plot_calibration_data)
         self.processing_controller.demodulationStarted.connect(self.on_demodulation_started)
@@ -269,8 +270,6 @@ class Application:
             # Salvar dados de calibração
             log_info(f"Salvando arquivo de calibração: {calibration_file or 'padrão'}...")
             DataStore.save_calibration_data(self.processing_controller.calibration_data, calibration_file)
-
-
                 
     
     def on_new_data(self, data):

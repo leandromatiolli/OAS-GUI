@@ -104,6 +104,18 @@ class ProcessingController(QObject):
         self.calibration_data = calibration_data
         self.process_calibration_data()
         self.plotCalibrationDataRequested.emit(self.calibration_data)
+        self.demodulate_data()
+
+    def set_loaded_data_as_calibration(self):
+        """
+        Define os dados carregados como calibração atual
+        """
+        if self.data is None:
+            log_warning("set_loaded_data_as_calibration: Nenhum dado carregado para definir como calibração")
+            return
+            
+        log_info("set_loaded_data_as_calibration: Definindo dados carregados como calibração")
+        self.set_calibration_data(self.data)
         
     def has_calibration_data(self) -> bool:
         """
@@ -530,12 +542,8 @@ class ProcessingController(QObject):
         if data is None or 'waveforms' not in data or data['waveforms'] is None:
             log_warning("process_calibration_data: Dados de calibração inválidos")
             return False
-            
-        # Verificar se temos pelo menos 2 canais
         waveforms = data['waveforms']
-        if waveforms.shape[0] < 2:
-            log_warning("process_calibration_data: Precisamos de 2 canais para calibração")
-            return False
+
             
         try:
             log_info("Processando dados de calibração...")
