@@ -3,7 +3,7 @@ Módulo para gerenciamento e armazenamento de dados
 """
 import os
 import glob
-import app.utils.log as log
+from app.utils import log
 import numpy as np
 import pickle
 import gzip

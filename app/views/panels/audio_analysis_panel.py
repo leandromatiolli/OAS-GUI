@@ -10,7 +10,7 @@ import os
 import numpy as np
 
 from app.views.widgets.canvas import MplCanvas
-import app.utils.log as log
+from app.utils import log
 
 class AudioAnalysisPanel(QWidget):
     """Painel dedicado para análise de áudio"""

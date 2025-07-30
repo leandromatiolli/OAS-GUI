@@ -10,7 +10,7 @@ import numpy as np
 import os
 
 from app.views.widgets.canvas import MplCanvas, NavigationToolbarCustom
-import app.utils.log as log
+from app.utils import log
 from app.models.data_store import DataStore
 
 class AnalysisPanel(QWidget):

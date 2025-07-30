@@ -8,7 +8,7 @@ from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QTextEdit, QPushButton, QHBox
                            QLabel, QCheckBox, QFileDialog)
 from PyQt5.QtCore import Qt, pyqtSlot, QObject, pyqtSignal
 from PyQt5.QtGui import QColor, QTextCharFormat
-import app.utils.log as log
+from app.utils import log
 
 class LogStream(QObject):
     """Stream para redirecionar saída do console para um widget"""
@@ -220,7 +220,7 @@ class LogPanel(QWidget):
             
     def clear_logs(self):
         """Limpa o conteúdo dos logs"""
-        import app.utils.log as log
+        from app.utils import log
         
         self.log_text.clear()
         

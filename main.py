@@ -26,7 +26,7 @@ from app.controllers.lora_controller import LoraController
 # Importar módulo de recursos
 from app.utils.resources import apply_stylesheet
 # Importar módulo de logging
-import app.utils.log as log
+from app.utils import log
 from app.models.data_store import DataStore
 
 def exception_hook(exctype, value, tb):

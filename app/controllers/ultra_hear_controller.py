@@ -11,7 +11,7 @@ from scipy.io import wavfile
 import pickle
 from PyQt5.QtCore import QObject, pyqtSignal
 
-import app.utils.log as log
+from app.utils import log
 
 class UltraHearController(QObject):
     """Controlador para processamento de áudio ultrassônico"""

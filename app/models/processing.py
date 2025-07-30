@@ -3,7 +3,7 @@ Módulo para processamento de sinais e transformações
 """
 import numpy as np
 from scipy import signal, optimize
-import app.utils.log as log
+from app.utils import log
 from typing import Dict, List, Tuple, Optional, Union, Any
 
 # Importar funções para processamento

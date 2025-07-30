@@ -14,7 +14,7 @@ from matplotlib.widgets import SpanSelector
 import matplotlib.pyplot as plt
 
 from app.views.widgets.canvas import MplCanvas
-import app.utils.log as log
+from app.utils import log
 
 class FrequencyBandSelector:
     """Classe para gerenciar seleção interativa de bandas de frequência"""

@@ -7,7 +7,7 @@ import serial
 import serial.tools.list_ports
 from PyQt5.QtCore import QObject, pyqtSignal
 
-import app.utils.log as log
+from app.utils import log
 
 class LoraController(QObject):
     """Controlador para comunicação LoRa"""

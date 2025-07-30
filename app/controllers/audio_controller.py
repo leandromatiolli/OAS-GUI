@@ -6,7 +6,7 @@ import numpy as np
 import os
 from scipy import signal
 from scipy.io import wavfile
-import app.utils.log as log
+from app.utils import log
 
 class AudioController(QObject):
     """Controlador para análise e processamento de áudio"""

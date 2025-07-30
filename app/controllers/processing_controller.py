@@ -7,7 +7,7 @@ from scipy import signal
 
 from app.models.processing import SignalProcessor
 from app.models.data_store import DataStore
-import app.utils.log as log
+from app.utils import log
 from typing import Dict, List, Tuple, Any, Optional
 
 class ProcessingController(QObject):
