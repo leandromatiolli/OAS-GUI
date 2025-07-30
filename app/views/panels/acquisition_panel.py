@@ -492,12 +492,3 @@ class AcquisitionPanel(QWidget):
             self.sensor_status_label.setStyleSheet("color: green;")
             self.connect_sensor_button.setText("Reconectar ao Sensor")
             self.connect_sensor_button.setStyleSheet("background-color: lightblue;")
-        else:
-            if error_message:
-                self.sensor_status_label.setText(f"Erro: {error_message}")
-                self.sensor_status_label.setStyleSheet("color: red;")
-            else:
-                self.sensor_status_label.setText("Desconectado")
-                self.sensor_status_label.setStyleSheet("color: red;")
-            self.connect_sensor_button.setText("Conectar ao Sensor")
-            self.connect_sensor_button.setStyleSheet("")

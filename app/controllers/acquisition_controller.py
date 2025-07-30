@@ -298,10 +298,13 @@ class AcquisitionController(QObject):
         Args:
             ip: Endereço IP do sensor
         """
+        self.scpi_server.set_ip(ip)
         try:
             # Tentar estabelecer conexão com o servidor SCPI
-            self.scpi_server.set_ip(ip)
-            response = self.scpi_server.start()
+            if self.scpi_server.status() != "active":
+                response = self.scpi_server.start()
+            else:
+                response = "Servidor SCPI já está ativo"
             self.sensorConnected.emit(True, ip, response)
         except Exception as e:
             error_message = f"Falha na conexão: {str(e)}"
