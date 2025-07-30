@@ -25,6 +25,7 @@ class AnalysisPanel(QWidget):
     movingAverageChanged = pyqtSignal(bool, int)  # Emitido quando a configuração de média móvel é alterada
     bandpassFilterChanged = pyqtSignal(bool, float, float, int)  # Emitido quando a configuração do filtro passa-banda é alterada
     spectrogramRequested = pyqtSignal(bool, int, float, float)  # Emitido quando o usuário solicita gerar espectrograma
+    statusMessage = pyqtSignal(str)  # Signal for status bar messages
     
     def __init__(self, parent=None):
         """
@@ -201,9 +202,10 @@ class AnalysisPanel(QWidget):
         
         self.ellipse_toolbar = NavigationToolbarCustom(self.ellipse_canvas, self)
         ellipse_toolbars_and_buttons_layout.addWidget(self.ellipse_toolbar)
-        self.coordinate_label = QLabel("")
-        ellipse_toolbars_and_buttons_layout.addWidget(self.coordinate_label)
-        self.ellipse_toolbar.set_coordinate_label(self.coordinate_label)
+        # Remove the coordinate label since we'll use status bar
+        # self.coordinate_label = QLabel("")
+        # ellipse_toolbars_and_buttons_layout.addWidget(self.coordinate_label)
+        # self.ellipse_toolbar.set_coordinate_label(self.coordinate_label)
         self.fit_ellipse_button = QPushButton("Ajustar Elipse")
         self.fit_ellipse_button.setFixedWidth(250)
         ellipse_toolbars_and_buttons_layout.addWidget(self.fit_ellipse_button)
@@ -302,6 +304,15 @@ class AnalysisPanel(QWidget):
         self.analysis_tabs.addTab(spectrogram_tab, "Espectrograma")
         
         layout.addWidget(self.analysis_tabs)
+        
+        # Connect toolbar coordinate signals to status bar
+        self.raw_toolbar.coordinatesChanged.connect(self.statusMessage.emit)
+        self.ellipse_toolbar.coordinatesChanged.connect(self.statusMessage.emit)
+        self.demodulated_toolbar.coordinatesChanged.connect(self.statusMessage.emit)
+        self.filtered_toolbar.coordinatesChanged.connect(self.statusMessage.emit)
+        self.spectrum_toolbar.coordinatesChanged.connect(self.statusMessage.emit)
+        self.spectrum_linear_toolbar.coordinatesChanged.connect(self.statusMessage.emit)
+        self.spectrogram_toolbar.coordinatesChanged.connect(self.statusMessage.emit)
         
         # Conectar sinais
         self.moving_avg_checkbox.stateChanged.connect(self.on_moving_average_changed)

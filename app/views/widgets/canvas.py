@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
 from typing import Dict, List, Tuple, Optional, Union, Any
-from PyQt5.QtCore import Qt
+from PyQt5.QtCore import Qt, pyqtSignal
 
 class MplCanvas(FigureCanvas):
     """Canvas para plotagem de gráficos usando Matplotlib"""
@@ -240,6 +240,9 @@ class MplCanvas(FigureCanvas):
 class NavigationToolbarCustom(NavigationToolbar):
     """Barra de ferramentas de navegação personalizada"""
     
+    # Signal to emit coordinate information to status bar
+    coordinatesChanged = pyqtSignal(str)
+    
     # Lista de ícones a ocultar
     toolitems = [t for t in NavigationToolbar.toolitems if t[0] in 
                ('Home', 'Pan', 'Zoom', 'Save')] 
@@ -251,10 +254,14 @@ class NavigationToolbarCustom(NavigationToolbar):
         self.setFixedWidth(50)
     
     def set_coordinate_label(self, label):
-        """Set the QLabel to display coordinates"""
+        """Set the QLabel to display coordinates (kept for compatibility)"""
         self.coordinate_label = label
     
     def set_message(self, s):
-        """Override to display coordinates in custom label"""
+        """Override to emit coordinates signal for status bar"""
+        # Emit signal for status bar
+        self.coordinatesChanged.emit(s)
+        
+        # Keep the old behavior for backward compatibility
         if self.coordinate_label is not None:
             self.coordinate_label.setText(f"{s}")
