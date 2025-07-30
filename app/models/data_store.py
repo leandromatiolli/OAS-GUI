@@ -69,16 +69,13 @@ class DataStore:
         data = data.copy()
         del data['t']
         # Salvar metadados em JSON
-        metadata: dict = data.pop('metadata')
-        data.update(metadata)
-        #filename = DataStore.create_filename(data_without_t)
         filename = data['timestamp']
         filepath = os.path.join(directory, filename)
         with gzip.open(filepath + '.pkl.gz', 'wb', compresslevel=1) as file:
             pickle.dump(data, file)
         del data['waveforms']
         with open(filepath + '.json', 'w', encoding='utf-8') as file:
-            json.dump(metadata, file, indent=4, ensure_ascii=True)
+            json.dump(data, file, indent=4, ensure_ascii=True)
         return
     
     @staticmethod

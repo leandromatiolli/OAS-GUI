@@ -283,13 +283,9 @@ class Application:
         log_info("Novos dados")
         self.window.show_status_message("Aquisição concluída")
         
-        data['metadata'] = self.window.metadata_panel.get_metadata()
+        metadata = self.window.metadata_panel.get_metadata()
+        data.update(metadata)
         self.processing_controller.set_data(data)
-        
-        
-        self.file_controller
-
-        
         directory = self.window.analysis_panel.dir_label.text()
         log_debug(f"Salvando dados adquiridos no diretório: {directory}")
         DataStore.save_data(data, directory=directory)
@@ -395,7 +391,9 @@ class Application:
             self.window.show_status_message(f"Sensor conectado: {ip}")
         else:
             log_error(f"Erro ao conectar sensor {ip}: {error_message}")
-            self.window.show_status_message(f"Erro na conexão do sensor: {error_message}")
+            error_message = '\n'.join([line.strip('') for line in error_message.split(':')])
+            self.window.show_error_message("Erro an conexão", error_message)
+            
         
         # Atualizar status do sensor no painel
         self.window.acquisition_panel.update_sensor_status(connected, ip, error_message)
@@ -858,11 +856,11 @@ class Application:
         """
         log_info("Aplicação OAS-GUI está sendo fechada")
         
-        config = get_all_input_values(self.window)
+        last_state = get_all_input_values(self.window)
         metadata = self.window.metadata_panel.get_metadata()
         self.window.metadata_panel.save_metadata_template()
-        config['metadata'] = metadata
-        DataStore.save_last_state(config)
+        last_state['metadata'] = metadata
+        DataStore.save_last_state(last_state)
     
     def run(self):
         """
