@@ -26,7 +26,7 @@ from app.controllers.lora_controller import LoraController
 # Importar módulo de recursos
 from app.utils.resources import apply_stylesheet
 # Importar módulo de logging
-from app.utils.debug_log import set_gui_log_handler, log_debug, log_info, log_warning, log_error
+from app.utils.debug_log import log_debug, log_info, log_warning, log_error
 from app.models.data_store import DataStore
 
 def exception_hook(exctype, value, tb):
@@ -87,7 +87,6 @@ class Application:
     def setup_logging(self):
         """Configurar sistema de logging"""
         # Definir o manipulador para atualizar o log na GUI
-        set_gui_log_handler(self.window.log_panel.append_log)
         log_info("Sistema de logging inicializado")
     
     def init_controllers(self):

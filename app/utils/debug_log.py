@@ -16,19 +16,6 @@ ERROR_COLOR = '\033[31m'  # Vermelho
 if os.name == 'nt':
     os.system('color')
 
-# Armazenar manipulador global para atualizar a interface
-gui_log_handler = None
-
-def set_gui_log_handler(handler):
-    """
-    Define o manipulador para atualizar o log na GUI
-    
-    Args:
-        handler: Função que recebe uma string e atualiza a GUI
-    """
-    global gui_log_handler
-    gui_log_handler = handler
-
 def log_debug(message):
     """
     Registra uma mensagem de debug tanto no terminal quanto na GUI

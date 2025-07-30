@@ -9,7 +9,7 @@ from datetime import datetime
 from typing import Dict, Any
 import os
 import json
-from app.utils.debug_log import set_gui_log_handler, log_debug, log_info, log_warning, log_error
+from app.utils.debug_log import log_debug, log_info, log_warning, log_error
 
 from app.models.data_store import DataStore
 from PyQt5.QtWidgets import QMessageBox, QInputDialog
