@@ -615,20 +615,7 @@ class AnalysisPanel(QWidget):
             filtered_safe[np.isnan(filtered_safe)] = 0
             filtered_safe[np.isinf(filtered_safe)] = 0
             filtered = filtered_safe
-            
-        # Salvar em arquivo temporário para diagnóstico
-        try:
-            import os
-            import pickle
-            temp_dir = os.path.join(os.getcwd(), 'temp')
-            os.makedirs(temp_dir, exist_ok=True)
-            temp_file = os.path.join(temp_dir, 'last_filtered_data.pkl.gz')
-            with open(temp_file, 'wb') as f:
-                pickle.dump({'t': t, 'filtered': filtered, 'params': filter_params}, f)
-            log_debug(f"show_filtered: Dados salvos em {temp_file}")
-        except Exception as e:
-            log_warning(f"show_filtered: Não foi possível salvar dados temporários: {str(e)}")
-            
+                        
         try:
             # Limitar número de pontos para plotagem
             max_points = 10000
@@ -646,26 +633,44 @@ class AnalysisPanel(QWidget):
             high_freq = filter_params.get('high_freq', 0)
             order = filter_params.get('order', 0)
             titulo = f'Sinal Filtrado (Passa-banda {low_freq:.1f}Hz-{high_freq:.1f}Hz, ordem {order})'
-            log_debug(f"show_filtered: Título do gráfico: '{titulo}'")
             
+
+
+
             # Plotar sinal filtrado
             self.filtered_canvas.axes.clear()
-            self.filtered_canvas.axes.plot(t_plot, filtered_plot)
+            line, = self.filtered_canvas.axes.plot(t_plot, filtered_plot)
             self.filtered_canvas.axes.set_xlabel('Tempo (s)')
             self.filtered_canvas.axes.set_ylabel('Fase (rad)')
             self.filtered_canvas.axes.set_title(titulo)
             self.filtered_canvas.axes.grid(True)
+            
             self.filtered_canvas.draw()
             log_debug("show_filtered: Canvas atualizado")
-            
-            # Habilitar botão para salvar dados filtrados
-            self.save_filtered_button.setEnabled(True)
-            
+                        
+            def update_line_on_zoom(event):
+                xlim = self.filtered_canvas.axes.get_xlim()
+                # # Get a dense enough subset in current view
+
+                idx = (t >= xlim[0]) & (t <= xlim[1])
+                x_view = t[idx]
+                y_view = filtered[idx]
+
+                # # Optional: downsample only if still too dense (e.g. > 5000 points)
+                if len(x_view) > max_points:
+                     step = len(x_view) // max_points
+                     x_view = x_view[::step]
+                     y_view = y_view[::step]
+
+                line.set_data(x_view, y_view)
+                self.filtered_canvas.axes.relim()
+                # self.filtered_canvas.axes.autoscale_view()
+                # self.filtered_canvas.draw_idle()
+            self.filtered_canvas.axes.callbacks.connect('xlim_changed', update_line_on_zoom)
+
             # Mudar para a aba de sinal filtrado
-            log_debug("show_filtered: Alterando para a aba de sinal filtrado (índice 3)")
             self.analysis_tabs.setCurrentIndex(3)
             
-            log_debug("Sinal filtrado plotado com sucesso")
             
             # Verificação final para garantir que a aba está correta
             if self.analysis_tabs.currentIndex() != 3:

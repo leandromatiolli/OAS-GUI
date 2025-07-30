@@ -601,11 +601,8 @@ class Application:
         Args:
             data: Dados com filtro passa-banda aplicado
         """
-        log_info("Filtro passa-banda aplicado aos dados")
-        log_debug(f"on_bandpass_filter_applied: Chaves disponíveis nos dados: {list(data.keys())}")
-        
+        #log_info("Filtro passa-banda aplicado aos dados")        
         # Função de diagnóstico - verificar todos os dados recebidos
-        self.diagnose_filtered_data(data)
         
         try:
             # Mostrar sinal filtrado na aba correspondente

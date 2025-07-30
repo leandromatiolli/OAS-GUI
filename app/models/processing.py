@@ -37,20 +37,6 @@ class SignalProcessor:
         Returns:
             Sinal filtrado
         """
-        # Converter frequências para valores normalizados (0 a 1, onde 1 é Nyquist, fs/2)
-        nyquist = 0.5 * fs
-        low = low_freq / nyquist
-        high = high_freq / nyquist
-        
-        # Limitar frequências ao intervalo válido (0, 1)
-        low = max(0.001, min(0.999, low))
-        high = max(0.001, min(0.999, high))
-        
-        # Verificar se frequências são válidas
-        if low >= high:
-            log_warning(f"Frequências de corte inválidas: low={low_freq} Hz, high={high_freq} Hz. Usando valores padrão.")
-            low = 0.1
-            high = 0.4
             
         # Limitar ordem do filtro (valores muito altos podem causar instabilidade)
         order = max(1, min(10, order))
@@ -59,14 +45,11 @@ class SignalProcessor:
         
         try:
             # Projetar o filtro Butterworth passa-banda
-            b, a = signal.butter(order, [low, high], btype='band')
-            
-            # Aplicar o filtro usando filtfilt (filtro de fase zero)
-            filtered_signal = signal.filtfilt(b, a, signal_data)
-            
-            # Calcular a diferença média após a filtragem
-            diff = np.abs(signal_data - filtered_signal).mean()
-            log_debug(f"Diferença média após aplicação do filtro: {diff}")
+            sos = signal.butter(order, [low_freq, high_freq], btype='band', analog=False, output='sos', fs=fs)
+
+            # Aplicar o filtro usando sosfilt (filtro de fase zero)
+            zi = signal.sosfilt_zi(sos)
+            filtered_signal, zo = signal.sosfilt(sos, signal_data, zi=zi*signal_data[0])
             
             return filtered_signal
             

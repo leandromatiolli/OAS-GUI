@@ -270,8 +270,7 @@ class ProcessingController(QObject):
             fs = 1 / (t[1] - t[0])
         else:
             fs = 1.953125e6  # valor padrão (125MHz/64)
-            
-        log_debug(f"apply_bandpass_filter: Taxa de amostragem calculada: {fs} Hz")
+    
         
         if self.use_bandpass_filter:
             log_info(f"Aplicando filtro passa-banda ({self.bandpass_low_freq:.1f}Hz-{self.bandpass_high_freq:.1f}Hz, ordem {self.bandpass_order})...")
@@ -285,11 +284,7 @@ class ProcessingController(QObject):
                     self.bandpass_high_freq,
                     self.bandpass_order
                 )
-                
-                # Verificar se o filtro fez alguma diferença
-                diff = np.abs(demodulated - self.filtered_demodulated).mean()
-                log_debug(f"apply_bandpass_filter: Diferença média após filtragem: {diff}")
-                
+                               
                 log_info("Filtro passa-banda aplicado com sucesso")
                 self.processingProgress.emit("Filtro passa-banda aplicado com sucesso")
                 
@@ -302,8 +297,6 @@ class ProcessingController(QObject):
                     'order': self.bandpass_order
                 }
                 
-                # Emitir sinal com os dados atualizados
-                log_debug("Emitindo sinal bandpassFilterApplied")
                 self.bandpassFilterApplied.emit(self.demodulated_data)
                 
             except Exception as e:
@@ -430,8 +423,6 @@ class ProcessingController(QObject):
             log_debug("demodulate_data: Demodulando o sinal usando os parâmetros da elipse")
             demodulated = SignalProcessor.demodulate(waveforms, ellipse_params)
             
-            log_info("Demodulação concluída com sucesso")
-            
             # Criar um dicionário com os dados demodulados
             if self.data.get('t') is not None:
                 t = self.data['t']
@@ -465,7 +456,6 @@ class ProcessingController(QObject):
                 self.apply_bandpass_filter()
                 
             # Emitir sinal com os dados demodulados
-            log_debug("Emitindo sinal demodulationFinished")
             self.demodulationFinished.emit(self.demodulated_data)
             self.processingProgress.emit("Demodulação concluída com sucesso")
             
