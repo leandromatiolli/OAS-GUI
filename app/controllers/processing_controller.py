@@ -7,7 +7,7 @@ from scipy import signal
 
 from app.models.processing import SignalProcessor
 from app.models.data_store import DataStore
-from app.utils.debug_log import log_debug, log_info, log_warning, log_error
+import app.utils.log as log
 from typing import Dict, List, Tuple, Any, Optional
 
 class ProcessingController(QObject):
@@ -56,8 +56,8 @@ class ProcessingController(QObject):
         Args:
             data: Dicionário com os dados a processar
         """
-        log_debug(f"set_data: Recebendo novos dados para processamento")
-        log_debug(f"set_data: Chaves disponíveis nos dados: {list(data.keys())}")
+        log.debug(f"set_data: Recebendo novos dados para processamento")
+        log.debug(f"set_data: Chaves disponíveis nos dados: {list(data.keys())}")
         
         self.data = data
         self.processed_waveforms = None
@@ -65,24 +65,24 @@ class ProcessingController(QObject):
         
         # Resetar configurações de filtro para novos dados
         if not data.get('bandpass_params', {}).get('enabled', False):
-            log_debug("set_data: Resetando configurações de filtro passa-banda para novos dados")
+            log.debug("set_data: Resetando configurações de filtro passa-banda para novos dados")
             self.use_bandpass_filter = False
             
         # Se já existirem dados demodulados, usar eles
         if 'demodulated' in data:
-            log_info(f"set_data: Dados demodulados encontrados! Configurando self.demodulated_data")
+            log.info(f"set_data: Dados demodulados encontrados! Configurando self.demodulated_data")
             self.demodulated_data = data
             
             # Se o arquivo carregado contém parâmetros de filtro, usar eles
             if 'bandpass_params' in data and isinstance(data['bandpass_params'], dict):
-                log_debug(f"set_data: Usando parâmetros de filtro do arquivo: {data['bandpass_params']}")
+                log.debug(f"set_data: Usando parâmetros de filtro do arquivo: {data['bandpass_params']}")
                 params = data['bandpass_params']
                 self.use_bandpass_filter = params.get('enabled', False)
                 self.bandpass_low_freq = params.get('low_freq', self.bandpass_low_freq)
                 self.bandpass_high_freq = params.get('high_freq', self.bandpass_high_freq)
                 self.bandpass_order = params.get('order', self.bandpass_order)
         else:
-            log_warning("set_data: Nenhum dado demodulado encontrado nos dados carregados")
+            log.warning("set_data: Nenhum dado demodulado encontrado nos dados carregados")
             self.demodulated_data = None
         
         # Processar os dados de acordo com as configurações atuais
@@ -100,7 +100,7 @@ class ProcessingController(QObject):
         Args:
             calibration_data: Dicionário com os dados de calibração
         """
-        log_debug(f"set_calibration_data: {'Definindo' if calibration_data else 'Limpando'} dados de calibração")
+        log.debug(f"set_calibration_data: {'Definindo' if calibration_data else 'Limpando'} dados de calibração")
         self.calibration_data = calibration_data
         self.process_calibration_data()
         self.plotCalibrationDataRequested.emit(self.calibration_data)
@@ -111,10 +111,10 @@ class ProcessingController(QObject):
         Define os dados carregados como calibração atual
         """
         if self.data is None:
-            log_warning("set_loaded_data_as_calibration: Nenhum dado carregado para definir como calibração")
+            log.warning("set_loaded_data_as_calibration: Nenhum dado carregado para definir como calibração")
             return
             
-        log_info("set_loaded_data_as_calibration: Definindo dados carregados como calibração")
+        log.info("set_loaded_data_as_calibration: Definindo dados carregados como calibração")
         self.set_calibration_data(self.data)
         
     def has_calibration_data(self) -> bool:
@@ -138,10 +138,10 @@ class ProcessingController(QObject):
         """
         # Verificar se houve alteração na configuração
         if self.use_moving_average == enabled and self.moving_average_window == window_size:
-            log_debug(f"set_moving_average: Configuração não alterada, ignorando...")
+            log.debug(f"set_moving_average: Configuração não alterada, ignorando...")
             return
             
-        log_info(f"set_moving_average: {'Aplicando' if enabled else 'Desativando'} média móvel (janela={window_size})")
+        log.info(f"set_moving_average: {'Aplicando' if enabled else 'Desativando'} média móvel (janela={window_size})")
         self.processingProgress.emit(f"{'Aplicando' if enabled else 'Desativando'} média móvel...")
         
         # Atualizar configurações
@@ -150,7 +150,7 @@ class ProcessingController(QObject):
         
         # Processar os dados de acordo com as novas configurações
         if self.data is not None and 'waveforms' in self.data:
-            log_debug(f"Aplicando média móvel aos dados (shape={self.data['waveforms'].shape})")
+            log.debug(f"Aplicando média móvel aos dados (shape={self.data['waveforms'].shape})")
             self.apply_moving_average()
             
             # Emitir sinal com os dados atualizados
@@ -160,12 +160,12 @@ class ProcessingController(QObject):
                 processed_data['waveforms'] = self.processed_waveforms
                 
                 # Emitir o sinal específico para média móvel
-                log_debug(f"Emitindo sinal movingAverageApplied (shape={processed_data['waveforms'].shape})")
+                log.debug(f"Emitindo sinal movingAverageApplied (shape={processed_data['waveforms'].shape})")
                 self.movingAverageApplied.emit(processed_data)
                 
                 # Se também temos dados demodulados, precisamos reprocessar
                 if self.demodulated_data is not None:
-                    log_debug("Reprocessando dados demodulados com a nova média móvel")
+                    log.debug("Reprocessando dados demodulados com a nova média móvel")
                     self.demodulate_data()
     
     def set_bandpass_filter(self, enabled: bool, low_freq: float, high_freq: float, order: int):
@@ -178,7 +178,7 @@ class ProcessingController(QObject):
             high_freq: Frequência de corte superior em Hz
             order: Ordem do filtro
         """
-        log_debug(f"set_bandpass_filter: enabled={enabled}, low_freq={low_freq}, high_freq={high_freq}, order={order}")
+        log.debug(f"set_bandpass_filter: enabled={enabled}, low_freq={low_freq}, high_freq={high_freq}, order={order}")
         
         # Força aplicação mesmo sem mudanças nos parâmetros se estamos desabilitando o filtro
         force_update = (self.use_bandpass_filter == True and enabled == False)
@@ -188,10 +188,10 @@ class ProcessingController(QObject):
             self.bandpass_low_freq == low_freq and 
             self.bandpass_high_freq == high_freq and 
             self.bandpass_order == order):
-            log_debug("set_bandpass_filter: Configuração não alterada, ignorando...")
+            log.debug("set_bandpass_filter: Configuração não alterada, ignorando...")
             return
             
-        log_info(f"set_bandpass_filter: {'Aplicando' if enabled else 'Desativando'} filtro passa-banda "
+        log.info(f"set_bandpass_filter: {'Aplicando' if enabled else 'Desativando'} filtro passa-banda "
                 f"({low_freq:.1f}Hz-{high_freq:.1f}Hz, ordem {order})")
         
         self.processingProgress.emit(f"{'Aplicando' if enabled else 'Desativando'} filtro passa-banda...")
@@ -204,10 +204,10 @@ class ProcessingController(QObject):
         
         # Aplicar filtro se temos dados demodulados
         if self.demodulated_data is not None and 'demodulated' in self.demodulated_data:
-            log_debug("set_bandpass_filter: Aplicando filtro aos dados demodulados")
+            log.debug("set_bandpass_filter: Aplicando filtro aos dados demodulados")
             self.apply_bandpass_filter()
         else:
-            log_warning("set_bandpass_filter: Sem dados demodulados para aplicar o filtro")
+            log.warning("set_bandpass_filter: Sem dados demodulados para aplicar o filtro")
             self.filtered_demodulated = None
             self.processingProgress.emit("Demodule os dados primeiro antes de aplicar o filtro passa-banda")
     
@@ -219,28 +219,28 @@ class ProcessingController(QObject):
             Array com as formas de onda processadas
         """
         if not self.data or 'waveforms' not in self.data:
-            log_warning("apply_moving_average: Sem dados para processar")
+            log.warning("apply_moving_average: Sem dados para processar")
             return None
             
         waveforms = self.data['waveforms']
         
         if self.use_moving_average:
-            log_info(f"Aplicando média móvel (janela={self.moving_average_window})...")
+            log.info(f"Aplicando média móvel (janela={self.moving_average_window})...")
             self.processingProgress.emit(f"Aplicando média móvel (janela={self.moving_average_window})...")
             try:
                 self.processed_waveforms = SignalProcessor.apply_moving_average(
                     waveforms, 
                     self.moving_average_window
                 )
-                log_info("Média móvel aplicada com sucesso")
+                log.info("Média móvel aplicada com sucesso")
                 self.processingProgress.emit("Média móvel aplicada com sucesso")
             except Exception as e:
-                log_error(f"Erro ao aplicar média móvel: {str(e)}")
+                log.error(f"Erro ao aplicar média móvel: {str(e)}")
                 self.processingProgress.emit(f"Erro ao aplicar média móvel: {str(e)}")
                 self.processed_waveforms = waveforms
         else:
             # Se a média móvel não está ativada, usar os dados originais
-            log_debug("Usando dados originais (média móvel desativada)")
+            log.debug("Usando dados originais (média móvel desativada)")
             self.processed_waveforms = waveforms
         
         return self.processed_waveforms
@@ -253,12 +253,12 @@ class ProcessingController(QObject):
             Array com o sinal demodulado filtrado
         """
         if not self.demodulated_data or 'demodulated' not in self.demodulated_data:
-            log_warning("apply_bandpass_filter: Sem dados demodulados para filtrar")
+            log.warning("apply_bandpass_filter: Sem dados demodulados para filtrar")
             self.processingProgress.emit("Sem dados demodulados para filtrar")
             return None
             
         demodulated = self.demodulated_data['demodulated']
-        log_debug(f"apply_bandpass_filter: Processando sinal demodulado com {len(demodulated)} pontos (enabled={self.use_bandpass_filter})")
+        log.debug(f"apply_bandpass_filter: Processando sinal demodulado com {len(demodulated)} pontos (enabled={self.use_bandpass_filter})")
         
         # Determinar taxa de amostragem
         if 'sample_frequency' in self.demodulated_data and 'decimation' in self.demodulated_data:
@@ -273,7 +273,7 @@ class ProcessingController(QObject):
     
         
         if self.use_bandpass_filter:
-            log_info(f"Aplicando filtro passa-banda ({self.bandpass_low_freq:.1f}Hz-{self.bandpass_high_freq:.1f}Hz, ordem {self.bandpass_order})...")
+            log.info(f"Aplicando filtro passa-banda ({self.bandpass_low_freq:.1f}Hz-{self.bandpass_high_freq:.1f}Hz, ordem {self.bandpass_order})...")
             self.processingProgress.emit(f"Aplicando filtro passa-banda...")
             
             try:
@@ -285,7 +285,7 @@ class ProcessingController(QObject):
                     self.bandpass_order
                 )
                                
-                log_info("Filtro passa-banda aplicado com sucesso")
+                log.info("Filtro passa-banda aplicado com sucesso")
                 self.processingProgress.emit("Filtro passa-banda aplicado com sucesso")
                 
                 # Atualizar o dicionário com os dados filtrados
@@ -300,7 +300,7 @@ class ProcessingController(QObject):
                 self.bandpassFilterApplied.emit(self.demodulated_data)
                 
             except Exception as e:
-                log_error(f"Erro ao aplicar filtro passa-banda: {str(e)}")
+                log.error(f"Erro ao aplicar filtro passa-banda: {str(e)}")
                 self.processingProgress.emit(f"Erro ao aplicar filtro passa-banda: {str(e)}")
                 self.filtered_demodulated = None
         else:
@@ -325,7 +325,7 @@ class ProcessingController(QObject):
                 }
                 
             # Emitir sinal para atualizar a interface
-            log_debug("Emitindo sinal bandpassFilterApplied (filtro desativado)")
+            log.debug("Emitindo sinal bandpassFilterApplied (filtro desativado)")
             self.bandpassFilterApplied.emit(self.demodulated_data)
             
         return self.filtered_demodulated
@@ -370,17 +370,17 @@ class ProcessingController(QObject):
     def demodulate_data(self):
         """Demodula os dados atuais, usando calibração se disponível"""
         if self.data is None:
-            log_warning("demodulate_data: Sem dados para demodular")
+            log.warning("demodulate_data: Sem dados para demodular")
             self.demodulationError.emit("Sem dados para demodular")
             return
             
         # Verificar se temos os dados necessários
         if 'waveforms' not in self.data or self.data['waveforms'] is None:
-            log_warning("demodulate_data: Sem formas de onda para demodular")
+            log.warning("demodulate_data: Sem formas de onda para demodular")
             self.demodulationError.emit("Sem formas de onda para demodular")
             return
             
-        log_info("Iniciando demodulação...")
+        log.info("Iniciando demodulação...")
         self.demodulationStarted.emit()
         self.processingProgress.emit("Iniciando demodulação...")
         
@@ -390,7 +390,7 @@ class ProcessingController(QObject):
             
             # Verificar se temos dados suficientes para demodulação
             if waveforms is None or waveforms.shape[0] < 2:
-                log_warning("demodulate_data: Dados insuficientes para demodulação (precisamos de 2 canais)")
+                log.warning("demodulate_data: Dados insuficientes para demodulação (precisamos de 2 canais)")
                 self.demodulationError.emit("Dados insuficientes para demodulação (precisamos de 2 canais)")
                 return
                 
@@ -402,25 +402,25 @@ class ProcessingController(QObject):
             else:
                 fs = 1.953125e6  # valor padrão (125MHz/64)
                 
-            log_debug(f"demodulate_data: Taxa de amostragem: {fs} Hz")
+            log.debug(f"demodulate_data: Taxa de amostragem: {fs} Hz")
             
             # Determinar se usamos parâmetros de elipse da calibração ou calculamos novos
             ellipse_params = None
             
             # Verificar se temos dados de calibração disponíveis
             if self.has_calibration_data():
-                log_debug("demodulate_data: Usando parâmetros de elipse da calibração")
+                log.debug("demodulate_data: Usando parâmetros de elipse da calibração")
                 ellipse_params = self.calibration_data['ellipse_params']
             elif 'ellipse_params' in self.data and self.data['ellipse_params'] is not None:
-                log_debug("demodulate_data: Usando parâmetros de elipse existentes nos dados")
+                log.debug("demodulate_data: Usando parâmetros de elipse existentes nos dados")
                 ellipse_params = self.data['ellipse_params']
             else:
-                log_debug("demodulate_data: Calculando novos parâmetros de elipse")
+                log.debug("demodulate_data: Calculando novos parâmetros de elipse")
                 # Calcular parâmetros da elipse a partir dos dados
                 ellipse_params = SignalProcessor.fit_ellipse(waveforms)
             
             # Demodular os dados usando os parâmetros da elipse
-            log_debug("demodulate_data: Demodulando o sinal usando os parâmetros da elipse")
+            log.debug("demodulate_data: Demodulando o sinal usando os parâmetros da elipse")
             demodulated = SignalProcessor.demodulate(waveforms, ellipse_params)
             
             # Criar um dicionário com os dados demodulados
@@ -452,7 +452,7 @@ class ProcessingController(QObject):
             
             # Aplicar filtro passa-banda se ativado
             if self.use_bandpass_filter:
-                log_debug("demodulate_data: Aplicando filtro passa-banda após demodulação")
+                log.debug("demodulate_data: Aplicando filtro passa-banda após demodulação")
                 self.apply_bandpass_filter()
                 
             # Emitir sinal com os dados demodulados
@@ -460,7 +460,7 @@ class ProcessingController(QObject):
             self.processingProgress.emit("Demodulação concluída com sucesso")
             
         except Exception as e:
-            log_error(f"Erro na demodulação: {str(e)}")
+            log.error(f"Erro na demodulação: {str(e)}")
             self.demodulationError.emit(f"Erro na demodulação: {str(e)}")
     
     def save_demodulated_data(self) -> str:
@@ -486,7 +486,7 @@ class ProcessingController(QObject):
             Tupla com eixo de frequências, amplitudes e lista de picos
         """
         if self.demodulated_data is None:
-            log_warning("calculate_spectrum: Sem dados demodulados")
+            log.warning("calculate_spectrum: Sem dados demodulados")
             return np.array([]), np.array([]), []
             
         if use_filtered and 'filtered_demodulated' in self.demodulated_data:
@@ -494,7 +494,7 @@ class ProcessingController(QObject):
         elif 'demodulated' in self.demodulated_data:
             signal = self.demodulated_data['demodulated']
         else:
-            log_warning("calculate_spectrum: Sem sinal demodulado")
+            log.warning("calculate_spectrum: Sem sinal demodulado")
             return np.array([]), np.array([]), []
             
         if 'sample_frequency_effective' in self.demodulated_data:
@@ -506,7 +506,7 @@ class ProcessingController(QObject):
             fs = 1.953125e6  # valor padrão (125MHz/64)
             
         # Calcular espectro
-        log_debug(f"calculate_spectrum: Calculando espectro (fs={fs} Hz, {'filtrado' if use_filtered else 'original'})")
+        log.debug(f"calculate_spectrum: Calculando espectro (fs={fs} Hz, {'filtrado' if use_filtered else 'original'})")
         try:
             freq_axis, magnitudes_db = SignalProcessor.calculate_spectrum(signal, fs)
             
@@ -515,7 +515,7 @@ class ProcessingController(QObject):
             
             return freq_axis, magnitudes_db, peaks
         except Exception as e:
-            log_error(f"Erro ao calcular espectro: {str(e)}")
+            log.error(f"Erro ao calcular espectro: {str(e)}")
             return np.array([]), np.array([]), []
     
     def process_calibration_data(self) -> bool:
@@ -530,13 +530,13 @@ class ProcessingController(QObject):
         """
         data = self.calibration_data
         if data is None or 'waveforms' not in data or data['waveforms'] is None:
-            log_warning("process_calibration_data: Dados de calibração inválidos")
+            log.warning("process_calibration_data: Dados de calibração inválidos")
             return False
         waveforms = data['waveforms']
 
             
         try:
-            log_info("Processando dados de calibração...")
+            log.info("Processando dados de calibração...")
             
             # Determinar taxa de amostragem
             if 'sample_frequency' in data and 'decimation' in data:
@@ -548,7 +548,7 @@ class ProcessingController(QObject):
             
             # Aplicar média móvel se configurada
             if self.use_moving_average:
-                log_debug("process_calibration_data: Aplicando média móvel aos dados de calibração")
+                log.debug("process_calibration_data: Aplicando média móvel aos dados de calibração")
                 processed_waveforms = SignalProcessor.apply_moving_average(
                     waveforms, 
                     self.moving_average_window
@@ -557,11 +557,11 @@ class ProcessingController(QObject):
                 processed_waveforms = waveforms
                 
             # Calcular parâmetros da elipse
-            log_debug("process_calibration_data: Calculando parâmetros da elipse")
+            log.debug("process_calibration_data: Calculando parâmetros da elipse")
             ellipse_params = SignalProcessor.fit_ellipse(processed_waveforms)
             
             if ellipse_params is None:
-                log_warning("process_calibration_data: Não foi possível calcular os parâmetros da elipse")
+                log.warning("process_calibration_data: Não foi possível calcular os parâmetros da elipse")
                 return False
                 
             # Criar dados de calibração
@@ -577,11 +577,11 @@ class ProcessingController(QObject):
             # Armazenar dados de calibração para uso futuro
             self.calibration_data.update(calibration_data)
             
-            log_info("Calibração concluída com sucesso")
+            log.info("Calibração concluída com sucesso")
             return True
             
         except Exception as e:
-            log_error(f"Erro ao processar calibração: {str(e)}")
+            log.error(f"Erro ao processar calibração: {str(e)}")
             return False
     
     def auto_demodulate(self, data: Dict[str, Any]) -> bool:
@@ -597,7 +597,7 @@ class ProcessingController(QObject):
         try:
             # Verificar se é um conjunto de dados de calibração
             if data.get('is_calibration', False):
-                log_info("auto_demodulate: Processando como dados de calibração")
+                log.info("auto_demodulate: Processando como dados de calibração")
                 return self.process_calibration_data(data)
                 
             # Configurar os dados para processamento
@@ -608,7 +608,7 @@ class ProcessingController(QObject):
             
             return self.demodulated_data is not None
         except Exception as e:
-            log_error(f"Erro na demodulação automática: {str(e)}")
+            log.error(f"Erro na demodulação automática: {str(e)}")
             return False
     
     @pyqtSlot(bool, int, float, float)
@@ -625,15 +625,15 @@ class ProcessingController(QObject):
         Returns:
             Um dicionário com os parâmetros e o resultado do espectrograma
         """
-        log_debug(f"generate_spectrogram: window_size={window_size}, overlap={overlap:.2f}, max_freq={max_freq}")
+        log.debug(f"generate_spectrogram: window_size={window_size}, overlap={overlap:.2f}, max_freq={max_freq}")
         
         if not enabled:
-            log_info("Espectrograma desabilitado")
+            log.info("Espectrograma desabilitado")
             return
             
         # Verificar se temos dados válidos
         if not self.data or 't' not in self.data:
-            log_warning("generate_spectrogram: Sem dados para gerar espectrograma")
+            log.warning("generate_spectrogram: Sem dados para gerar espectrograma")
             self.processingProgress.emit("Sem dados para gerar espectrograma")
             return
             
@@ -647,20 +647,20 @@ class ProcessingController(QObject):
         else:
             fs = 1.953125e6  # valor padrão (125MHz/64)
             
-        log_debug(f"generate_spectrogram: Taxa de amostragem: {fs} Hz")
+        log.debug(f"generate_spectrogram: Taxa de amostragem: {fs} Hz")
         
         # Selecionar o sinal a ser usado para o espectrograma
         if self.use_bandpass_filter and 'filtered_demodulated' in self.data:
-            log_debug("generate_spectrogram: Usando sinal filtrado para o espectrograma")
+            log.debug("generate_spectrogram: Usando sinal filtrado para o espectrograma")
             signal_data = self.data['filtered_demodulated']
         elif 'demodulated' in self.data:
-            log_debug("generate_spectrogram: Usando sinal demodulado para o espectrograma")
+            log.debug("generate_spectrogram: Usando sinal demodulado para o espectrograma")
             signal_data = self.data['demodulated']
         elif 'waveforms' in self.data and self.data['waveforms'].shape[0] > 0:
-            log_debug("generate_spectrogram: Usando primeiro canal de dados brutos para o espectrograma")
+            log.debug("generate_spectrogram: Usando primeiro canal de dados brutos para o espectrograma")
             signal_data = self.data['waveforms'][0]
         else:
-            log_warning("generate_spectrogram: Não há sinal adequado para gerar o espectrograma")
+            log.warning("generate_spectrogram: Não há sinal adequado para gerar o espectrograma")
             self.processingProgress.emit("Não há sinal adequado para gerar o espectrograma")
             return
             
@@ -669,7 +669,7 @@ class ProcessingController(QObject):
             noverlap = int(window_size * overlap)
             
             # Calcular o espectrograma usando STFT
-            log_debug(f"generate_spectrogram: Calculando espectrograma (fs={fs}, nperseg={window_size}, noverlap={noverlap})")
+            log.debug(f"generate_spectrogram: Calculando espectrograma (fs={fs}, nperseg={window_size}, noverlap={noverlap})")
             self.processingProgress.emit("Calculando espectrograma...")
             
             # Limitar a frequência máxima, se especificado
@@ -693,7 +693,7 @@ class ProcessingController(QObject):
                 f = f[:freqs_limit]
                 Sxx = Sxx[:freqs_limit, :]
                 
-            log_debug(f"generate_spectrogram: Espectrograma calculado com sucesso (shape={Sxx.shape})")
+            log.debug(f"generate_spectrogram: Espectrograma calculado com sucesso (shape={Sxx.shape})")
             
             # Preparar parâmetros para retorno
             params = {
@@ -710,7 +710,7 @@ class ProcessingController(QObject):
             self.data['spectrogram_params'] = params
             
             # Emitir sinal com os resultados
-            log_info("Espectrograma gerado com sucesso")
+            log.info("Espectrograma gerado com sucesso")
             self.processingProgress.emit("Espectrograma gerado com sucesso")
             # Emitir sinal com os arrays NumPy diretamente
             self.spectrogramGenerated.emit(self.data, t, f, Sxx)
@@ -718,7 +718,7 @@ class ProcessingController(QObject):
             return self.data
             
         except Exception as e:
-            log_error(f"Erro ao gerar espectrograma: {str(e)}")
+            log.error(f"Erro ao gerar espectrograma: {str(e)}")
             self.processingProgress.emit(f"Erro ao gerar espectrograma: {str(e)}")
             return None
 
@@ -726,35 +726,35 @@ class ProcessingController(QObject):
         """
         Diagnostica o estado atual dos dados para debugging
         """
-        log_info("=== DIAGNÓSTICO DO ESTADO DOS DADOS ===")
+        log.info("=== DIAGNÓSTICO DO ESTADO DOS DADOS ===")
         
         # Verificar self.data
         if self.data:
-            log_info(f"self.data presente com {len(self.data)} chaves")
-            log_info(f"  Chaves em self.data: {list(self.data.keys())}")
+            log.info(f"self.data presente com {len(self.data)} chaves")
+            log.info(f"  Chaves em self.data: {list(self.data.keys())}")
             if 'demodulated' in self.data:
-                log_info(f"  'demodulated' encontrado em self.data (tamanho: {len(self.data['demodulated'])})")
+                log.info(f"  'demodulated' encontrado em self.data (tamanho: {len(self.data['demodulated'])})")
             else:
-                log_warning("  'demodulated' NÃO encontrado em self.data")
+                log.warning("  'demodulated' NÃO encontrado em self.data")
         else:
-            log_warning("self.data é None")
+            log.warning("self.data é None")
         
         # Verificar self.demodulated_data
         if self.demodulated_data:
-            log_info(f"self.demodulated_data presente com {len(self.demodulated_data)} chaves")
-            log_info(f"  Chaves em self.demodulated_data: {list(self.demodulated_data.keys())}")
+            log.info(f"self.demodulated_data presente com {len(self.demodulated_data)} chaves")
+            log.info(f"  Chaves em self.demodulated_data: {list(self.demodulated_data.keys())}")
             if 'demodulated' in self.demodulated_data:
-                log_info(f"  'demodulated' encontrado em self.demodulated_data (tamanho: {len(self.demodulated_data['demodulated'])})")
+                log.info(f"  'demodulated' encontrado em self.demodulated_data (tamanho: {len(self.demodulated_data['demodulated'])})")
             else:
-                log_warning("  'demodulated' NÃO encontrado em self.demodulated_data")
+                log.warning("  'demodulated' NÃO encontrado em self.demodulated_data")
         else:
-            log_warning("self.demodulated_data é None")
+            log.warning("self.demodulated_data é None")
         
         # Verificar se são o mesmo objeto
         if self.data and self.demodulated_data:
-            log_info(f"self.data is self.demodulated_data: {self.data is self.demodulated_data}")
+            log.info(f"self.data is self.demodulated_data: {self.data is self.demodulated_data}")
         
-        log_info("=== FIM DO DIAGNÓSTICO ===")
+        log.info("=== FIM DO DIAGNÓSTICO ===")
 
     @pyqtSlot()
     def generate_audio_wav(self):
@@ -764,32 +764,32 @@ class ProcessingController(QObject):
         Returns:
             str: Caminho do arquivo WAV gerado, ou None se houve erro
         """
-        log_info("Iniciando geração de arquivo de áudio WAV")
+        log.info("Iniciando geração de arquivo de áudio WAV")
         
         # Fazer diagnóstico completo do estado dos dados
         self.diagnose_data_state()
         
         # Debug: verificar estado atual dos dados
-        log_debug(f"generate_audio_wav: self.demodulated_data={'presente' if self.demodulated_data else 'None'}")
-        log_debug(f"generate_audio_wav: self.data={'presente' if self.data else 'None'}")
+        log.debug(f"generate_audio_wav: self.demodulated_data={'presente' if self.demodulated_data else 'None'}")
+        log.debug(f"generate_audio_wav: self.data={'presente' if self.data else 'None'}")
         
         if self.demodulated_data:
-            log_debug(f"generate_audio_wav: Chaves em self.demodulated_data: {list(self.demodulated_data.keys())}")
+            log.debug(f"generate_audio_wav: Chaves em self.demodulated_data: {list(self.demodulated_data.keys())}")
         if self.data:
-            log_debug(f"generate_audio_wav: Chaves em self.data: {list(self.data.keys())}")
+            log.debug(f"generate_audio_wav: Chaves em self.data: {list(self.data.keys())}")
         
         # Verificar se temos dados demodulados em qualquer um dos locais
         data_source = None
         if self.demodulated_data and 'demodulated' in self.demodulated_data:
             data_source = self.demodulated_data
-            log_info("generate_audio_wav: Usando dados de self.demodulated_data")
+            log.info("generate_audio_wav: Usando dados de self.demodulated_data")
         elif self.data and 'demodulated' in self.data:
             data_source = self.data
-            log_info("generate_audio_wav: Usando dados de self.data")
+            log.info("generate_audio_wav: Usando dados de self.data")
         else:
-            log_warning("generate_audio_wav: Sem dados demodulados para gerar áudio")
-            log_warning(f"generate_audio_wav: DEBUG - self.demodulated_data has 'demodulated': {self.demodulated_data and 'demodulated' in self.demodulated_data if self.demodulated_data else 'N/A'}")
-            log_warning(f"generate_audio_wav: DEBUG - self.data has 'demodulated': {self.data and 'demodulated' in self.data if self.data else 'N/A'}")
+            log.warning("generate_audio_wav: Sem dados demodulados para gerar áudio")
+            log.warning(f"generate_audio_wav: DEBUG - self.demodulated_data has 'demodulated': {self.demodulated_data and 'demodulated' in self.demodulated_data if self.demodulated_data else 'N/A'}")
+            log.warning(f"generate_audio_wav: DEBUG - self.data has 'demodulated': {self.data and 'demodulated' in self.data if self.data else 'N/A'}")
             self.processingProgress.emit("Sem dados demodulados para gerar áudio. Demodule os dados primeiro.")
             return None
             
@@ -811,10 +811,10 @@ class ProcessingController(QObject):
             elif 'sample_frequency' in data_source and 'decimation' in data_source:
                 fs_orig = float(data_source['sample_frequency']) / float(data_source['decimation'])
             else:
-                log_warning("generate_audio_wav: Não foi possível determinar a taxa de amostragem original, usando padrão")
+                log.warning("generate_audio_wav: Não foi possível determinar a taxa de amostragem original, usando padrão")
                 fs_orig = 1.953125e6  # valor padrão (125MHz/64)
                 
-            log_debug(f"generate_audio_wav: Taxa de amostragem original: {fs_orig} Hz")
+            log.debug(f"generate_audio_wav: Taxa de amostragem original: {fs_orig} Hz")
             
             # Parâmetros de conversão (baseados no convert_to_wav_gui.py)
             target_rate = 44100  # Hz
@@ -822,17 +822,17 @@ class ProcessingController(QObject):
             lp_cutoff = 20000.0  # Hz
             
             # Filtro passa-alta (20 Hz) – Butterworth de 4ª ordem
-            log_debug("generate_audio_wav: Aplicando filtro passa-alta")
+            log.debug("generate_audio_wav: Aplicando filtro passa-alta")
             sos = signal.butter(N=4, Wn=hp_cutoff, btype="highpass", fs=fs_orig, output="sos")
             signal_hp = signal.sosfiltfilt(sos, signal_in)
             
             # Filtro passa-baixa (20 kHz) – Butterworth de 4ª ordem
-            log_debug("generate_audio_wav: Aplicando filtro passa-baixa")
+            log.debug("generate_audio_wav: Aplicando filtro passa-baixa")
             sos = signal.butter(N=4, Wn=lp_cutoff, btype="lowpass", fs=fs_orig, output="sos")
             signal_lp = signal.sosfiltfilt(sos, signal_hp)
             
             # Reamostragem para target_rate
-            log_debug("generate_audio_wav: Reamostrando sinal")
+            log.debug("generate_audio_wav: Reamostrando sinal")
             self.processingProgress.emit("Reamostrando sinal para taxa de áudio...")
             
             # Calcular fatores inteiros up/down para resample_poly
@@ -850,11 +850,11 @@ class ProcessingController(QObject):
                 up = (up + 1) // 2
                 down = (down + 1) // 2
                 
-            log_debug(f"generate_audio_wav: Fatores de reamostragem: up={up}, down={down}")
+            log.debug(f"generate_audio_wav: Fatores de reamostragem: up={up}, down={down}")
             signal_resampled = signal.resample_poly(signal_lp, up, down)
             
             # Normalização para [-1, 1]
-            log_debug("generate_audio_wav: Normalizando sinal")
+            log.debug("generate_audio_wav: Normalizando sinal")
             max_abs = np.max(np.abs(signal_resampled))
             if max_abs == 0:
                 norm_signal = signal_resampled
@@ -882,11 +882,11 @@ class ProcessingController(QObject):
             wav_path = os.path.join(root_dir, wav_name)
             
             # Salvar arquivo WAV
-            log_debug(f"generate_audio_wav: Salvando em {wav_path}")
+            log.debug(f"generate_audio_wav: Salvando em {wav_path}")
             self.processingProgress.emit("Salvando arquivo WAV...")
             wavfile.write(wav_path, target_rate, pcm16)
             
-            log_info(f"Arquivo de áudio WAV gerado com sucesso: {wav_path}")
+            log.info(f"Arquivo de áudio WAV gerado com sucesso: {wav_path}")
             self.processingProgress.emit(f"Arquivo WAV salvo: {os.path.basename(wav_path)}")
             
             # Emitir sinal de conclusão
@@ -895,6 +895,6 @@ class ProcessingController(QObject):
             return wav_path
             
         except Exception as e:
-            log_error(f"Erro ao gerar arquivo de áudio: {str(e)}")
+            log.error(f"Erro ao gerar arquivo de áudio: {str(e)}")
             self.processingProgress.emit(f"Erro ao gerar áudio: {str(e)}")
             return None 

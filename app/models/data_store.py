@@ -3,7 +3,7 @@ Módulo para gerenciamento e armazenamento de dados
 """
 import os
 import glob
-from app.utils.debug_log import log_debug
+import app.utils.log as log
 import numpy as np
 import pickle
 import gzip
@@ -67,7 +67,7 @@ class DataStore:
             data: Dicionário contendo os dados
             directory: Diretório onde salvar o arquivo
         """
-        log_debug(f"Salvando dados adquiridos no diretório: {directory}")        
+        log.debug(f"Salvando dados adquiridos no diretório: {directory}")        
         data = data.copy()
         del data['t']
         # Salvar metadados em JSON

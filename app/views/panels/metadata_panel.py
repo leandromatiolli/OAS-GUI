@@ -9,7 +9,7 @@ from datetime import datetime
 from typing import Dict, Any
 import os
 import json
-from app.utils.debug_log import log_debug, log_info, log_warning, log_error
+import app.utils.log as log
 
 from app.models.data_store import DataStore
 from PyQt5.QtWidgets import QMessageBox, QInputDialog
@@ -97,7 +97,7 @@ class MetadataPanel(QWidget):
         """
         if metadata_name:
             # Create appropriate widget based on type
-            log_debug(f"Adicionando metadado: {metadata_name} do tipo {metadata_type}")
+            log.debug(f"Adicionando metadado: {metadata_name} do tipo {metadata_type}")
             if metadata_type[0] == "text":
                 widget = QLineEdit()
                 widget.textChanged.connect(self.update_metadata_dict(metadata_name))
@@ -165,7 +165,7 @@ class MetadataPanel(QWidget):
             metadata_layout: Layout da linha de metadado a ser removida
         """
         def remove(value):
-            log_debug(f"Removing metadata row {metadata_layout}")
+            log.debug(f"Removing metadata row {metadata_layout}")
             widget = metadata_layout.itemAt(0).widget()  # Remove the widget
             for key, value in self.metadata_widget_dict.items():
                 if value == widget:
@@ -237,7 +237,7 @@ class MetadataPanel(QWidget):
         """
         def update_value(new_value):
             self.metadata[metadata_name] = new_value
-            log_debug(f"Atualizando {metadata_name} para {new_value}")
+            log.debug(f"Atualizando {metadata_name} para {new_value}")
 
         return update_value
     
@@ -255,24 +255,24 @@ class MetadataPanel(QWidget):
                     self.metadata_template.update(json.load(f))
 
                 for key, value in self.metadata_template.items():
-                    log_debug(f"Carregando metadado: {key} do tipo {value}")
+                    log.debug(f"Carregando metadado: {key} do tipo {value}")
                     self.add_metadata_form_row(key, value)
 
         except Exception as e:
-            log_error(f"Erro ao carregar opções: {str(e)}")
+            log.error(f"Erro ao carregar opções: {str(e)}")
 
         try:
             if os.path.exists(self.last_state_file):
                 with open(self.last_state_file, 'r', encoding='utf-8') as f:
                     self.metadata.update(json.load(f)["metadata"])
-                    log_debug(f"Último estado carregado: {self.metadata}")
+                    log.debug(f"Último estado carregado: {self.metadata}")
 
             for key, value in self.metadata.items():
                 if key in self.metadata_widget_dict:
                     self.set_widget_value(key, value)
 
         except Exception as e:
-            log_error(f"Erro ao carregar último estado: {str(e)}")
+            log.error(f"Erro ao carregar último estado: {str(e)}")
 
 
     def save_metadata_template(self):
@@ -284,7 +284,7 @@ class MetadataPanel(QWidget):
             with open(self.metadata_template_file, 'w', encoding='utf-8') as f:
                 json.dump(self.metadata_template, f, indent=4, ensure_ascii=False)
         except Exception as e:
-            log_error(f"Erro ao salvar opções: {str(e)}")
+            log.error(f"Erro ao salvar opções: {str(e)}")
                 
     def get_metadata(self) -> Dict[str, Any]:
         """

@@ -16,7 +16,7 @@ ERROR_COLOR = '\033[31m'  # Vermelho
 if os.name == 'nt':
     os.system('color')
 
-def log_debug(message):
+def debug(message):
     """
     Registra uma mensagem de debug tanto no terminal quanto na GUI
     
@@ -32,7 +32,7 @@ def log_debug(message):
     print(terminal_message, file=sys.stdout, end='')
     sys.stdout.flush()  # Forçar flush para garantir que apareça imediatamente
 
-def log_info(message):
+def info(message):
     """
     Registra uma mensagem informativa tanto no terminal quanto na GUI
     
@@ -48,7 +48,7 @@ def log_info(message):
     print(terminal_message, file=sys.stdout, end='')
     sys.stdout.flush()  # Forçar flush para garantir que apareça imediatamente
 
-def log_warning(message):
+def warning(message):
     """
     Registra uma mensagem de aviso tanto no terminal quanto na GUI
     
@@ -64,7 +64,7 @@ def log_warning(message):
     print(terminal_message, file=sys.stdout, end='')
     sys.stdout.flush()  # Forçar flush para garantir que apareça imediatamente
 
-def log_error(message):
+def error(message):
     """
     Registra uma mensagem de erro tanto no terminal quanto na GUI
     

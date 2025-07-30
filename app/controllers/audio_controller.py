@@ -6,7 +6,7 @@ import numpy as np
 import os
 from scipy import signal
 from scipy.io import wavfile
-from app.utils.debug_log import log_debug, log_info, log_warning, log_error
+import app.utils.log as log
 
 class AudioController(QObject):
     """Controlador para análise e processamento de áudio"""
@@ -33,7 +33,7 @@ class AudioController(QObject):
             filename: Caminho do arquivo .pkl
         """
         try:
-            log_info(f"Carregando arquivo para análise de áudio: {filename}")
+            log.info(f"Carregando arquivo para análise de áudio: {filename}")
             
             # Carregar dados do arquivo pickle
             import pickle
@@ -57,14 +57,14 @@ class AudioController(QObject):
             
             # Armazenar dados
             self.current_data = data
-            log_info(f"Dados carregados: {len(data['demodulated'])} pontos")
+            log.info(f"Dados carregados: {len(data['demodulated'])} pontos")
             
             # Emitir sinal com os dados carregados
             self.audioLoaded.emit(data)
             
         except Exception as e:
             error_msg = f"Erro ao carregar arquivo de áudio: {str(e)}"
-            log_error(error_msg)
+            log.error(error_msg)
             self.audioError.emit(error_msg)
     
     @pyqtSlot()
@@ -75,7 +75,7 @@ class AudioController(QObject):
             return
             
         try:
-            log_info("Gerando arquivo de áudio WAV")
+            log.info("Gerando arquivo de áudio WAV")
             
             # Obter dados demodulados
             demodulated = self.current_data['demodulated']
@@ -91,7 +91,7 @@ class AudioController(QObject):
                 dt = t[1] - t[0]
                 original_fs = 1 / dt
             
-            log_debug(f"Taxa de amostragem original: {original_fs} Hz")
+            log.debug(f"Taxa de amostragem original: {original_fs} Hz")
             
             # Aplicar filtros de áudio
             audio_signal = self._apply_audio_filters(demodulated, original_fs)
@@ -109,14 +109,14 @@ class AudioController(QObject):
             wavfile.write(filename, self.sample_rate, audio_signal)
             
             self.current_audio_path = filename
-            log_info(f"Arquivo de áudio salvo: {filename}")
+            log.info(f"Arquivo de áudio salvo: {filename}")
             
             # Emitir sinal de sucesso
             self.audioGenerated.emit(filename)
             
         except Exception as e:
             error_msg = f"Erro ao gerar áudio: {str(e)}"
-            log_error(error_msg)
+            log.error(error_msg)
             self.audioError.emit(error_msg)
     
     @pyqtSlot()
@@ -127,7 +127,7 @@ class AudioController(QObject):
             return
             
         try:
-            log_info("Calculando espectro do sinal")
+            log.info("Calculando espectro do sinal")
             
             demodulated = self.current_data['demodulated']
             
@@ -153,14 +153,14 @@ class AudioController(QObject):
             magnitudes = np.abs(fft_result[:N//2])
             frequencies = np.arange(N//2) * fs / N
             
-            log_debug(f"Espectro calculado: {len(frequencies)} pontos, freq_max={frequencies[-1]} Hz")
+            log.debug(f"Espectro calculado: {len(frequencies)} pontos, freq_max={frequencies[-1]} Hz")
             
             # Emitir sinal com o espectro
             self.spectrumCalculated.emit(frequencies, magnitudes)
             
         except Exception as e:
             error_msg = f"Erro ao calcular espectro: {str(e)}"
-            log_error(error_msg)
+            log.error(error_msg)
             self.audioError.emit(error_msg)
     
     def _apply_audio_filters(self, signal_data, fs):
@@ -186,7 +186,7 @@ class AudioController(QObject):
         up = self.sample_rate // common_divisor
         down = int(original_fs) // common_divisor
         
-        log_debug(f"Reamostragem: {original_fs} Hz -> {self.sample_rate} Hz (up={up}, down={down})")
+        log.debug(f"Reamostragem: {original_fs} Hz -> {self.sample_rate} Hz (up={up}, down={down})")
         
         # Reamostrar
         resampled = signal.resample_poly(signal_data, up, down)

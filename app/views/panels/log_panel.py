@@ -8,7 +8,7 @@ from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QTextEdit, QPushButton, QHBox
                            QLabel, QCheckBox, QFileDialog)
 from PyQt5.QtCore import Qt, pyqtSlot, QObject, pyqtSignal
 from PyQt5.QtGui import QColor, QTextCharFormat
-from app.utils.debug_log import log_info, log_error
+import app.utils.log as log
 
 class LogStream(QObject):
     """Stream para redirecionar saída do console para um widget"""
@@ -220,13 +220,13 @@ class LogPanel(QWidget):
             
     def clear_logs(self):
         """Limpa o conteúdo dos logs"""
-        from app.utils.debug_log import log_info
+        import app.utils.log as log
         
         self.log_text.clear()
         
         # Adicionar mensagem inicial
         self.append_log("=== Log limpo ===\n")
-        log_info("Log limpo pelo usuário")
+        log.info("Log limpo pelo usuário")
         
     def copy_logs(self):
         """Copia logs para a área de transferência"""
@@ -253,9 +253,9 @@ class LogPanel(QWidget):
             try:
                 with open(filename, 'w', encoding='utf-8') as f:
                     f.write(self.log_text.toPlainText())
-                log_info(f"Logs salvos em: {filename}")
+                log.info(f"Logs salvos em: {filename}")
             except Exception as e:
-                log_error(f"Erro ao salvar logs: {str(e)}")
+                log.error(f"Erro ao salvar logs: {str(e)}")
                 
     def closeEvent(self, event):
         """Restaura saída original ao fechar"""
