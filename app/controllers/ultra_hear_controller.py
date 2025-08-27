@@ -45,8 +45,18 @@ class UltraHearController(QObject):
             if 'demodulated' not in data:
                 raise ValueError("Arquivo não contém dados demodulados")
             
+            # Verificar se os dados demodulados são válidos
+            demodulated = data['demodulated']
+            if len(demodulated) == 0:
+                raise ValueError("Dados demodulados estão vazios")
+            
+            # Verificar se temos taxa de amostragem
+            if 'sample_frequency_effective' not in data:
+                log_warning("Taxa de amostragem não encontrada, usando padrão")
+                data['sample_frequency_effective'] = 1953125.0
+            
             self.current_data = data
-            log_info(f"Dados carregados: {len(data['demodulated'])} pontos")
+            log_info(f"Dados carregados: {len(demodulated)} pontos, fs={data['sample_frequency_effective']} Hz")
             
             # Emitir sinal
             self.dataLoaded.emit(data)

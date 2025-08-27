@@ -9,6 +9,7 @@ from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QPushButton,
                              QProgressBar, QSplitter)
 from PyQt5.QtCore import pyqtSignal, Qt, QThread, pyqtSlot
 import os
+import traceback
 import numpy as np
 from matplotlib.widgets import SpanSelector
 import matplotlib.pyplot as plt
@@ -125,19 +126,36 @@ class UltraHearPanel(QWidget):
     def create_file_control_group(self):
         """Cria o grupo de controles de arquivo"""
         group = QGroupBox("Arquivo de Dados")
-        layout = QHBoxLayout(group)
+        layout = QVBoxLayout(group)
+        
+        # Linha superior - seleção de arquivo
+        file_row = QHBoxLayout()
         
         # Botão para selecionar arquivo
         self.select_file_button = QPushButton("Selecionar Arquivo")
         self.select_file_button.clicked.connect(self.on_select_file)
-        layout.addWidget(self.select_file_button)
+        file_row.addWidget(self.select_file_button)
+        
+        # Botão para listar arquivos disponíveis
+        self.list_files_button = QPushButton("📁 Listar Arquivos")
+        self.list_files_button.clicked.connect(self.on_list_available_files)
+        file_row.addWidget(self.list_files_button)
+        
+        file_row.addStretch()
+        layout.addLayout(file_row)
         
         # Label para mostrar arquivo selecionado
         self.file_label = QLabel("Nenhum arquivo selecionado")
         self.file_label.setStyleSheet("color: gray; font-style: italic;")
         layout.addWidget(self.file_label)
         
-        layout.addStretch()
+        # Lista de arquivos disponíveis (inicialmente oculta)
+        self.files_list = QTextEdit()
+        self.files_list.setMaximumHeight(100)
+        self.files_list.setReadOnly(True)
+        self.files_list.setVisible(False)
+        self.files_list.setPlaceholderText("Arquivos com dados demodulados disponíveis...")
+        layout.addWidget(self.files_list)
         
         return group
     
@@ -415,7 +433,7 @@ class UltraHearPanel(QWidget):
         file_path, _ = QFileDialog.getOpenFileName(
             self,
             "Selecionar Arquivo de Dados",
-            "",
+            "data/Dados para treinamento",  # Diretório padrão com arquivos demodulados
             "Arquivos PKL (*.pkl);;Todos os Arquivos (*)"
         )
         
@@ -425,12 +443,89 @@ class UltraHearPanel(QWidget):
             self.file_label.setText(filename)
             self.file_label.setStyleSheet("color: black;")
             
-            # Habilitar controles
-            self.activate_selection_button.setEnabled(True)
-            self.process_button.setEnabled(True)
+            # Verificar se o arquivo contém dados demodulados
+            try:
+                import pickle
+                with open(file_path, 'rb') as f:
+                    data = pickle.load(f)
+                
+                if 'demodulated' in data:
+                    log_info(f"Arquivo com dados demodulados selecionado: {file_path}")
+                    self.status_label.setText("Arquivo carregado - dados demodulados disponíveis")
+                    
+                    # Habilitar controles
+                    self.activate_selection_button.setEnabled(True)
+                    self.process_button.setEnabled(True)
+                    
+                    # Carregar e mostrar espectro automaticamente
+                    self.audioFileSelected.emit(file_path)
+                    
+                else:
+                    log_warning(f"Arquivo selecionado não contém dados demodulados: {file_path}")
+                    self.status_label.setText("Arquivo não contém dados demodulados")
+                    
+                    # Mostrar mensagem ao usuário
+                    QMessageBox.warning(
+                        self, 
+                        "Arquivo Incompatível", 
+                        "O arquivo selecionado não contém dados demodulados.\n\n"
+                        "Para usar o Ultra-Hear, selecione um arquivo que contenha dados demodulados "
+                        "(arquivos com 'demodulado' no nome)."
+                    )
+                    
+            except Exception as e:
+                log_error(f"Erro ao verificar arquivo: {str(e)}")
+                self.status_label.setText("Erro ao verificar arquivo")
+                QMessageBox.critical(self, "Erro", f"Erro ao verificar arquivo:\n{str(e)}")
+    
+    def on_list_available_files(self):
+        """Lista arquivos disponíveis com dados demodulados"""
+        try:
+            # Procurar arquivos com dados demodulados
+            demod_files = []
             
-            log_info(f"Arquivo selecionado para Ultra-Hear: {file_path}")
-            self.audioFileSelected.emit(file_path)
+            # Verificar no diretório de dados para treinamento
+            training_dir = "data/Dados para treinamento"
+            if os.path.exists(training_dir):
+                for file in os.listdir(training_dir):
+                    if file.endswith('.pkl') and 'demodulado' in file:
+                        file_path = os.path.join(training_dir, file)
+                        demod_files.append(file_path)
+            
+            if demod_files:
+                # Mostrar lista
+                files_text = "Arquivos com dados demodulados disponíveis:\n\n"
+                for i, file_path in enumerate(demod_files, 1):
+                    filename = os.path.basename(file_path)
+                    files_text += f"{i}. {filename}\n"
+                
+                self.files_list.setPlainText(files_text)
+                self.files_list.setVisible(True)
+                
+                self.status_label.setText(f"Encontrados {len(demod_files)} arquivos com dados demodulados")
+                
+                # Mostrar mensagem informativa
+                QMessageBox.information(
+                    self,
+                    "Arquivos Disponíveis",
+                    f"Encontrados {len(demod_files)} arquivos com dados demodulados.\n\n"
+                    "Use 'Selecionar Arquivo' para escolher um deles."
+                )
+                
+            else:
+                self.files_list.setVisible(False)
+                QMessageBox.warning(
+                    self,
+                    "Nenhum Arquivo Encontrado",
+                    "Nenhum arquivo com dados demodulados foi encontrado.\n\n"
+                    "Certifique-se de que existem arquivos com 'demodulado' no nome "
+                    "no diretório 'data/Dados para treinamento'."
+                )
+                
+        except Exception as e:
+            log_error(f"Erro ao listar arquivos: {str(e)}")
+            self.status_label.setText("Erro ao listar arquivos")
+            QMessageBox.critical(self, "Erro", f"Erro ao listar arquivos:\n{str(e)}")
     
     def on_activate_selection(self):
         """Ativa/desativa a seleção interativa de bandas"""
@@ -539,9 +634,23 @@ class UltraHearPanel(QWidget):
         self.current_data = data
         log_info("Dados carregados no painel Ultra-Hear")
         
-        # Atualizar visualizações se necessário
-        if 'demodulated' in data and 't' in data:
+        # Verificar se temos dados demodulados
+        if 'demodulated' in data:
+            log_debug(f"Dados demodulados carregados: {len(data['demodulated'])} pontos")
+            
+            # Mostrar espectro original
             self.show_original_spectrum(data)
+            
+            # Atualizar status
+            self.status_label.setText("Dados carregados - pronto para processamento")
+            
+            # Habilitar controles
+            self.activate_selection_button.setEnabled(True)
+            self.process_button.setEnabled(True)
+            
+        else:
+            log_warning("Dados carregados não contêm informações demoduladas")
+            self.status_label.setText("Dados carregados - sem dados demodulados")
     
     def show_original_spectrum(self, data):
         """Mostra o espectro original"""
@@ -550,7 +659,9 @@ class UltraHearPanel(QWidget):
             from scipy.fft import fft, fftfreq
             
             signal = data['demodulated']
-            fs = data.get('sample_frequency_effective', 44100)
+            fs = data.get('sample_frequency_effective', 1953125.0)  # Taxa padrão do sistema
+            
+            log_debug(f"Calculando espectro: {len(signal)} pontos, fs={fs} Hz")
             
             # FFT
             n = len(signal)
@@ -569,14 +680,29 @@ class UltraHearPanel(QWidget):
             self.original_spectrum_canvas.axes.semilogx(freqs, spectrum_db)
             self.original_spectrum_canvas.axes.set_xlabel('Frequência (Hz) - Escala Log')
             self.original_spectrum_canvas.axes.set_ylabel('Amplitude (dB)')
-            self.original_spectrum_canvas.axes.set_title('Espectro Original')
+            self.original_spectrum_canvas.axes.set_title('Espectro Original - Dados Demodulados')
             self.original_spectrum_canvas.axes.grid(True, which="both", ls="-", alpha=0.3)
+            
+            # Definir limites de frequência apropriados para ultrassom
+            self.original_spectrum_canvas.axes.set_xlim(1, fs/2)
+            
+            # Adicionar linhas de referência para frequências ultrassônicas
+            ultra_freqs = [20000, 40000, 80000, 120000, 200000]
+            for freq in ultra_freqs:
+                if freq < fs/2:
+                    self.original_spectrum_canvas.axes.axvline(
+                        freq, color='red', linestyle='--', alpha=0.5, 
+                        label=f'{freq/1000:.0f} kHz'
+                    )
+            
+            self.original_spectrum_canvas.axes.legend()
             self.original_spectrum_canvas.draw()
             
-            log_debug("Espectro original exibido com escala logarítmica")
+            log_debug("Espectro original exibido com escala logarítmica e referências ultrassônicas")
             
         except Exception as e:
             log_error(f"Erro ao exibir espectro original: {str(e)}")
+            traceback.print_exc()
     
     def on_processing_finished(self, result):
         """Manipula o fim do processamento"""
@@ -657,7 +783,7 @@ class UltraHearPanel(QWidget):
             freq_range = result['original_freq_range']
             info_lines.append(f"Faixa Original: {freq_range[0]:.1f} - {freq_range[1]:.1f} Hz")
         
-        if 'transposed_freq_range' in result:
+        if 'transposed_freq_range' in result and result['transposed_freq_range'] is not None:
             freq_range = result['transposed_freq_range']
             info_lines.append(f"Faixa Transposta: {freq_range[0]:.1f} - {freq_range[1]:.1f} Hz")
         
