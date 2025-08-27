@@ -34,3 +34,8 @@ Thumbs.db
 .vscode/
 *.sublime-project
 *.sublime-workspace
+
+# arquivos de audio e .pkl
+
+*.wav
+*.pkl

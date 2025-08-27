@@ -4,13 +4,18 @@
     "material": "Epoxy",
     "location": "MKFotonica Labs",
     "pressure": 10.0,
+    "pressure_unit": "bar",
     "flow": 1.0,
+    "flow_unit": "L/min",
     "distance": 250.0,
+    "distance_unit": "cm",
     "equipment_type": "Válvula",
     "equipment_status": [
         "Água Estática",
         "Sem Vazamento"
     ],
     "comments": "falando longe\n",
-    "custom_labels": ""
+    "timestamp": "20250827_160840",
+    "save_directory": "data/Dados para treinamento",
+    "is_calibration": false
 }
