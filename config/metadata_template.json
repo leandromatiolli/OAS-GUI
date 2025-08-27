@@ -11,11 +11,17 @@
     "Fluxo (L/min)": [
         "float"
     ],
+    "Distancia cm": [
+        "float"
+    ],
     "Fotos": [
         "filename"
     ],
     "Comentario": [
         "text_area"
+    ],
+    "Timestamp": [
+        "datetime"
     ],
     "Material": [
         "combo",
@@ -57,8 +63,5 @@
             "Tanque",
             "Outro"
         ]
-    ],
-    "Distancia (cm)": [
-        "float"
     ]
 }
