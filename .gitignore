@@ -17,6 +17,7 @@ ENV/
 *.pkl
 *.npy
 *.h5
+*.wav
 
 # Configurações específicas do usuário
 oas_config.json
@@ -34,3 +35,8 @@ Thumbs.db
 .vscode/
 *.sublime-project
 *.sublime-workspace
+
+# Arquivos de dados
+data
+
+config.json

@@ -1050,3 +1050,15 @@ class scpi (object):
     def err_n(self):
         """Error next."""
         return self.txrx_txt('SYST:ERR:NEXT?')
+    
+    def flush(self):
+        """Flush the command buffer."""
+        n = 0
+        while True:
+            try:
+                self._socket.settimeout(0.5)
+                n = len(self._socket.recv(1024))
+            except TimeoutError:
+                break
+        self._socket.settimeout(self.timeout)
+        return n

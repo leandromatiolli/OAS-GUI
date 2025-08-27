@@ -35,9 +35,6 @@ class FileController(QObject):
             files = DataStore.get_available_files()
             self.fileListUpdated.emit(files)
             
-            # Atualizar também a lista de calibrações
-            self.refresh_calibration_list()
-            
         except Exception as e:
             self.fileError.emit(f"Erro ao listar arquivos: {str(e)}")
     
@@ -170,7 +167,7 @@ class FileController(QObject):
             if not calibration_file:
                 return None
                 
-            return DataStore.load_calibration_data(calibration_file)
+            return DataStore.load_data(calibration_file)
         except Exception as e:
             self.fileError.emit(f"Erro ao carregar calibração: {str(e)}")
             return None

@@ -42,7 +42,7 @@ class AnalysisPanel(QWidget):
         layout = QVBoxLayout(self)
         
         # Widget para selecionar arquivo
-        file_selection = QHBoxLayout()
+        
         self.file_list = QListWidget()
         self.file_list.setSelectionMode(QListWidget.MultiSelection)
         self.file_list.setMinimumWidth(400)
@@ -60,17 +60,31 @@ class AnalysisPanel(QWidget):
         self.use_save_dir_button.clicked.connect(self.on_use_save_dir_clicked)
         self.current_dir = DataStore.load_config().get('save_directory', os.getcwd())
         self.dir_label = QLabel(self.current_dir)
-        
-        file_selection.addWidget(QLabel("Arquivo(s):"))
-        file_selection.addWidget(self.file_list)
-        file_selection.addWidget(self.refresh_button)
-        file_selection.addWidget(self.browse_button)
-        file_selection.addWidget(self.load_button)
-        file_selection.addWidget(self.select_dir_button)
-        file_selection.addWidget(self.use_save_dir_button)
-        file_selection.addWidget(self.dir_label)
-        
-        layout.addLayout(file_selection)
+        self.dir_label.setToolTip("Pasta para salvar os dado adquiridos")
+        self.dir_label.setObjectName("mk_save_directory")
+
+
+        file_buttons_group = QWidget()
+        file_buttons_layout = QHBoxLayout()
+        file_buttons_layout.addWidget(self.refresh_button)
+        file_buttons_layout.addWidget(self.browse_button)
+        file_buttons_layout.addWidget(self.load_button)
+        file_buttons_layout.addWidget(self.select_dir_button)
+        file_buttons_layout.addWidget(self.use_save_dir_button)
+        file_buttons_group.setLayout(file_buttons_layout)
+
+        file_right_group = QWidget()
+        file_right_layout = QVBoxLayout()
+        file_right_group.setLayout(file_right_layout)
+        file_right_layout.addWidget(self.dir_label)
+        file_right_layout.addWidget(file_buttons_group)
+       
+        file_selection_group = QGroupBox("Arquivo(s):")
+        file_selection_layout = QHBoxLayout()
+        file_selection_group.setLayout(file_selection_layout)
+        file_selection_layout.addWidget(self.file_list)
+        file_selection_layout.addWidget(file_right_group)
+        layout.addWidget(file_selection_group)
 
         # Área de metadados
         metadata_group = QGroupBox("Metadados do Arquivo")
@@ -86,45 +100,74 @@ class AnalysisPanel(QWidget):
         # Layout para os controles de processamento
         processing_layout = QHBoxLayout()
         
-        # Grupo para média móvel
-        moving_avg_group = QGroupBox("Média Móvel")
-        moving_avg_layout = QFormLayout()
-        
+
+
+        # Grupo variados
+
+        variety_group = QGroupBox("Variados")
+        variety_group_layout = QFormLayout()
+        variety_group.setLayout(variety_group_layout)
+        processing_layout.addWidget(variety_group)
+
+        ## Linha para média móvel
+        moving_avg_layout = QHBoxLayout()
         self.moving_avg_checkbox = QCheckBox("Ativar")
+        self.moving_avg_checkbox.setObjectName("mk_moving_avg_active")
+        moving_avg_layout.addWidget(self.moving_avg_checkbox)
         self.window_size_spinbox = QSpinBox()
+        self.window_size_spinbox.setObjectName("mk_moving_avg_window_size")
         self.window_size_spinbox.setRange(2, 101)
         self.window_size_spinbox.setSingleStep(1)
         self.window_size_spinbox.setValue(10)
         self.window_size_spinbox.setEnabled(False)
+        moving_avg_layout.addWidget(self.window_size_spinbox)
+        variety_group_layout.addRow("Média Movel: ", moving_avg_layout)
+
+        ## Linha salvar demodulado automaticamente
+
+        self.autosave_demodulated_checkbox = QCheckBox()
+        self.autosave_demodulated_checkbox.setChecked(False)
+        self.autosave_demodulated_checkbox.setObjectName("mk_autosave_demodulated")
+        variety_group_layout.addRow("Salvar Demodulado Automaticamente: ", self.autosave_demodulated_checkbox)
         
-        moving_avg_layout.addRow(self.moving_avg_checkbox)
-        moving_avg_layout.addRow("Janela:", self.window_size_spinbox)
-        moving_avg_group.setLayout(moving_avg_layout)
-        processing_layout.addWidget(moving_avg_group)
+        ## Exibir medida automaticamente
+        self.autoshow_waveform = QCheckBox("")
+        self.autoshow_waveform.setObjectName("mk_autoshow_waveform")
+        variety_group_layout.addRow("Exibir dados automaticamente: ", self.autoshow_waveform)
+        
+        ## Demodular dados automaticamente
+        self.autodemodulate = QCheckBox("")
+        self.autodemodulate.setObjectName("mk_autodemodulate")
+        variety_group_layout.addRow("Demodular dados automaticamente: ", self.autodemodulate)
+        
         
         # Grupo para filtro passa-banda
         bandpass_group = QGroupBox("Filtro Passa-Banda")
         bandpass_layout = QFormLayout()
         
         self.bandpass_checkbox = QCheckBox("Ativar")
+        self.bandpass_checkbox.setObjectName("mk_apply_band_pass_filter")
         self.low_freq_spinbox = QDoubleSpinBox()
+        self.low_freq_spinbox.setObjectName("mk_band_pass_filter_low_freq")
         self.low_freq_spinbox.setRange(0.1, 100000.0)
         self.low_freq_spinbox.setValue(50.0)
         self.low_freq_spinbox.setSuffix(" Hz")
         self.low_freq_spinbox.setEnabled(False)
         
         self.high_freq_spinbox = QDoubleSpinBox()
+        self.high_freq_spinbox.setObjectName("mk_band_pass_filter_high_freq")
         self.high_freq_spinbox.setRange(0.1, 100000.0)
         self.high_freq_spinbox.setValue(5000.0)
         self.high_freq_spinbox.setSuffix(" Hz")
         self.high_freq_spinbox.setEnabled(False)
         
         self.order_spinbox = QSpinBox()
+        self.order_spinbox.setObjectName("mk_band_pass_filter_order")
         self.order_spinbox.setRange(1, 10)
         self.order_spinbox.setValue(4)
         self.order_spinbox.setEnabled(False)
         
-        self.apply_filter_button = QPushButton("Aplicar")
+        self.apply_filter_button = QPushButton("Aplicar")   
         self.apply_filter_button.setEnabled(False)
         
         bandpass_layout.addRow(self.bandpass_checkbox)
@@ -360,7 +403,7 @@ class AnalysisPanel(QWidget):
             self,
             "Selecionar arquivos de dados",
             "",
-            "Arquivos pickle (*.pkl)"
+            "Arquivos pickle (*.pkl, *.pkl.gz) "
         )
         
         if file_paths:
@@ -564,7 +607,7 @@ class AnalysisPanel(QWidget):
             import pickle
             temp_dir = os.path.join(os.getcwd(), 'temp')
             os.makedirs(temp_dir, exist_ok=True)
-            temp_file = os.path.join(temp_dir, 'last_filtered_data.pkl')
+            temp_file = os.path.join(temp_dir, 'last_filtered_data.pkl.gz')
             with open(temp_file, 'wb') as f:
                 pickle.dump({'t': t, 'filtered': filtered, 'params': filter_params}, f)
             log_debug(f"show_filtered: Dados salvos em {temp_file}")
@@ -803,27 +846,19 @@ class AnalysisPanel(QWidget):
 
     def load_selected_file_from_list(self, file_list):
         """Carrega múltiplos arquivos a partir de uma lista de caminhos e plota espectros"""
-        import pickle
-        import numpy as np
-        from scipy.signal import get_window
         self.multiple_demodulated_data = []
         self.multiple_metadata = []  # Lista para armazenar metadados de todos os arquivos
         
         for filename in file_list:
             try:
-                with open(filename, 'rb') as f:
-                    data = pickle.load(f)
-                # Converter para dict se necessário
-                if not isinstance(data, dict):
-                    temp_dict = {}
-                    for key in dir(data):
-                        if not key.startswith('__') and not callable(getattr(data, key)):
-                            temp_dict[key] = getattr(data, key)
-                    data = temp_dict
+                data = DataStore.load_data(filename)  # Carregar dados usando DataStore
                 if 'demodulated' in data:
                     self.multiple_demodulated_data.append(data)
                     # Coletar metadados do arquivo
-                    metadata = data.get('metadata', {})
+                    if 'metadata' in data.keys():
+                        metadata = data.get('metadata', {})
+                    else:
+                        metadata = {k: v for k, v in data.items() if k not in ['waveforms', 'demodulated']}
                     metadata['filename'] = filename  # Adicionar nome do arquivo aos metadados
                     self.multiple_metadata.append(metadata)
                     
@@ -910,6 +945,15 @@ class AnalysisPanel(QWidget):
             ax.legend()
             canvas.draw()
 
+    def plot_calibration_data(self, calibration_data):
+                        
+        self.show_raw_data(calibration_data['t'], 
+                           calibration_data['waveforms'], 
+                           calibration_data['channels'])
+        self.show_ellipse(calibration_data['waveforms'], 
+                         calibration_data['ellipse_params'])
+        
+
     def show_metadata_multiple(self, metadata_list):
         """
         Exibe os metadados de múltiplos arquivos
@@ -954,11 +998,11 @@ class AnalysisPanel(QWidget):
         self.refresh_file_list_in_dir()
     
     def refresh_file_list_in_dir(self):
-        """Atualiza a lista de arquivos demodulados (.pkl) na pasta atual de análise, sem duplicatas e só o nome do arquivo"""
+        """Atualiza a lista de arquivos demodulados (.pkl.gz) na pasta atual de análise, sem duplicatas e só o nome do arquivo"""
         self.file_list.clear()
         # Procurar apenas arquivos demodulados na pasta selecionada
         demod_files = [f for f in os.listdir(self.current_dir)
-                       if f.startswith("vazamento_demodulado_") and f.endswith('.pkl')]
+                       if f.startswith("vazamento_demodulado_") and (f.endswith('.pkl') or f.endswith('.pkl.gz'))]
         # Remover duplicatas
         demod_files = list(sorted(set(demod_files), key=lambda x: os.path.getmtime(os.path.join(self.current_dir, x)), reverse=True))
         for file in demod_files:

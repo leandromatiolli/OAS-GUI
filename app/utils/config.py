@@ -3,7 +3,8 @@ Módulo para configurações e constantes da aplicação
 """
 import os
 import json
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, Callable, List, Type, Union
+from PyQt5.QtWidgets import QWidget
 
 # Configurações padrão da aplicação
 DEFAULT_CONFIG = {
@@ -158,3 +159,93 @@ def set_config(section: str, key: str, value: Any):
     """
     Config().set(section, key, value)
     Config().save() 
+
+
+# Widget traversal utilities
+def traverse_widgets(
+    widget: QWidget, 
+    apply_function: Callable[[QWidget], None], 
+    widget_types: Optional[Union[Type, List[Type]]] = None,
+    recursive: bool = True
+) -> List[QWidget]:
+    """
+    Traverses all child widgets of a given widget and applies a function to them.
+    
+    Args:
+        widget: The parent widget to traverse
+        apply_function: Function to apply to each matching widget
+        widget_types: Type or list of types to filter by (e.g., QPushButton, QLabel).
+                     If None, applies to all QWidget instances.
+        recursive: If True, traverses recursively through all child widgets
+        
+    Returns:
+        List of widgets that were processed
+    """
+    processed_widgets = []
+    if widget_types is None:
+        widget_types = [QWidget]
+    elif not isinstance(widget_types, list):
+        widget_types = [widget_types]
+    
+    def _traverse_recursive(current_widget: QWidget):
+        """Internal recursive function"""
+        # Check if current widget matches any of the desired types
+        if any(isinstance(current_widget, widget_type) for widget_type in widget_types):
+            try:
+                apply_function(current_widget)
+                processed_widgets.append(current_widget)
+            except Exception as e:
+                print(f"Error applying function to widget {current_widget}: {e}")
+        
+        # Traverse children if recursive is enabled
+        if recursive:
+            for child in current_widget.children():
+                if isinstance(child, QWidget):
+                    _traverse_recursive(child)
+    
+    # Start traversal
+    _traverse_recursive(widget)
+    return processed_widgets
+
+
+def find_widgets_by_type(widget: QWidget, widget_types: Union[Type, List[Type]]) -> List[QWidget]:
+    """
+    Find all child widgets of specific type(s).
+    
+    Args:
+        widget: The parent widget to search in
+        widget_types: Type or list of types to search for
+        
+    Returns:
+        List of widgets matching the specified types
+    """
+    found_widgets = []
+    
+    def collect_widget(w: QWidget):
+        found_widgets.append(w)
+    
+    traverse_widgets(widget, collect_widget, widget_types, recursive=True)
+    return found_widgets
+
+
+def apply_to_widget_type(
+    widget: QWidget, 
+    widget_type: Type, 
+    apply_function: Callable[[QWidget], None]
+) -> int:
+    """
+    Apply a function to all widgets of a specific type.
+    
+    Args:
+        widget: The parent widget to search in
+        widget_type: The type of widget to apply the function to
+        apply_function: Function to apply to each matching widget
+        
+    Returns:
+        Number of widgets processed
+    """
+    processed = traverse_widgets(widget, apply_function, widget_type, recursive=True)
+    return len(processed)
+
+
+    

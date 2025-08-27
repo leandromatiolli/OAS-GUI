@@ -19,10 +19,55 @@ def bring_up_scpi_server(host="rp-f0b916.local", stop=False):
     if r.text.strip('\n') == state2:
         print(f"Servidor SCPI {state2}")
 
-def setup_continuous_acquisition(ip, decimation=1, avg="OFF", waveform_len=16384, ch=[1,2]):
+class SCPI_Server(requests.Session):
+    """Classe para gerenciar a conexão com o servidor SCPI do RedPitaya"""
+
+    def __init__(self, ip_address="rp-f0b916.local"):
+        super().__init__()
+        self.ip_address = ip_address
+        self.auth = ('user', 'pass')
+
+    def set_ip(self, ip_address):
+        """Define o endereço IP do servidor SCPI"""
+        self.ip_address = ip_address
+
+    def status(self):
+        """Obtém o status do servidor SCPI"""
+        response = self.get(f'http://{self.ip_address}/get_scpi_status', auth=self.auth)
+        if response.status_code != 200:
+            raise Exception(f"Erro ao obter status do servidor SCPI: {response.status_code}")
+        self._status = response.text.strip('\n')
+        return self._status
+    
+    def start(self):
+        """Inicia o servidor SCPI"""
+        response = self.get(f'http://{self.ip_address}/start_scpi_manager', auth=self.auth)
+        if response.status_code != 200:
+            raise Exception(f"Erro ao iniciar o servidor SCPI: {response.status_code}")
+        self._status = response.text.strip('\n')
+        return self._status
+    
+    def stop(self):
+        """Para o servidor SCPI"""
+        response = self.get(f'http://{self.ip_address}/stop_scpi_manager', auth=self.auth)
+        if response.status_code != 200:
+            raise Exception(f"Erro ao parar o servidor SCPI: {response.status_code}")
+        self._status = response.text.strip('\n')
+        return self._status
+    
+
+def connect_scpi(ip_address="rp-f0b916.local", timeout=1):
+    """Conecta ao servidor SCPI do RedPitaya"""
+    try:
+        dig = scpi.scpi(ip_address, timeout=timeout)
+        return dig
+    except Exception as e:
+        print(f"Erro ao conectar ao RedPitaya em {ip_address}: {str(e)}")
+        return None
+
+def setup_continuous_acquisition(dig: scpi.scpi, decimation=1, avg="OFF", waveform_len=16384, ch=[1,2]):
     """Configura o RedPitaya para aquisição contínua de dados"""
     n_ch = len(ch)
-    dig = scpi.scpi(ip, timeout=1) 
     dig.waveform_len = waveform_len
     
     # Resetar a aquisição
@@ -31,7 +76,7 @@ def setup_continuous_acquisition(ip, decimation=1, avg="OFF", waveform_len=16384
     # Verificar memória disponível
     start_address = int(dig.txrx_txt('ACQ:AXI:START?'))
     size = int(dig.txrx_txt('ACQ:AXI:SIZE?'))
-    print(f'Memória reservada para aquisição: {size/1E6:.2f} MB')
+    #print(f'Memória reservada para aquisição: {size/1E6:.2f} MB')
     
     # Dividir o buffer entre os canais
     start_address2 = round(start_address + size/2) if n_ch == 2 else start_address
@@ -114,7 +159,7 @@ def tear_down(dig):
     dig.tx_txt('ACQ:AXI:SOUR2:ENable OFF')
     dig.close()
 
-def acquire_continuous_data(ip_address, duration=5, sample_rate=125e6, decimation=1, channels=[1,2]):
+def acquire_data(ip_address, duration=5, sample_rate=125e6, decimation=1, channels=[1,2]):
     """Adquire dados continuamente por um período específico"""
     # Calcular tamanho da forma de onda baseado na duração e taxa de amostragem
     effective_sample_rate = sample_rate / decimation
@@ -134,9 +179,6 @@ def acquire_continuous_data(ip_address, duration=5, sample_rate=125e6, decimatio
     print(f"- Tamanho da forma de onda: {waveform_len:_} pontos")
     print(f"- Taxa de amostragem efetiva: {effective_sample_rate/1e6:.2f} MHz")
     print(f"- Fator de decimação: {decimation}")
-    
-    # Inicializar o servidor SCPI
-    bring_up_scpi_server(ip_address)
     
     # Configurar a aquisição
     dig = setup_continuous_acquisition(ip_address, decimation=decimation, 
@@ -209,6 +251,20 @@ def save_data(data):
     print(f"Dados salvos em {filename}")
     return filename
 
+def ping_scpi_server(ip_address):
+    """Verifica se o servidor SCPI está respondendo"""
+    return requests.get(f'http://{ip_address}/get_scpi_status', auth=('user', 'pass'))
+    # try:
+    #     r = requests.get(f'http://{ip_address}/get_scpi_status', auth=('user', 'pass'))
+    #     if r.status_code == 200:
+    #         return True
+    #     else:
+    #         print(f"Erro ao conectar com {ip_address}, código: {r.status_code}")
+    #         return False
+    # except requests.RequestException as e:
+    #     print(f"Erro de conexão com {ip_address}: {str(e)}")
+    #     return False
+
 def main():
     # Configurações
     IP_ADDRESS = "rp-f0b916.local"  # Substitua pelo IP ou hostname do seu RedPitaya
@@ -219,7 +275,7 @@ def main():
     
     # Adquirir dados de forma contínua
     print("Iniciando aquisição contínua de dados do sensor de vazamento...")
-    data = acquire_continuous_data(IP_ADDRESS, duration=DURATION, 
+    data = acquire_data(IP_ADDRESS, duration=DURATION, 
                                  sample_rate=SAMPLE_RATE, 
                                  decimation=DECIMATION,
                                  channels=CHANNELS)

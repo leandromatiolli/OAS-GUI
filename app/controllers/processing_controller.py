@@ -22,6 +22,7 @@ class ProcessingController(QObject):
     bandpassFilterApplied = pyqtSignal(dict)  # Novo sinal para filtro passa-banda
     spectrogramGenerated = pyqtSignal(dict, object, object, object)  # Sinal emitido quando o espectrograma é gerado
     audioGenerated = pyqtSignal(str)  # Sinal emitido quando o arquivo de áudio é gerado
+    plotCalibrationDataRequested = pyqtSignal(dict)  # Sinal para plotar dados de calibração
     
     def __init__(self, parent=None):
         """
@@ -101,6 +102,8 @@ class ProcessingController(QObject):
         """
         log_debug(f"set_calibration_data: {'Definindo' if calibration_data else 'Limpando'} dados de calibração")
         self.calibration_data = calibration_data
+        self.process_calibration_data()
+        self.plotCalibrationDataRequested.emit(self.calibration_data)
         
     def has_calibration_data(self) -> bool:
         """
@@ -513,7 +516,7 @@ class ProcessingController(QObject):
             log_error(f"Erro ao calcular espectro: {str(e)}")
             return np.array([]), np.array([]), []
     
-    def process_calibration_data(self, data: Dict[str, Any]) -> bool:
+    def process_calibration_data(self) -> bool:
         """
         Processa dados de calibração e salva os parâmetros da elipse
         
@@ -523,6 +526,7 @@ class ProcessingController(QObject):
         Returns:
             True se a calibração foi bem-sucedida, False caso contrário
         """
+        data = self.calibration_data
         if data is None or 'waveforms' not in data or data['waveforms'] is None:
             log_warning("process_calibration_data: Dados de calibração inválidos")
             return False
@@ -535,10 +539,6 @@ class ProcessingController(QObject):
             
         try:
             log_info("Processando dados de calibração...")
-            self.processingProgress.emit("Processando dados de calibração...")
-            
-            # Verificar se temos nome de arquivo específico para calibração
-            calibration_file = data.get('calibration_file')
             
             # Determinar taxa de amostragem
             if 'sample_frequency' in data and 'decimation' in data:
@@ -569,33 +569,21 @@ class ProcessingController(QObject):
             # Criar dados de calibração
             calibration_data = {
                 'ellipse_params': ellipse_params,
-                'sample_frequency': data.get('sample_frequency'),
-                'decimation': data.get('decimation'),
                 'sample_frequency_effective': fs,
                 'moving_average': {
                     'enabled': self.use_moving_average,
                     'window_size': self.moving_average_window
                 },
-                'metadata': data.get('metadata', {}),
-                'timestamp': data.get('timestamp'),
-                'is_calibration': True
             }
             
-            # Salvar dados de calibração
-            log_info(f"Salvando arquivo de calibração: {calibration_file or 'padrão'}...")
-            DataStore.save_calibration_data(calibration_data, calibration_file)
-            
             # Armazenar dados de calibração para uso futuro
-            self.calibration_data = calibration_data
+            self.calibration_data.update(calibration_data)
             
             log_info("Calibração concluída com sucesso")
-            self.processingProgress.emit("Calibração concluída com sucesso")
-            
             return True
             
         except Exception as e:
             log_error(f"Erro ao processar calibração: {str(e)}")
-            self.processingProgress.emit(f"Erro ao processar calibração: {str(e)}")
             return False
     
     def auto_demodulate(self, data: Dict[str, Any]) -> bool:

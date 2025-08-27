@@ -3,12 +3,13 @@ Módulo com o painel de metadados para informações do teste
 """
 from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QFormLayout, QGroupBox,
                            QComboBox, QLineEdit, QDoubleSpinBox, QLabel, QPushButton,
-                           QFileDialog, QTextEdit, QCheckBox)
-from PyQt5.QtCore import Qt
+                           QFileDialog, QTextEdit, QCheckBox, QSpinBox)
+from PyQt5.QtCore import Qt, QTimer
 from datetime import datetime
 from typing import Dict, Any
 import os
 import json
+from app.utils.debug_log import set_gui_log_handler, log_debug, log_info, log_warning, log_error
 
 from app.models.data_store import DataStore
 
@@ -23,20 +24,24 @@ class MetadataPanel(QWidget):
             parent: Widget pai
         """
         super().__init__(parent)
-        self.config_file = "config/metadata_options.json"
-        self.last_state_file = "config/last_metadata_state.json"
+        self.metadata = {}
+        self.metadata_widget_dict = {}
+        self.metadata_template = {}
+        self.metadata_template_file = "config/metadata_template.json"
+        self.last_state_file = "config/last_state.json"
+
         self.setup_ui()
-        self.load_options()
-        self.load_last_state()
+        self.load_metadata()
+        self.get_metadata()
         
     def setup_ui(self):
         """Configura a interface do painel"""
         # Layout principal
         layout = QVBoxLayout(self)
         
-        # Grupo principal de metadados
         metadata_group = QGroupBox("Informações para Treinamento de IA")
         metadata_form = QFormLayout()
+        self.metadata_form = metadata_form
         
         # Número de série do sensor
         self.sensor_sn_edit = QLineEdit()
@@ -152,6 +157,27 @@ class MetadataPanel(QWidget):
         metadata_form.addRow("Status do Equipamento:", status_group)
 
         metadata_group.setLayout(metadata_form)
+        
+        self.new_entry_layout = QHBoxLayout()
+        new_entry_label = QLineEdit()
+        new_entry_label.setPlaceholderText("Nome do novo metadado")
+        new_entry_type = QComboBox()
+        new_entry_type.addItems([
+            "text", 
+            "float", 
+            "int", 
+            "filename",
+            "combo",
+            "timestamp",
+            "material",
+            "tipo de teste", 
+        ])
+        new_entry_button = QPushButton("Adicionar")
+        self.new_entry_layout.addWidget(new_entry_label)
+        self.new_entry_layout.addWidget(new_entry_type)  
+        self.new_entry_layout.addWidget(new_entry_button)
+        self.new_entry_layout.addWidget(QLabel(""), stretch=1)
+        metadata_form.addRow("Adicionar novo metadado:", self.new_entry_layout)
         layout.addWidget(metadata_group)  
         
         # Informações adicionais
@@ -161,139 +187,186 @@ class MetadataPanel(QWidget):
         
         # Adicionar espaço vazio para expansão
         layout.addStretch(1)
+
+        new_entry_button.clicked.connect(self.add_custom_metadata)
+
+    def update_timestamp(self, timestamp_name: str):
+        """
+        Atualiza o timestamp do painel de metadados
+        """
         
-    def load_options(self):
+        def update_time():
+            current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            if timestamp_name in self.metadata_widget_dict:
+                self.metadata_widget_dict[timestamp_name].setText(current_time)
+        return update_time
+
+    def add_metadata_form_row(self, metadata_name: str, metadata_type):
+        """
+        Adiciona uma nova linha de metadado ao formulário
+        
+        Args:
+            metadata_name: Nome do metadado
+            widget: Widget correspondente ao metadado (QLineEdit, QComboBox, etc.)
+        """
+        if metadata_name:
+            # Create appropriate widget based on type
+            if metadata_type[0] == "text":
+                widget = QLineEdit()
+                widget.textChanged.connect(self.update_metadata_dict(metadata_name))
+            elif metadata_type[0] == "text_area":
+                widget = QTextEdit()
+                widget.textChanged.connect(self.text_changed(metadata_name, widget))
+            elif metadata_type[0] == "float":
+                widget = QDoubleSpinBox()
+                widget.setRange(-999999.0, 999999.0)
+                widget.valueChanged.connect(self.update_metadata_dict(metadata_name))
+            elif metadata_type[0] == "int":
+                widget = QSpinBox()
+                widget.setRange(-999999, 999999)
+                widget.valueChanged.connect(self.update_metadata_dict(metadata_name))
+            elif metadata_type[0] == "filename":
+                widget = QPushButton("Selecionar Arquivo")
+                # You might want to add click handler for file selection
+                #widget.clicked.connect(self.update_metadata_dict(metadata_name))
+            elif metadata_type[0] == "datetime":
+                widget = QLabel()
+                self.update_timer = QTimer()
+                self.update_timer.timeout.connect(self.update_timestamp(metadata_name))
+                self.update_timer.start(1000)
+            elif metadata_type[0] == "combo":
+                widget = QComboBox()
+                widget.addItems(metadata_type[1])
+                widget.currentTextChanged.connect(self.update_metadata_dict(metadata_name))
+            else:  # material, tipo de teste, or other combo types'
+                pass
+
+            self.metadata_widget_dict[metadata_name] = widget
+            row_count = self.metadata_form.rowCount()
+
+            metadata_layout = QHBoxLayout()
+            metadata_layout.addWidget(widget)
+            remove_metadata_button = QPushButton("Remover")
+            metadata_layout.addWidget(QLabel(""), stretch = 1)
+            remove_metadata_button.clicked.connect(self.remove_metadata_row(metadata_layout))
+            metadata_layout.addWidget(remove_metadata_button)
+            self.metadata_form.insertRow(row_count - 1, metadata_name + ":", metadata_layout)
+
+    def set_widget_value(self, metadata_name: str, value: Any):
+        """
+        Define o valor de um widget específico
+        
+        Args:
+            widget: O widget a ser atualizado
+            value: Valor a ser definido
+        """
+
+        widget = self.metadata_widget_dict[metadata_name]
+        if isinstance(widget, QLineEdit):
+            widget.setText(str(value))
+        elif isinstance(widget, QDoubleSpinBox):
+            widget.setValue(float(value))
+        elif isinstance(widget, QComboBox):
+            index = widget.findText(str(value))
+            if index >= 0:
+                widget.setCurrentIndex(index)
+
+    def remove_metadata_row(self, metadata_layout: QHBoxLayout):
+        """
+        Remove uma linha de metadado do formulário
+        
+        Args:
+            metadata_layout: Layout da linha de metadado a ser removida
+        """
+        def remove(value):
+            print(f"Removing metadata row {metadata_layout}")
+            widget = metadata_layout.itemAt(0).widget()  # Remove the widget
+            for key, value in self.metadata_widget_dict.items():
+                if value == widget:
+                    metadata_name = key
+                    break
+            self.metadata_widget_dict.pop(metadata_name)
+            self.metadata_template.pop(metadata_name)
+            self.metadata.pop(metadata_name)
+            self.metadata_form.removeRow(metadata_layout)
+
+        return remove
+
+    def add_custom_metadata(self):
+        # Get reference to the widgets from the layout
+        new_entry_label = self.new_entry_layout.itemAt(0).widget()
+        new_entry_type = self.new_entry_layout.itemAt(1).widget()
+
+        # Get the label name and type
+        metadata_name = new_entry_label.text().strip()
+        metadata_type = new_entry_type.currentText()
+    
+        self.add_metadata_form_row(metadata_name, metadata_type)
+        self.metadata_template[metadata_name] = metadata_type
+        self.save_metadata_template()
+
+        
+    def update_metadata_dict(self, metadata_name: str):
+        """
+        Atualiza o dicionário de metadados com o valor do widget
+        
+        Args:
+            metadata_name: Nome do metadado
+        """
+        def update_value(new_value):
+            self.metadata[metadata_name] = new_value
+            log_debug(f"Atualizando {metadata_name} para {new_value}")
+
+        return update_value
+    
+    def text_changed(self, metadata_name: str, widget: QTextEdit):
+
+        def update_metadata():
+            self.metadata[metadata_name] = widget.toPlainText()
+        return update_metadata
+
+    def load_metadata(self):
         """Carrega as opções disponíveis do arquivo de configuração"""
         try:
-            if os.path.exists(self.config_file):
-                with open(self.config_file, 'r', encoding='utf-8') as f:
-                    config = json.load(f)
-                    
-                # Atualizar opções do tipo de teste
-                if 'test_types' in config:
-                    self.test_type_combo.clear()
-                    self.test_type_combo.addItems(config['test_types'])
-                    
-                # Atualizar opções de material
-                if 'materials' in config:
-                    self.material_combo.clear()
-                    self.material_combo.addItems(config['materials'])
-                    
-                # Novo: opções de equipamento
-                self.equipment_types = config.get('equipment_types', [])
-                self.equipment_type_combo.clear()
-                self.equipment_type_combo.addItems(self.equipment_types)
+            if os.path.exists(self.metadata_template_file):
+                with open(self.metadata_template_file, 'r', encoding='utf-8') as f:
+                    self.metadata_template.update(json.load(f))
+
+                for key, value in self.metadata_template.items():
+                    log_debug(f"Carregando metadado: {key} do tipo {value}")
+                    self.add_metadata_form_row(key, value)
+
         except Exception as e:
-            print(f"Erro ao carregar opções: {str(e)}")
-            
-    def save_options(self):
-        """Salva as opções atuais no arquivo de configuração"""
-        try:
-            # Criar diretório se não existir
-            os.makedirs(os.path.dirname(self.config_file), exist_ok=True)
-            
-            config = {
-                'test_types': [self.test_type_combo.itemText(i) for i in range(self.test_type_combo.count())],
-                'materials': [self.material_combo.itemText(i) for i in range(self.material_combo.count())],
-                'equipment_types': self.equipment_types
-            }
-            
-            with open(self.config_file, 'w', encoding='utf-8') as f:
-                json.dump(config, f, indent=4, ensure_ascii=False)
-        except Exception as e:
-            print(f"Erro ao salvar opções: {str(e)}")
-            
-    def load_last_state(self):
-        """Carrega o último estado usado"""
+            log_error(f"Erro ao carregar opções: {str(e)}")
+
         try:
             if os.path.exists(self.last_state_file):
                 with open(self.last_state_file, 'r', encoding='utf-8') as f:
-                    state = json.load(f)
-                    
-                # Restaurar valores
-                if 'sensor_sn' in state:
-                    self.sensor_sn_edit.setText(state['sensor_sn'])
-                if 'test_type' in state:
-                    index = self.test_type_combo.findText(state['test_type'])
-                    if index >= 0:
-                        self.test_type_combo.setCurrentIndex(index)
-                if 'material' in state:
-                    index = self.material_combo.findText(state['material'])
-                    if index >= 0:
-                        self.material_combo.setCurrentIndex(index)
-                if 'location' in state:
-                    self.location_edit.setText(state['location'])
-                if 'pressure' in state:
-                    self.pressure_spin.setValue(state['pressure'])
-                if 'flow' in state:
-                    self.flow_spin.setValue(state['flow'])
-                if 'distance' in state:
-                    self.distance_spin.setValue(state['distance'])
-                if 'equipment_type' in state:
-                    index = self.equipment_type_combo.findText(state['equipment_type'])
-                    if index >= 0:
-                        self.equipment_type_combo.setCurrentIndex(index)
-                if 'equipment_status' in state:
-                    # Novo: restaurar checkboxes
-                    checked_status = state['equipment_status'] if isinstance(state['equipment_status'], list) else []
-                    for cb in self.status_checkboxes:
-                        cb.setChecked(cb.text() in checked_status)
-                if 'comments' in state:
-                    self.comments_edit.setPlainText(state['comments'])
-                if 'custom_labels' in state:
-                    self.custom_labels_edit.setPlainText(state['custom_labels'])
+                    self.metadata.update(json.load(f)["metadata"])
+                    log_debug(f"Último estado carregado: {self.metadata}")
+
+            for key, value in self.metadata.items():
+                if key in self.metadata_widget_dict:
+                    self.set_widget_value(key, value)
+
         except Exception as e:
-            print(f"Erro ao carregar último estado: {str(e)}")
+            log_error(f"Erro ao carregar último estado: {str(e)}")
             
-    def save_last_state(self):
-        """Salva o estado atual para uso futuro"""
+        for key, value in self.metadata.items():
+            pass
+            #self.set_widget_value(key, value)
+
+    def save_metadata_template(self):
+        """Salva os metadados atuais no arquivo de configuração"""
         try:
             # Criar diretório se não existir
-            os.makedirs(os.path.dirname(self.last_state_file), exist_ok=True)
-            checked_status = [cb.text() for cb in self.status_checkboxes if cb.isChecked()]
-            state = {
-                'sensor_sn': self.sensor_sn_edit.text(),
-                'test_type': self.test_type_combo.currentText(),
-                'material': self.material_combo.currentText(),
-                'location': self.location_edit.text(),
-                'pressure': self.pressure_spin.value(),
-                'flow': self.flow_spin.value(),
-                'distance': self.distance_spin.value(),
-                'equipment_type': self.equipment_type_combo.currentText(),
-                'equipment_status': checked_status,
-                'comments': self.comments_edit.toPlainText(),
-                'custom_labels': self.custom_labels_edit.toPlainText()
-            }
-            
-            with open(self.last_state_file, 'w', encoding='utf-8') as f:
-                json.dump(state, f, indent=4, ensure_ascii=False)
+            os.makedirs(os.path.dirname(self.metadata_template_file), exist_ok=True)
+            # Salvar os metadados no arquivo
+            with open(self.metadata_template_file, 'w', encoding='utf-8') as f:
+                json.dump(self.metadata_template, f, indent=4, ensure_ascii=False)
         except Exception as e:
-            print(f"Erro ao salvar último estado: {str(e)}")
-        
-    def load_setup_photos(self):
-        """Abre um diálogo para selecionar fotos do setup"""
-        file_dialog = QFileDialog()
-        file_dialog.setFileMode(QFileDialog.ExistingFiles)
-        file_dialog.setNameFilter("Imagens (*.png *.jpg *.jpeg *.bmp)")
-        
-        if file_dialog.exec_():
-            selected_files = file_dialog.selectedFiles()
-            if selected_files:
-                self.setup_photos = selected_files
-                self.setup_photos_label.setText(f"{len(selected_files)} foto(s) selecionada(s)")
-        
-    def select_save_directory(self):
-        """Abre um diálogo para selecionar a pasta de destino dos arquivos"""
-        dir_path = QFileDialog.getExistingDirectory(self, "Selecione a pasta para salvar os dados", self.save_directory)
-        if dir_path:
-            self.save_directory = dir_path
-            self.save_dir_button.setText(dir_path)
-            
-            # Salvar a pasta escolhida nas configurações
-            config = DataStore.load_config()
-            config['save_directory'] = dir_path
-            DataStore.save_config(config)
-        
+            log_error(f"Erro ao salvar opções: {str(e)}")
+                
     def get_metadata(self) -> Dict[str, Any]:
         """
         Coleta os metadados do painel
@@ -343,9 +416,32 @@ class MetadataPanel(QWidget):
         # Adicionar fotos se existirem
         if hasattr(self, 'setup_photos'):
             metadata['setup_photos'] = self.setup_photos
-        # Salvar último estado
-        self.save_last_state()
         return metadata
+        
+    def select_save_directory(self):
+        """Abre um diálogo para selecionar a pasta de salvamento"""
+        directory = QFileDialog.getExistingDirectory(self, "Selecione a Pasta de Destino", self.save_directory)
+        if directory:
+            self.save_directory = directory
+            self.save_dir_button.setText(directory)
+            # Salvar nas configurações
+            config = DataStore.load_config()
+            config['save_directory'] = directory
+            DataStore.save_config(config)
+    
+    def load_setup_photos(self):
+        """Abre um diálogo para carregar fotos do setup"""
+        files, _ = QFileDialog.getOpenFileNames(
+            self, 
+            "Selecionar Fotos do Setup", 
+            "", 
+            "Imagens (*.png *.jpg *.jpeg *.bmp *.tiff)"
+        )
+        if files:
+            self.setup_photos = files
+            self.setup_photos_label.setText(f"{len(files)} foto(s) carregada(s)")
+        else:
+            self.setup_photos_label.setText("Nenhuma foto carregada")
         
     def clear_fields(self):
         """Limpa todos os campos do formulário"""

@@ -307,7 +307,7 @@ O OAS-GUI implementa uma arquitetura robusta baseada no padrão MVC (Model-View-
    ```python
    # Aquisição
    acquisitionStarted = pyqtSignal()
-   acquisitionFinished = pyqtSignal(dict)
+   acquisitionFinished = pyqtSignal(str)
    acquisitionError = pyqtSignal(str)
    
    # Processamento

@@ -5,6 +5,7 @@ import os
 import glob
 import numpy as np
 import pickle
+import gzip
 from datetime import datetime
 from typing import Dict, List, Tuple, Optional, Union, Any
 import json
@@ -15,7 +16,11 @@ class DataStore:
     
     # Constantes
     DEFAULT_CALIBRATION_FILE = "calibracao_sistema.pkl"
-    CONFIG_FILE = "config/data_store_config.json"
+    CONFIG_FILE = "./config/last_state.json"
+    DEFAULT_CONFIG = {
+        "save_directory": os.curdir,
+        "calibration_directory": os.curdir,
+    }
     
     @staticmethod
     def save_config(config: Dict[str, Any]) -> None:
@@ -26,7 +31,7 @@ class DataStore:
             config: Dicionário com as configurações
         """
         # Criar diretório se não existir
-        os.makedirs(os.path.dirname(DataStore.CONFIG_FILE), exist_ok=True)
+        #os.makedirs(os.path.dirname(DataStore.CONFIG_FILE), exist_ok=True)
         
         # Salvar configurações
         with open(DataStore.CONFIG_FILE, 'w', encoding='utf-8') as f:
@@ -42,7 +47,7 @@ class DataStore:
         """
         # Se o arquivo não existe, retornar configurações padrão
         if not os.path.exists(DataStore.CONFIG_FILE):
-            return {}
+            return DataStore.DEFAULT_CONFIG
             
         # Carregar configurações
         try:
@@ -65,6 +70,7 @@ class DataStore:
         Returns:
             Nome do arquivo onde os dados foram salvos
         """
+        data = {k: v for k, v in data.items() if k != 't'}
         def clean(s):
             # Remove acentos, espaços e caracteres especiais
             s = ''.join(c for c in unicodedata.normalize('NFD', str(s)) if unicodedata.category(c) != 'Mn')
@@ -135,12 +141,12 @@ class DataStore:
                     break
         # Montar string de labels abreviados
         label_str = f"_{field_abbr['sensor_sn']}{sensor_sn}_{field_abbr['test_type']}{test_type}_{field_abbr['material']}{material}_{field_abbr['distance']}{distance}cm_{field_abbr['pressure']}{pressure}b_{field_abbr['flow']}{flow}L_{field_abbr['equipment_type']}{equipment_type}_{field_abbr['equipment_status']}{status_str}_{field_abbr['location']}{location}{vazamento_info}"
-        filename = f"{prefix}_{timestamp}{label_str}.pkl"
+        filename = f"{prefix}_{timestamp}{label_str}.pkl.gz"
         if 'metadata' not in data:
             data['metadata'] = {}
         data['metadata']['timestamp'] = timestamp
         filepath = os.path.join(directory, filename)
-        with open(filepath, 'wb') as f:
+        with gzip.open(filepath, 'wb', compresslevel=1) as f:
             pickle.dump(data, f)
         # Salvar metadados em JSON
         metadata_filename = os.path.splitext(filepath)[0] + '.json'
@@ -217,12 +223,7 @@ class DataStore:
             return None
             
         try:
-            with open(calibration_file, 'rb') as f:
-                calibration_data = pickle.load(f)
-                
-            # Verificar se é um arquivo de calibração válido
-            if not calibration_data.get('is_calibration', False) or 'ellipse_params' not in calibration_data:
-                return None
+            calibration_data = DataStore.load_data(calibration_file)
                 
             return calibration_data
         except Exception:
@@ -260,8 +261,12 @@ class DataStore:
             return []
 
         # Procurar arquivos de calibração com padrão calibracao_*.pkl no diretório
-        search_path = os.path.join(calib_dir, "calibracao_*.pkl")
+        search_path = os.path.join(calib_dir, "*.pkl")
         calibration_files.extend(glob.glob(search_path))
+        
+        # Also search for compressed calibration files
+        search_path_gz = os.path.join(calib_dir, "*.pkl.gz")
+        calibration_files.extend(glob.glob(search_path_gz))
         
         # Incluir o arquivo padrão de calibração se existir no diretório
         default_calib_path = os.path.join(calib_dir, DataStore.DEFAULT_CALIBRATION_FILE)
@@ -286,8 +291,23 @@ class DataStore:
         Returns:
             Dicionário contendo os dados carregados
         """
-        with open(filename, 'rb') as f:
-            data = pickle.load(f)
+        # Verificar se o arquivo é comprimido baseado na extensão
+        is_compressed = filename.endswith(('.gz', '.zip')) or 'pkl.gz' in filename
+
+        try:
+            if is_compressed:
+                with gzip.open(filename, 'rb') as f:
+                    data = pickle.load(f)
+            else:
+                with open(filename, 'rb') as f:
+                    data = pickle.load(f)
+        except Exception as e:
+            # Se falhar com gzip, tentar sem compressão
+            if is_compressed:
+                with open(filename, 'rb') as f:
+                    data = pickle.load(f)
+            else:
+                raise e
             
         # Converter para dicionário se não for
         if not isinstance(data, dict):
@@ -322,9 +342,14 @@ class DataStore:
         # Procurar arquivos .pkl
         pkl_files.extend(glob.glob("vazamento_sensor_*.pkl"))
         pkl_files.extend(glob.glob("vazamento_continuo_*.pkl"))
+
+        # Procurar arquivos .pkl.zip (comprimidos)
+        pkl_files.extend(glob.glob("vazamento_sensor_*.pkl.gz"))
+        pkl_files.extend(glob.glob("vazamento_continuo_*.pkl.gz"))
         
         if include_all:
             pkl_files.extend(glob.glob("vazamento_demodulado_*.pkl"))
+            pkl_files.extend(glob.glob("vazamento_demodulado_*.pkl.gz"))
         
         # Ordenar por data de modificação (mais recente primeiro)
         pkl_files.sort(key=os.path.getmtime, reverse=True)

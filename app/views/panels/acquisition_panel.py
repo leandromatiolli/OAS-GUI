@@ -16,6 +16,7 @@ class AcquisitionPanel(QWidget):
     calibrationFolderChanged = pyqtSignal(str)
     loraLigarRequested = pyqtSignal(str)  # Emitido quando o usuário solicita ligar equipamento LoRa
     loraDesligarRequested = pyqtSignal(str)  # Emitido quando o usuário solicita desligar equipamento LoRa
+    sensorConnectRequested = pyqtSignal(str)  # Emitido quando o usuário solicita conectar ao sensor
     
     def __init__(self, parent=None):
         """
@@ -32,43 +33,79 @@ class AcquisitionPanel(QWidget):
         # Layout principal
         layout = QVBoxLayout(self)
         
+        # Grupo de status do sensor
+        self.sensor_status_group = QGroupBox("Conexão com o Sensor")
+        sensor_layout = QHBoxLayout()
+        
+        # Status da conexão
+        sensor_layout.addWidget(QLabel("Status:"))
+        self.sensor_status_label = QLabel("Desconectado")
+        self.sensor_status_label.setStyleSheet("color: red;")
+        sensor_layout.addWidget(self.sensor_status_label)
+        
+        # IP do sensor
+        sensor_layout.addWidget(QLabel("IP RedPitaya:"))
+        self.ip_edit = QLineEdit("rp-f0b916.local")
+        self.ip_edit.setObjectName("mk_ip_edit")
+        sensor_layout.addWidget(self.ip_edit)
+        
+        # Botão para conectar ao sensor
+        self.connect_sensor_button = QPushButton("Conectar ao Sensor")
+        self.connect_sensor_button.clicked.connect(self.connect_to_sensor)
+        sensor_layout.addWidget(self.connect_sensor_button)
+        
+        self.sensor_status_group.setLayout(sensor_layout)
+        layout.addWidget(self.sensor_status_group)
+        
         # Grupo de configurações de aquisição
         self.acquisition_group = QGroupBox("Configurações de Aquisição")
         acquisition_form = QFormLayout()
         
-        # IP do RedPitaya
-        self.ip_edit = QLineEdit("rp-f0b916.local")
-        acquisition_form.addRow("IP RedPitaya:", self.ip_edit)
-        
-        # Duração da aquisição
+        ## Duração da aquisição
         self.duration_spin = QDoubleSpinBox()
+        self.duration_spin.setObjectName("mk_acquisition_duration")       
         self.duration_spin.setRange(0.1, 60.0)
         self.duration_spin.setValue(5.0)
         self.duration_spin.setSingleStep(0.5)
-        acquisition_form.addRow("Duração (s):", self.duration_spin)
         
-        # Decimação
+        ## Aquisição em série
+        self.series_acquisition_checkbox = QCheckBox("Aquisição em série")
+        self.series_acquisition_checkbox.setObjectName("mk_series_acquisition")
+
+        # parametro de tempo
+        time_params = QHBoxLayout()
+        time_params.addWidget(QLabel("Duração (s):"))
+        time_params.addWidget(self.duration_spin)
+        time_params.addWidget(self.series_acquisition_checkbox)
+        time_params.addWidget(QLabel(""), stretch=1)  # Spacer with em
+        acquisition_form.addRow(time_params)
+        
+        ## Decimação
         self.decimation_combo = QComboBox()
+        self.decimation_combo.setObjectName("mk_decimation")
         for i in range(0, 17):  # Potências de 2 de 1 a 2^16
             self.decimation_combo.addItem(f"{2**i}", 2**i)
         self.decimation_combo.setCurrentIndex(6)  # 2^6 = 64
         self.decimation_combo.currentIndexChanged.connect(self.update_effective_rate)
         acquisition_form.addRow("Decimação:", self.decimation_combo)
         
-        # Taxa de amostragem efetiva
+        ## Taxa de amostragem efetiva
         self.effective_rate_label = QLabel()
         acquisition_form.addRow("Taxa efetiva:", self.effective_rate_label)
         self.update_effective_rate()  # Inicializa o rótulo
         
-        # Canais
+        ## Canais
         self.ch1_check = QCheckBox("Canal 1")
         self.ch1_check.setChecked(True)
+        self.ch1_check.setObjectName("mk_channel_1")
         self.ch2_check = QCheckBox("Canal 2")
         self.ch2_check.setChecked(True)
-        
+        self.ch2_check.setObjectName("mk_channel_2")
+
         channels_layout = QHBoxLayout()
         channels_layout.addWidget(self.ch1_check)
         channels_layout.addWidget(self.ch2_check)
+        channels_layout.addWidget(QLabel(""), stretch=1)
         acquisition_form.addRow("Canais:", channels_layout)
         
         # Grupo de configurações de calibração
@@ -78,6 +115,7 @@ class AcquisitionPanel(QWidget):
         # Botão para selecionar a pasta de calibrações
         calib_folder_layout = QHBoxLayout()
         self.calib_folder_label = QLabel("Nenhuma pasta selecionada")
+        self.calib_folder_label.setObjectName("mk_calibration_folder")
         self.calib_folder_label.setToolTip("Pasta contendo os arquivos de calibração")
         self.select_calib_folder_button = QPushButton("Selecionar Pasta")
         self.select_calib_folder_button.clicked.connect(self.select_calibration_folder)
@@ -94,6 +132,7 @@ class AcquisitionPanel(QWidget):
         # Campo para nome de arquivo de calibração
         self.calib_name_layout = QHBoxLayout()
         self.calib_name_edit = QLineEdit("calibracao_sensor")
+        self.calib_name_edit.setObjectName("mk_calibration_file_name")
         self.calib_name_edit.setPlaceholderText("Nome do arquivo de calibração")
         self.calib_name_layout.addWidget(self.calib_name_edit)
         
@@ -105,6 +144,7 @@ class AcquisitionPanel(QWidget):
         # Lista suspensa com calibrações disponíveis
         self.calib_selection_layout = QHBoxLayout()
         self.calib_combo = QComboBox()
+        self.calib_combo.setObjectName("mk_calibration_file")
         self.calib_combo.setToolTip("Selecione um arquivo de calibração para usar")
         self.calib_combo.currentIndexChanged.connect(self.on_calibration_selected)
         self.calib_selection_layout.addWidget(self.calib_combo, 1)
@@ -137,6 +177,7 @@ class AcquisitionPanel(QWidget):
         # Seleção de porta serial
         port_layout = QHBoxLayout()
         self.lora_port_combo = QComboBox()
+        self.lora_port_combo.setObjectName("mk_lora_port")
         self.lora_port_combo.setToolTip("Selecione a porta serial do módulo LoRa")
         self.refresh_lora_ports_button = QPushButton("↻")
         self.refresh_lora_ports_button.setToolTip("Atualizar lista de portas")
@@ -189,11 +230,11 @@ class AcquisitionPanel(QWidget):
         
         # Formatação inteligente baseada no valor
         if effective_rate >= 1e6:
-            formatted = f"{effective_rate/1e6:.2f} MHz"
+            formatted = f"{effective_rate/1e6:.2f} MSps"
         elif effective_rate >= 1e3:
-            formatted = f"{effective_rate/1e3:.2f} kHz"
+            formatted = f"{effective_rate/1e3:.2f} kSps"
         else:
-            formatted = f"{effective_rate:.2f} Hz"
+            formatted = f"{effective_rate:.2f} Sps"
         
         # Exibir e calcular Nyquist
         nyquist = effective_rate / 2
@@ -311,6 +352,8 @@ class AcquisitionPanel(QWidget):
         duration = self.duration_spin.value()
         decimation = self.decimation_combo.currentData()
         sample_rate = 125e6  # Taxa fixa do Red Pitaya
+
+        is_series = self.series_acquisition_checkbox.isChecked()
         
         # Verificar canais selecionados
         channels = []
@@ -333,7 +376,8 @@ class AcquisitionPanel(QWidget):
             'decimation': decimation,
             'sample_rate': sample_rate,
             'channels': channels,
-            'is_calibration': is_calibration
+            'is_calibration': is_calibration,
+            'is_series' : is_series
         }
         
         # Adicionar nome do arquivo de calibração se estiver no modo de calibração
@@ -349,7 +393,16 @@ class AcquisitionPanel(QWidget):
     def get_acquisition_params(self):
         """Retorna os parâmetros de aquisição atuais"""
         return self.request_acquisition() # Reutiliza a lógica para obter os parâmetros
+    
+    # def stop_acquisition(self):
+    #     # Request interruption of the acquisition thread
+    #     self.acquisition_controller.stop_acquisition()
         
+    #     # Update UI
+    #     self.acquire_button.setText("Adquirir Dados")
+    #     self.acquire_button.setStyleSheet("background-color: blue")
+    #     self.acquire_button.clicked.connect(self.request_acquisition)
+
     def set_enabled(self, enabled):
         """
         Habilita ou desabilita os controles do painel
@@ -413,4 +466,37 @@ class AcquisitionPanel(QWidget):
         elif "DESLIGADO" in status:
             self.lora_status_label.setStyleSheet("color: red;")
         else:
-            self.lora_status_label.setStyleSheet("color: orange;") 
+            self.lora_status_label.setStyleSheet("color: orange;")
+    
+    def connect_to_sensor(self):
+        """Solicita conexão ao sensor Red Pitaya"""
+        ip = self.ip_edit.text()
+        if not ip:
+            QMessageBox.warning(self, "IP inválido", "Por favor, insira um IP válido para o Red Pitaya.")
+            return
+        
+        self.sensorConnectRequested.emit(ip)
+    
+    def update_sensor_status(self, connected=False, ip=None, error_message=None):
+        """
+        Atualiza o status da conexão com o sensor
+        
+        Args:
+            connected: True se conectado, False se desconectado
+            ip: IP do sensor, se disponível
+            error_message: Mensagem de erro, se houve erro na conexão
+        """
+        if connected:
+            self.sensor_status_label.setText("Conectado")
+            self.sensor_status_label.setStyleSheet("color: green;")
+            self.connect_sensor_button.setText("Reconectar ao Sensor")
+            self.connect_sensor_button.setStyleSheet("background-color: lightblue;")
+        else:
+            if error_message:
+                self.sensor_status_label.setText(f"Erro: {error_message}")
+                self.sensor_status_label.setStyleSheet("color: red;")
+            else:
+                self.sensor_status_label.setText("Desconectado")
+                self.sensor_status_label.setStyleSheet("color: red;")
+            self.connect_sensor_button.setText("Conectar ao Sensor")
+            self.connect_sensor_button.setStyleSheet("")

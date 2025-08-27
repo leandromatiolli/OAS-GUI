@@ -1,0 +1,67 @@
+{
+    "SN do sensor": [
+        "text"
+    ],
+    "Localização": [
+        "text"
+    ],
+    "Pressão (bar)": [
+        "float"
+    ],
+    "Fluxo (L/min)": [
+        "float"
+    ],
+    "Distancia cm": [
+        "float"
+    ],
+    "Fotos": [
+        "filename"
+    ],
+    "Comentario": [
+        "text_area"
+    ],
+    "Timestamp": [
+        "datetime"
+    ],
+    "Material": [
+        "combo",
+        [
+            "PVC",
+            "Aço",
+            "Epoxy",
+            "Cobre",
+            "Polietileno",
+            "Polipropileno",
+            "Ferro Fundido",
+            "Outro"
+        ]
+    ],
+    "Tipo do Teste": [
+        "combo",
+        [
+            "Vazamento de Água",
+            "Vazamento de Ar",
+            "Vazamento de Gás",
+            "Descarga Elétrica",
+            "Ruído Mecânico",
+            "Controle (Sem Vazamento)",
+            "Outro"
+        ]
+    ],
+    "Tipo do Equipamento": [
+        "combo",
+        [
+            "Forno",
+            "Transformador",
+            "Lançador de Oxigênio",
+            "Serpentina",
+            "Válvula",
+            "Motor",
+            "Bomba",
+            "Compressor",
+            "Trocador de Calor",
+            "Tanque",
+            "Outro"
+        ]
+    ]
+}
