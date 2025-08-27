@@ -303,7 +303,7 @@ class Application:
         
         directory = self.window.analysis_panel.dir_label.text()
         log_debug(f"Salvando dados adquiridos no diretório: {directory}")
-        DataStore.save_data(data, prefix="", directory=directory)
+        DataStore.save_data(data, prefix="vazamento_continuo", directory=directory)
 
         if self.window.analysis_panel.autoshow_waveform.isChecked():
             self.window.acquisition_panel.set_enabled(True)
@@ -373,12 +373,11 @@ class Application:
                 self.window.show_status_message(f"Erro ao salvar dados processados: {str(e)}")
     
         # ETAPA 3: Atualizar lista de arquivos
-        if not self.window.acquisition_panel.series_acquisition_checkbox.isChecked():   
-            try:
-                log_debug("Atualizando lista de arquivos...")
-                self.file_controller.refresh_file_list()
-            except Exception as e:
-                log_error(f"Erro ao atualizar lista de arquivos: {str(e)}")
+        try:
+            log_debug("Atualizando lista de arquivos...")
+            self.file_controller.refresh_file_list()
+        except Exception as e:
+            log_error(f"Erro ao atualizar lista de arquivos: {str(e)}")
     
     def on_acquisition_error(self, message):
         """
@@ -419,6 +418,7 @@ class Application:
             data: Dados carregados
         """
         log_info(f"Arquivo carregado com sucesso")
+        log_debug(f"on_file_loaded: Chaves disponíveis nos dados: {list(data.keys())}")
         self.window.show_status_message(f"Arquivo carregado")
         
         # Exibir metadados do arquivo
@@ -430,6 +430,7 @@ class Application:
             self.window.analysis_panel.show_metadata(None)
         
         # Atualizar controlador de processamento com os novos dados
+        log_debug("on_file_loaded: Atualizando controlador de processamento")
         self.processing_controller.set_data(data)
         
         # Atualizar visualizações
@@ -437,25 +438,36 @@ class Application:
             # Verificar se temos dados de formas de onda
             if 'waveforms' in data and 't' in data:
                 channels = data.get('channels', [1, 2])
+                log_debug(f"on_file_loaded: Dados de formas de onda encontrados - shape={data['waveforms'].shape}, t={len(data['t'])}, channels={channels}")
                 
                 # Obter formas de onda processadas (com ou sem média móvel)
                 waveforms = self.processing_controller.get_waveforms_for_processing()
-                log_debug(f"Exibindo dados brutos do arquivo (shape={waveforms.shape})")
-                self.window.analysis_panel.show_raw_data(data['t'], waveforms, channels)
+                log_debug(f"on_file_loaded: Formas de onda processadas - shape={waveforms.shape if waveforms is not None else 'None'}")
+                if waveforms is not None:
+                    log_debug(f"Exibindo dados brutos do arquivo (shape={waveforms.shape})")
+                    self.window.analysis_panel.show_raw_data(data['t'], waveforms, channels)
+                else:
+                    log_warning("on_file_loaded: Formas de onda processadas são None")
                 
                 # Verificar se temos dois canais para a elipse
-                if waveforms.shape[0] >= 2:
+                if waveforms is not None and waveforms.shape[0] >= 2:
                     ellipse_params = data.get('ellipse_params', None)
-                    log_debug("Exibindo elipse do arquivo")
+                    log_debug(f"on_file_loaded: Exibindo elipse do arquivo - ellipse_params={ellipse_params is not None}")
                     self.window.analysis_panel.show_ellipse(waveforms, ellipse_params)
+                else:
+                    log_warning("on_file_loaded: Não há canais suficientes para exibir elipse")
+            else:
+                log_warning("on_file_loaded: Dados de formas de onda não encontrados")
                 
             # Verificar se temos dados demodulados
             if 'demodulated' in data and 't' in data:
+                log_debug(f"on_file_loaded: Dados demodulados encontrados - t={len(data['t'])}, demodulated={len(data['demodulated'])}")
                 log_debug("Exibindo dados demodulados do arquivo")
                 self.window.analysis_panel.show_demodulated(data['t'], data['demodulated'])
                 
                 # Verificar se temos dados filtrados
                 if 'filtered_demodulated' in data and 'bandpass_params' in data:
+                    log_debug(f"on_file_loaded: Dados filtrados encontrados - filtered_demodulated={len(data['filtered_demodulated'])}, bandpass_params={data['bandpass_params']}")
                     log_debug("Exibindo dados filtrados do arquivo")
                     self.window.analysis_panel.show_filtered(
                         data['t'], 
@@ -477,19 +489,31 @@ class Application:
                         self.window.analysis_panel.high_freq_spinbox.setEnabled(params['enabled'])
                         self.window.analysis_panel.order_spinbox.setEnabled(params['enabled'])
                         self.window.analysis_panel.apply_filter_button.setEnabled(params['enabled'])
+                else:
+                    log_debug("on_file_loaded: Dados filtrados não encontrados")
                 
                 # Calcular e mostrar espectro
                 try:
                     # Verificar se devemos usar o sinal filtrado para o espectro
                     use_filtered = 'filtered_demodulated' in data and data.get('bandpass_params', {}).get('enabled', False)
-                    log_debug(f"Calculando espectro dos dados carregados (use_filtered={use_filtered})")
+                    log_debug(f"on_file_loaded: Calculando espectro dos dados carregados (use_filtered={use_filtered})")
                     freq_axis, magnitudes, peaks = self.processing_controller.calculate_spectrum(use_filtered=use_filtered)
-                    self.window.analysis_panel.show_spectrum(freq_axis, magnitudes, peaks, use_filtered=use_filtered)
+                    log_debug(f"on_file_loaded: Espectro calculado - freq_axis={len(freq_axis)}, magnitudes={len(magnitudes)}, peaks={len(peaks) if peaks else 0}")
+                    if len(freq_axis) > 0 and len(magnitudes) > 0:
+                        self.window.analysis_panel.show_spectrum(freq_axis, magnitudes, peaks, use_filtered=use_filtered)
+                    else:
+                        log_warning("on_file_loaded: Espectro calculado está vazio")
                 except Exception as e:
-                    log_error(f"Erro ao calcular espectro: {str(e)}")
+                    log_error(f"on_file_loaded: Erro ao calcular espectro: {str(e)}")
+                    import traceback
+                    log_error(f"on_file_loaded: Traceback: {traceback.format_exc()}")
+            else:
+                log_warning("on_file_loaded: Dados demodulados não encontrados")
                     
         except Exception as e:
-            log_error(f"Erro ao exibir dados carregados: {str(e)}")
+            log_error(f"on_file_loaded: Erro ao exibir dados carregados: {str(e)}")
+            import traceback
+            log_error(f"on_file_loaded: Traceback: {traceback.format_exc()}")
             self.window.show_status_message(f"Erro ao exibir dados: {str(e)}")
     
     def on_file_error(self, message):

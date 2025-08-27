@@ -391,7 +391,11 @@ class AnalysisPanel(QWidget):
         """
         self.file_list.clear()
         for file in files:
-            self.file_list.addItem(file)
+            # Mostrar apenas o nome do arquivo, não o caminho completo
+            filename = os.path.basename(file)
+            self.file_list.addItem(filename)
+            # Armazenar o caminho completo como dados do item
+            self.file_list.item(self.file_list.count() - 1).setData(Qt.UserRole, file)
             
     def on_refresh_clicked(self):
         """Solicita atualização da lista de arquivos na pasta atual"""
@@ -424,14 +428,22 @@ class AnalysisPanel(QWidget):
         if self.file_list.count() == 0:
             return
         # Obter todos os arquivos selecionados
-        selected_files = [item.text() for item in self.file_list.selectedItems()]
+        selected_files = []
+        for item in self.file_list.selectedItems():
+            # Usar o caminho completo armazenado nos dados do item
+            full_path = item.data(Qt.UserRole)
+            if full_path:
+                selected_files.append(full_path)
+            else:
+                # Fallback: usar o texto do item como caminho completo
+                selected_files.append(item.text())
+        
         if not selected_files:
             return
-        # Montar caminho completo para cada arquivo
-        selected_files_full = [os.path.join(self.current_dir, f) for f in selected_files]
-        log_info(f"Carregando arquivos: {selected_files_full}")
+            
+        log_info(f"Carregando arquivos: {selected_files}")
         # Emitir sinal com a lista de arquivos
-        self.fileSelected.emit(selected_files_full)
+        self.fileSelected.emit(selected_files)
         
     def on_demodulate_clicked(self):
         """Solicita demodulação dos dados"""

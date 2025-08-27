@@ -292,20 +292,28 @@ class DataStore:
             Dicionário contendo os dados carregados
         """
         # Verificar se o arquivo é comprimido baseado na extensão
-        is_compressed = filename.endswith(('.gz', '.zip')) or 'pkl.gz' in filename
+        is_compressed = filename.endswith('.gz') or filename.endswith('.zip') or '.pkl.gz' in filename
 
         try:
             if is_compressed:
+                print(f"Carregando arquivo comprimido: {filename}")
                 with gzip.open(filename, 'rb') as f:
                     data = pickle.load(f)
             else:
+                print(f"Carregando arquivo normal: {filename}")
                 with open(filename, 'rb') as f:
                     data = pickle.load(f)
         except Exception as e:
+            print(f"Erro ao carregar arquivo {filename}: {str(e)}")
             # Se falhar com gzip, tentar sem compressão
             if is_compressed:
-                with open(filename, 'rb') as f:
-                    data = pickle.load(f)
+                print(f"Tentando carregar como arquivo não comprimido: {filename}")
+                try:
+                    with open(filename, 'rb') as f:
+                        data = pickle.load(f)
+                except Exception as e2:
+                    print(f"Erro ao carregar como arquivo não comprimido: {str(e2)}")
+                    raise e2
             else:
                 raise e
             
@@ -339,17 +347,25 @@ class DataStore:
         """
         pkl_files = []
         
+        # Obter diretório de salvamento das configurações
+        config = DataStore.load_config()
+        save_dir = config.get('save_directory', os.getcwd())
+        
+        # Se o diretório não existir, usar o diretório atual
+        if not os.path.isdir(save_dir):
+            save_dir = os.getcwd()
+        
         # Procurar arquivos .pkl
-        pkl_files.extend(glob.glob("vazamento_sensor_*.pkl"))
-        pkl_files.extend(glob.glob("vazamento_continuo_*.pkl"))
+        pkl_files.extend(glob.glob(os.path.join(save_dir, "vazamento_sensor_*.pkl")))
+        pkl_files.extend(glob.glob(os.path.join(save_dir, "vazamento_continuo_*.pkl")))
 
-        # Procurar arquivos .pkl.zip (comprimidos)
-        pkl_files.extend(glob.glob("vazamento_sensor_*.pkl.gz"))
-        pkl_files.extend(glob.glob("vazamento_continuo_*.pkl.gz"))
+        # Procurar arquivos .pkl.gz (comprimidos)
+        pkl_files.extend(glob.glob(os.path.join(save_dir, "vazamento_sensor_*.pkl.gz")))
+        pkl_files.extend(glob.glob(os.path.join(save_dir, "vazamento_continuo_*.pkl.gz")))
         
         if include_all:
-            pkl_files.extend(glob.glob("vazamento_demodulado_*.pkl"))
-            pkl_files.extend(glob.glob("vazamento_demodulado_*.pkl.gz"))
+            pkl_files.extend(glob.glob(os.path.join(save_dir, "vazamento_demodulado_*.pkl")))
+            pkl_files.extend(glob.glob(os.path.join(save_dir, "vazamento_demodulado_*.pkl.gz")))
         
         # Ordenar por data de modificação (mais recente primeiro)
         pkl_files.sort(key=os.path.getmtime, reverse=True)
