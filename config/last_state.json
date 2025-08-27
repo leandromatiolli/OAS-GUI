@@ -1,6 +1,10 @@
 {
     "ip_edit": "rp-f0b916.local",
+<<<<<<< HEAD
     "acquisition_duration": 5.0,
+=======
+    "acquisition_duration": 10.0,
+>>>>>>> db4e97fd2148c52ebfbb81570be8dfceb8b2e7e1
     "series_acquisition": false,
     "decimation": "128",
     "channel_1": true,
@@ -20,6 +24,7 @@
     "band_pass_filter_high_freq": 5000.0,
     "band_pass_filter_order": 4,
     "metadata": {
+<<<<<<< HEAD
         "sensor_sn": "",
         "test_type": "Vazamento de Água",
         "material": "PVC",
@@ -35,5 +40,16 @@
         "comments": "",
         "timestamp": "2025-08-27 14:26:10",
         "save_directory": "C:/Users/win/OneDrive/Empresa 2/Lab/OAS-GUI/data/Dados para treinamento"
+=======
+        "SN do sensor": "1",
+        "Localização": "MKFotonica Labs",
+        "Pressão (bar)": 2.0,
+        "Fluxo (L/min)": 3.0,
+        "materials": "Epoxy",
+        "test_types": "Vazamento de Gás",
+        "equipment_types": "Válvula",
+        "Comentario": "",
+        "Distancia (cm)": 0.0
+>>>>>>> db4e97fd2148c52ebfbb81570be8dfceb8b2e7e1
     }
 }

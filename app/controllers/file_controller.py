@@ -139,9 +139,9 @@ class FileController(QObject):
             directory: Caminho para o diretório de calibração
         """
         try:
-            config = DataStore.load_config()
+            config = DataStore.load_last_state()
             config['calibration_directory'] = directory
-            DataStore.save_config(config)
+            DataStore.save_last_state(config)
             
             # Atualizar a lista de calibrações
             self.refresh_calibration_list()

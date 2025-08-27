@@ -10,7 +10,7 @@ import os
 import numpy as np
 
 from app.views.widgets.canvas import MplCanvas
-from app.utils.debug_log import log_debug, log_info, log_warning, log_error
+from app.utils import log
 
 class AudioAnalysisPanel(QWidget):
     """Painel dedicado para análise de áudio"""
@@ -293,7 +293,7 @@ class AudioAnalysisPanel(QWidget):
             self.generate_button.setEnabled(True)
             
             # Emitir sinal para carregar arquivo
-            log_info(f"Arquivo selecionado para análise de áudio: {file_path}")
+            log.info(f"Arquivo selecionado para análise de áudio: {file_path}")
             self.audioFileSelected.emit(file_path)
     
     def on_generate_audio(self):
@@ -302,7 +302,7 @@ class AudioAnalysisPanel(QWidget):
             QMessageBox.warning(self, "Aviso", "Selecione um arquivo primeiro")
             return
             
-        log_info("Solicitando geração de áudio WAV")
+        log.info("Solicitando geração de áudio WAV")
         self.generate_button.setEnabled(False)
         self.generate_button.setText("Gerando...")
         self.generateAudioRequested.emit()
@@ -313,12 +313,12 @@ class AudioAnalysisPanel(QWidget):
             QMessageBox.warning(self, "Aviso", "Gere um arquivo de áudio primeiro")
             return
             
-        log_info("Solicitando reprodução de arquivo de áudio")
+        log.info("Solicitando reprodução de arquivo de áudio")
         self.playAudioRequested.emit()
     
     def on_audio_loaded(self, data):
         """Manipula o carregamento de dados de áudio"""
-        log_info("Dados de áudio carregados no painel")
+        log.info("Dados de áudio carregados no painel")
         
         # Atualizar metadados
         self.update_metadata_display(data)
@@ -349,7 +349,7 @@ class AudioAnalysisPanel(QWidget):
     
     def on_audio_error(self, error_message):
         """Manipula erros de áudio"""
-        log_error(f"Erro de áudio: {error_message}")
+        log.error(f"Erro de áudio: {error_message}")
         
         # Restaurar interface
         self.generate_button.setEnabled(True)
@@ -362,7 +362,7 @@ class AudioAnalysisPanel(QWidget):
         """Exibe o sinal demodulado"""
         try:
             if 't' not in data or 'demodulated' not in data:
-                log_warning("Dados incompletos para exibir sinal")
+                log.warning("Dados incompletos para exibir sinal")
                 return
             
             t = data['t']
@@ -395,10 +395,10 @@ class AudioAnalysisPanel(QWidget):
                 f"Taxa: {sample_rate:.0f} Hz | Min: {np.min(demodulated):.3f} | Max: {np.max(demodulated):.3f}"
             )
             
-            log_debug("Sinal demodulado exibido na aba de análise de áudio")
+            log.debug("Sinal demodulado exibido na aba de análise de áudio")
             
         except Exception as e:
-            log_error(f"Erro ao exibir sinal demodulado: {str(e)}")
+            log.error(f"Erro ao exibir sinal demodulado: {str(e)}")
     
     def show_spectrum(self, frequencies, magnitudes):
         """Exibe o espectro do sinal"""
@@ -424,10 +424,10 @@ class AudioAnalysisPanel(QWidget):
                 f"Banda: 10 Hz - {frequencies[-1]/1000:.1f} kHz"
             )
             
-            log_debug("Espectro exibido na aba de análise de áudio")
+            log.debug("Espectro exibido na aba de análise de áudio")
             
         except Exception as e:
-            log_error(f"Erro ao exibir espectro: {str(e)}")
+            log.error(f"Erro ao exibir espectro: {str(e)}")
     
     def update_metadata_display(self, data):
         """Atualiza a exibição de metadados"""
@@ -457,7 +457,7 @@ class AudioAnalysisPanel(QWidget):
             self.metadata_text.setPlainText(metadata_str)
             
         except Exception as e:
-            log_error(f"Erro ao atualizar metadados: {str(e)}")
+            log.error(f"Erro ao atualizar metadados: {str(e)}")
             self.metadata_text.setPlainText("Erro ao carregar metadados")
     
     def clear_displays(self):

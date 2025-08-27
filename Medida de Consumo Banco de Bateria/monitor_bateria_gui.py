@@ -62,7 +62,7 @@ class MonitorBateriaGUI:
         self.r2_divisor = 10000.0
         
         # Carregar configurações salvas
-        self.load_config()
+        self.load_last_state()
         
         # Thread para leitura serial
         self.thread_serial = None
@@ -523,7 +523,7 @@ class MonitorBateriaGUI:
             self.r2_divisor = r2
             
             # Salvar configuração no arquivo
-            self.save_config()
+            self.save_last_state()
 
             # Enviar para o Arduino se conectado
             if self.conectado and self.arduino:
@@ -536,7 +536,7 @@ class MonitorBateriaGUI:
         except ValueError:
             messagebox.showerror("Erro", "Valores inválidos. Por favor, insira apenas números.")
 
-    def load_config(self):
+    def load_last_state(self):
         try:
             with open(self.config_file, 'r') as f:
                 config_data = json.load(f)
@@ -549,7 +549,7 @@ class MonitorBateriaGUI:
         except (FileNotFoundError, json.JSONDecodeError):
             print("Arquivo de configuração não encontrado ou inválido. Usando valores padrão.")
 
-    def save_config(self):
+    def save_last_state(self):
         config_data = {
             'capacidade_total': self.capacidade_total,
             'tensao_nominal': self.tensao_nominal,

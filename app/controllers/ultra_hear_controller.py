@@ -11,7 +11,7 @@ from scipy.io import wavfile
 import pickle
 from PyQt5.QtCore import QObject, pyqtSignal
 
-from app.utils.debug_log import log_debug, log_info, log_warning, log_error
+from app.utils import log
 
 class UltraHearController(QObject):
     """Controlador para processamento de áudio ultrassônico"""
@@ -35,7 +35,7 @@ class UltraHearController(QObject):
             file_path: Caminho do arquivo
         """
         try:
-            log_info(f"Carregando arquivo para Ultra-Hear: {file_path}")
+            log.info(f"Carregando arquivo para Ultra-Hear: {file_path}")
             
             # Carregar arquivo pickle
             with open(file_path, 'rb') as f:
@@ -46,14 +46,14 @@ class UltraHearController(QObject):
                 raise ValueError("Arquivo não contém dados demodulados")
             
             self.current_data = data
-            log_info(f"Dados carregados: {len(data['demodulated'])} pontos")
+            log.info(f"Dados carregados: {len(data['demodulated'])} pontos")
             
             # Emitir sinal
             self.dataLoaded.emit(data)
             
         except Exception as e:
             error_msg = f"Erro ao carregar arquivo: {str(e)}"
-            log_error(error_msg)
+            log.error(error_msg)
             self.processingError.emit(error_msg)
     
     def process_ultrasonic_audio(self, params):
@@ -65,8 +65,8 @@ class UltraHearController(QObject):
         """
         try:
             start_time = time.time()
-            log_info("Iniciando processamento Ultra-Hear")
-            log_debug(f"Parâmetros: {params}")
+            log.info("Iniciando processamento Ultra-Hear")
+            log.debug(f"Parâmetros: {params}")
             
             # Carregar dados se necessário
             if params['file_path'] != getattr(self, 'current_file_path', None):
@@ -80,7 +80,7 @@ class UltraHearController(QObject):
             signal_data = self.current_data['demodulated'].copy()
             fs_original = self.current_data.get('sample_frequency_effective', 1953125.0)
             
-            log_debug(f"Sinal original: {len(signal_data)} pontos, fs={fs_original} Hz")
+            log.debug(f"Sinal original: {len(signal_data)} pontos, fs={fs_original} Hz")
             
             # ETAPA 1: Filtrar frequências
             filtered_signal, filtered_spectrum = self.apply_frequency_filters(
@@ -124,14 +124,14 @@ class UltraHearController(QObject):
             }
             
             self.processed_audio_path = audio_path
-            log_info(f"Processamento concluído em {processing_time:.2f}s")
+            log.info(f"Processamento concluído em {processing_time:.2f}s")
             
             # Emitir sinal de sucesso
             self.processingFinished.emit(result)
             
         except Exception as e:
             error_msg = f"Erro no processamento: {str(e)}"
-            log_error(error_msg)
+            log.error(error_msg)
             self.processingError.emit(error_msg)
     
     def apply_frequency_filters(self, signal_data, fs, params):
@@ -146,7 +146,7 @@ class UltraHearController(QObject):
         Returns:
             tuple: (sinal_filtrado, espectro_filtrado)
         """
-        log_debug("Aplicando filtros de frequência")
+        log.debug("Aplicando filtros de frequência")
         
         # Calcular FFT do sinal original
         n = len(signal_data)
@@ -169,7 +169,7 @@ class UltraHearController(QObject):
             filter_mask[idx_min:idx_max] = True
             filter_mask[-(idx_max-1):-(idx_min-1)] = True
             
-            log_debug(f"Filtro manual: {freq_min}-{freq_max} Hz")
+            log.debug(f"Filtro manual: {freq_min}-{freq_max} Hz")
             
         elif params['selection_mode'] == "Seleção Interativa no Espectro":
             # Usar bandas selecionadas interativamente
@@ -180,7 +180,7 @@ class UltraHearController(QObject):
                 filter_mask[idx_min:idx_max] = True
                 filter_mask[-(idx_max-1):-(idx_min-1)] = True
                 
-                log_debug(f"Banda interativa: {freq_min:.1f}-{freq_max:.1f} Hz")
+                log.debug(f"Banda interativa: {freq_min:.1f}-{freq_max:.1f} Hz")
         
         elif params['selection_mode'] == "Bandas Pré-definidas":
             # Usar bandas pré-definidas para ultrassom
@@ -211,7 +211,7 @@ class UltraHearController(QObject):
             'magnitudes': 20 * np.log10(np.abs(filtered_spectrum[:n//2]) + 1e-12)
         }
         
-        log_debug(f"Filtro aplicado, energia preservada: {np.sum(filter_mask)/len(filter_mask)*100:.1f}%")
+        log.debug(f"Filtro aplicado, energia preservada: {np.sum(filter_mask)/len(filter_mask)*100:.1f}%")
         
         return filtered_signal, filtered_spectrum_viz
     
@@ -228,7 +228,7 @@ class UltraHearController(QObject):
             tuple: (sinal_transposto, fs_saida)
         """
         method = params['transpose_method']
-        log_debug(f"Transposição por {method}")
+        log.debug(f"Transposição por {method}")
         
         if method == "Divisão de Frequência":
             return self._frequency_division(signal_data, fs_input, params)
@@ -265,7 +265,7 @@ class UltraHearController(QObject):
             # Decimação simples
             resampled_signal = signal_data[::division_factor]
         
-        log_debug(f"Divisão de frequência: fator={division_factor}, fs_out={fs_output}")
+        log.debug(f"Divisão de frequência: fator={division_factor}, fs_out={fs_output}")
         return resampled_signal, fs_output
     
     def _heterodyne_mixing(self, signal_data, fs_input, params):
@@ -301,7 +301,7 @@ class UltraHearController(QObject):
         # Reamostrar para taxa de áudio
         resampled_signal = self.resample_signal(filtered_mixed, fs_input, fs_output)
         
-        log_debug(f"Mistura heteródina: center={center_freq:.1f}Hz, mix={mix_freq:.1f}Hz, target={target_freq:.1f}Hz")
+        log.debug(f"Mistura heteródina: center={center_freq:.1f}Hz, mix={mix_freq:.1f}Hz, target={target_freq:.1f}Hz")
         return resampled_signal, fs_output
     
     def _amplitude_modulation(self, signal_data, fs_input, params):
@@ -323,7 +323,7 @@ class UltraHearController(QObject):
         # Reamostrar para taxa de áudio
         resampled_signal = self.resample_signal(modulated_signal, fs_input, fs_output)
         
-        log_debug(f"Modulação AM: freq_portadora={target_freq:.1f}Hz")
+        log.debug(f"Modulação AM: freq_portadora={target_freq:.1f}Hz")
         return resampled_signal, fs_output
     
     def _time_compression(self, signal_data, fs_input, params):
@@ -350,7 +350,7 @@ class UltraHearController(QObject):
         effective_fs = fs_input / division_factor
         resampled_signal = self.resample_signal(compressed_signal, effective_fs, fs_output)
         
-        log_debug(f"Compressão temporal: fator={division_factor}, novo_comprimento={new_length}")
+        log.debug(f"Compressão temporal: fator={division_factor}, novo_comprimento={new_length}")
         return resampled_signal, fs_output
     
     def control_amplitude(self, signal_data, params):
@@ -364,7 +364,7 @@ class UltraHearController(QObject):
         Returns:
             np.array: Sinal com amplitude controlada
         """
-        log_debug("Controlando amplitude")
+        log.debug("Controlando amplitude")
         
         processed_signal = signal_data.copy()
         
@@ -416,7 +416,7 @@ class UltraHearController(QObject):
             processed_signal
         )
         
-        log_debug(f"Amplitude controlada: ganho={params['gain_db']}dB, norm={norm_type}")
+        log.debug(f"Amplitude controlada: ganho={params['gain_db']}dB, norm={norm_type}")
         return processed_signal
     
     def resample_signal(self, signal_data, fs_input, fs_output):
@@ -441,7 +441,7 @@ class UltraHearController(QObject):
         # Usar scipy.signal.resample para reamostragem de alta qualidade
         resampled_signal = signal.resample(signal_data, new_length)
         
-        log_debug(f"Reamostragem: {fs_input}Hz -> {fs_output}Hz, {len(signal_data)} -> {len(resampled_signal)} pontos")
+        log.debug(f"Reamostragem: {fs_input}Hz -> {fs_output}Hz, {len(signal_data)} -> {len(resampled_signal)} pontos")
         return resampled_signal
     
     def save_processed_audio(self, signal_data, fs, params):
@@ -467,7 +467,7 @@ class UltraHearController(QObject):
         # Salvar arquivo
         wavfile.write(filename, int(fs), signal_16bit)
         
-        log_info(f"Áudio Ultra-Hear salvo: {filename}")
+        log.info(f"Áudio Ultra-Hear salvo: {filename}")
         return filename
     
     def get_current_audio_path(self):

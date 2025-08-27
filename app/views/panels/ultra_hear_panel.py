@@ -14,7 +14,7 @@ from matplotlib.widgets import SpanSelector
 import matplotlib.pyplot as plt
 
 from app.views.widgets.canvas import MplCanvas
-from app.utils.debug_log import log_debug, log_info, log_warning, log_error
+from app.utils import log
 
 class FrequencyBandSelector:
     """Classe para gerenciar seleção interativa de bandas de frequência"""
@@ -39,7 +39,7 @@ class FrequencyBandSelector:
             interactive=True
         )
         self.span_selectors.append(span)
-        log_info("Seleção de bandas de frequência ativada")
+        log.info("Seleção de bandas de frequência ativada")
         
     def deactivate(self):
         """Desativa a seleção de bandas"""
@@ -47,7 +47,7 @@ class FrequencyBandSelector:
         for span in self.span_selectors:
             span.set_active(False)
         self.span_selectors.clear()
-        log_info("Seleção de bandas de frequência desativada")
+        log.info("Seleção de bandas de frequência desativada")
         
     def on_band_selected(self, xmin, xmax):
         """Callback quando uma banda é selecionada"""
@@ -61,7 +61,7 @@ class FrequencyBandSelector:
         band = (xmin, xmax)
         self.selected_bands.append(band)
         
-        log_info(f"Banda selecionada: {xmin:.1f} Hz - {xmax:.1f} Hz")
+        log.info(f"Banda selecionada: {xmin:.1f} Hz - {xmax:.1f} Hz")
         
         if self.callback:
             self.callback(self.selected_bands)
@@ -69,7 +69,7 @@ class FrequencyBandSelector:
     def clear_bands(self):
         """Limpa todas as bandas selecionadas"""
         self.selected_bands.clear()
-        log_info("Bandas de frequência limpas")
+        log.info("Bandas de frequência limpas")
         
     def get_bands(self):
         """Retorna as bandas selecionadas"""
@@ -429,7 +429,7 @@ class UltraHearPanel(QWidget):
             self.activate_selection_button.setEnabled(True)
             self.process_button.setEnabled(True)
             
-            log_info(f"Arquivo selecionado para Ultra-Hear: {file_path}")
+            log.info(f"Arquivo selecionado para Ultra-Hear: {file_path}")
             self.audioFileSelected.emit(file_path)
     
     def on_activate_selection(self):
@@ -487,8 +487,8 @@ class UltraHearPanel(QWidget):
         # Coletar parâmetros
         params = self.get_processing_parameters()
         
-        log_info("Iniciando processamento Ultra-Hear")
-        log_debug(f"Parâmetros: {params}")
+        log.info("Iniciando processamento Ultra-Hear")
+        log.debug(f"Parâmetros: {params}")
         
         # Mostrar progresso
         self.progress_bar.setVisible(True)
@@ -504,7 +504,7 @@ class UltraHearPanel(QWidget):
             QMessageBox.warning(self, "Aviso", "Processe o áudio primeiro.")
             return
         
-        log_info("Reproduzindo áudio processado")
+        log.info("Reproduzindo áudio processado")
         self.playProcessedAudioRequested.emit()
     
     def get_processing_parameters(self):
@@ -537,7 +537,7 @@ class UltraHearPanel(QWidget):
     def on_data_loaded(self, data):
         """Manipula o carregamento de dados"""
         self.current_data = data
-        log_info("Dados carregados no painel Ultra-Hear")
+        log.info("Dados carregados no painel Ultra-Hear")
         
         # Atualizar visualizações se necessário
         if 'demodulated' in data and 't' in data:
@@ -573,10 +573,10 @@ class UltraHearPanel(QWidget):
             self.original_spectrum_canvas.axes.grid(True, which="both", ls="-", alpha=0.3)
             self.original_spectrum_canvas.draw()
             
-            log_debug("Espectro original exibido com escala logarítmica")
+            log.debug("Espectro original exibido com escala logarítmica")
             
         except Exception as e:
-            log_error(f"Erro ao exibir espectro original: {str(e)}")
+            log.error(f"Erro ao exibir espectro original: {str(e)}")
     
     def on_processing_finished(self, result):
         """Manipula o fim do processamento"""
@@ -617,7 +617,7 @@ class UltraHearPanel(QWidget):
             self.processed_signal_canvas.draw()
             
         except Exception as e:
-            log_error(f"Erro ao exibir sinal processado: {str(e)}")
+            log.error(f"Erro ao exibir sinal processado: {str(e)}")
     
     def show_filtered_spectrum(self, result):
         """Mostra o espectro filtrado"""
@@ -647,7 +647,7 @@ class UltraHearPanel(QWidget):
             self.filtered_spectrum_canvas.draw()
             
         except Exception as e:
-            log_error(f"Erro ao exibir espectro filtrado: {str(e)}")
+            log.error(f"Erro ao exibir espectro filtrado: {str(e)}")
     
     def format_processing_info(self, result):
         """Formata as informações do processamento"""
@@ -673,4 +673,4 @@ class UltraHearPanel(QWidget):
         """Manipula erros"""
         self.progress_bar.setVisible(False)
         self.status_label.setText(f"Erro: {error_message}")
-        log_error(f"Erro no Ultra-Hear: {error_message}")
+        log.error(f"Erro no Ultra-Hear: {error_message}")

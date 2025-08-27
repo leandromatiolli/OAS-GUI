@@ -42,10 +42,10 @@ class Config:
         """Implementação de Singleton"""
         if cls._instance is None:
             cls._instance = super(Config, cls).__new__(cls)
-            cls._instance._load_config()
+            cls._instance._load_last_state()
         return cls._instance
     
-    def _load_config(self):
+    def _load_last_state(self):
         """Carrega as configurações do arquivo"""
         # Inicializar com valores padrão
         self._config = DEFAULT_CONFIG.copy()

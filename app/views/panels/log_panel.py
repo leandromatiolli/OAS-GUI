@@ -7,8 +7,8 @@ from io import StringIO
 from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QTextEdit, QPushButton, QHBoxLayout, 
                            QLabel, QCheckBox, QFileDialog)
 from PyQt5.QtCore import Qt, pyqtSlot, QObject, pyqtSignal
-from PyQt5.QtGui import QColor
-from app.utils.debug_log import log_info, log_error
+from PyQt5.QtGui import QColor, QTextCharFormat
+from app.utils import log
 
 class LogStream(QObject):
     """Stream para redirecionar saída do console para um widget"""
@@ -65,6 +65,18 @@ class LogPanel(QWidget):
         super().__init__(parent)
         self.setup_ui()
         self.setup_stream()
+
+        # Mapeamento de cores ANSI para QColor
+        self.ansi_colors = {
+            '30': QColor(0, 0, 0),        # Preto
+            '31': QColor(170, 0, 0),      # Vermelho
+            '32': QColor(0, 130, 0),      # Verde  
+            '33': QColor(170, 85, 0),     # Amarelo
+            '34': QColor(0, 0, 170),      # Azul
+            '35': QColor(170, 0, 170),    # Magenta
+            '36': QColor(0, 0, 170),    # Ciano QColor(0, 170, 170)
+            '37': QColor(170, 170, 170),  # Branco
+        }
         
     def setup_ui(self):
         """Configura a interface do painel"""
@@ -134,7 +146,7 @@ class LogPanel(QWidget):
         self.log_stream = LogStream(self.original_stdout)
         self.error_stream = LogStream(self.original_stderr)
         self.log_stream.newText.connect(self.append_log)
-        self.error_stream.newText.connect(self.append_log)
+        self.error_stream.newText.connect(self.append_error_log)
         
         # Redirecionar saídas, mas mantendo a saída para o terminal original
         sys.stdout = self.log_stream
@@ -154,30 +166,67 @@ class LogPanel(QWidget):
     @pyqtSlot(str)
     def append_log(self, text):
         """
-        Adiciona texto ao widget de logs
+        Adiciona texto ao widget de logs com suporte a cores ANSI
         
         Args:
-            text: Texto a adicionar
+            text: Texto a adicionar (pode conter códigos ANSI)
         """
-        # Inserir o texto no fim do documento
+        # Regex para encontrar códigos ANSI
+        ansi_escape = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
+        
         cursor = self.log_text.textCursor()
         cursor.movePosition(cursor.End)
-        cursor.insertText(text)
+        
+        # Dividir o texto em partes com e sem códigos ANSI
+        parts = ansi_escape.split(text)
+        codes = ansi_escape.findall(text)
+        
+        current_format = QTextCharFormat()
+        current_format.setForeground(QColor(51, 51, 51))  # Cor padrão (#333333)
+        
+        for i, part in enumerate(parts):
+            if part:  # Se há texto para adicionar
+                cursor.setCharFormat(current_format)
+                cursor.insertText(part)
+            
+            # Se há um código ANSI correspondente a esta parte
+            if i < len(codes):
+                code = codes[i]
+                # Extrair o número do código (ex: \033[32m -> 32)
+                color_match = re.search(r'\[(\d+)m', code)
+                if color_match:
+                    color_code = color_match.group(1)
+                    if color_code == '0':  # Reset
+                        current_format = QTextCharFormat()
+                        current_format.setForeground(QColor(51, 51, 51))
+                    elif color_code in self.ansi_colors:
+                        current_format.setForeground(self.ansi_colors[color_code])
         
         # Auto-rolagem se ativada
         if self.auto_scroll.isChecked():
             self.log_text.setTextCursor(cursor)
             self.log_text.ensureCursorVisible()
+
+    @pyqtSlot(str)
+    def append_error_log(self, text):
+        """
+        Adiciona texto de erro ao widget de logs com formatação especial
+        
+        Args:
+            text: Texto de erro a adicionar
+        """
+        # You can add special formatting for errors here if needed
+        self.append_log(text)
             
     def clear_logs(self):
         """Limpa o conteúdo dos logs"""
-        from app.utils.debug_log import log_info
+        from app.utils import log
         
         self.log_text.clear()
         
         # Adicionar mensagem inicial
         self.append_log("=== Log limpo ===\n")
-        log_info("Log limpo pelo usuário")
+        log.info("Log limpo pelo usuário")
         
     def copy_logs(self):
         """Copia logs para a área de transferência"""
@@ -204,9 +253,9 @@ class LogPanel(QWidget):
             try:
                 with open(filename, 'w', encoding='utf-8') as f:
                     f.write(self.log_text.toPlainText())
-                log_info(f"Logs salvos em: {filename}")
+                log.info(f"Logs salvos em: {filename}")
             except Exception as e:
-                log_error(f"Erro ao salvar logs: {str(e)}")
+                log.error(f"Erro ao salvar logs: {str(e)}")
                 
     def closeEvent(self, event):
         """Restaura saída original ao fechar"""

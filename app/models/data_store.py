@@ -3,6 +3,7 @@ Módulo para gerenciamento e armazenamento de dados
 """
 import os
 import glob
+from app.utils import log
 import numpy as np
 import pickle
 import gzip
@@ -16,14 +17,14 @@ class DataStore:
     
     # Constantes
     DEFAULT_CALIBRATION_FILE = "calibracao_sistema.pkl"
-    CONFIG_FILE = "./config/last_state.json"
+    LAST_STATE_FILE = "./config/last_state.json"
     DEFAULT_CONFIG = {
         "save_directory": os.curdir,
         "calibration_directory": os.curdir,
     }
     
     @staticmethod
-    def save_config(config: Dict[str, Any]) -> None:
+    def save_last_state(config: Dict[str, Any]) -> None:
         """
         Salva as configurações em arquivo
         
@@ -31,14 +32,14 @@ class DataStore:
             config: Dicionário com as configurações
         """
         # Criar diretório se não existir
-        #os.makedirs(os.path.dirname(DataStore.CONFIG_FILE), exist_ok=True)
+        #os.makedirs(os.path.dirname(DataStore.LAST_STATE_FILE), exist_ok=True)
         
         # Salvar configurações
-        with open(DataStore.CONFIG_FILE, 'w', encoding='utf-8') as f:
+        with open(DataStore.LAST_STATE_FILE, 'w', encoding='utf-8') as f:
             json.dump(config, f, indent=4, ensure_ascii=False)
             
     @staticmethod
-    def load_config() -> Dict[str, Any]:
+    def load_last_state() -> Dict[str, Any]:
         """
         Carrega as configurações do arquivo
         
@@ -46,31 +47,41 @@ class DataStore:
             Dicionário com as configurações
         """
         # Se o arquivo não existe, retornar configurações padrão
-        if not os.path.exists(DataStore.CONFIG_FILE):
+        if not os.path.exists(DataStore.LAST_STATE_FILE):
             return DataStore.DEFAULT_CONFIG
             
         # Carregar configurações
         try:
-            with open(DataStore.CONFIG_FILE, 'r', encoding='utf-8') as f:
+            with open(DataStore.LAST_STATE_FILE, 'r', encoding='utf-8') as f:
                 return json.load(f)
         except Exception as e:
             print(f"Erro ao carregar configurações: {str(e)}")
             return {}
     
     @staticmethod
-    def save_data(data: Dict[str, Any], prefix: str = "vazamento_continuo", directory: str = None) -> str:
+    def save_data(data: Dict[str, Any], directory: str = None) -> str:
         """
-        Salva dados em arquivo pickle
+        Salva dados em arquivo pickle comprimido com gzip
         
         Args:
             data: Dicionário contendo os dados
-            prefix: Prefixo para o nome do arquivo
             directory: Diretório onde salvar o arquivo
-            
-        Returns:
-            Nome do arquivo onde os dados foram salvos
         """
-        data = {k: v for k, v in data.items() if k != 't'}
+        log.debug(f"Salvando dados adquiridos no diretório: {directory}")        
+        data = data.copy()
+        del data['t']
+        # Salvar metadados em JSON
+        filename = data['timestamp']
+        filepath = os.path.join(directory, filename)
+        with gzip.open(filepath + '.pkl.gz', 'wb', compresslevel=1) as file:
+            pickle.dump(data, file)
+        del data['waveforms']
+        with open(filepath + '.json', 'w', encoding='utf-8') as file:
+            json.dump(data, file, indent=4, ensure_ascii=True)
+        return
+    
+    @staticmethod
+    def create_filename(data: Dict):
         def clean(s):
             # Remove acentos, espaços e caracteres especiais
             s = ''.join(c for c in unicodedata.normalize('NFD', str(s)) if unicodedata.category(c) != 'Mn')
@@ -101,12 +112,8 @@ class DataStore:
             'equipment_status': 'Status',
             'location': 'Local',
         }
-        if directory is None:
-            directory = DataStore.load_config().get('save_directory')
-        if directory is None:
-            directory = os.getcwd()
-        os.makedirs(directory, exist_ok=True)
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        timestamp = data['timestamp']
+        #timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         metadata = data.get('metadata', {})
         # Extrair e abreviar campos
         sensor_sn = clean(metadata.get('sensor_sn', ''))
@@ -141,18 +148,9 @@ class DataStore:
                     break
         # Montar string de labels abreviados
         label_str = f"_{field_abbr['sensor_sn']}{sensor_sn}_{field_abbr['test_type']}{test_type}_{field_abbr['material']}{material}_{field_abbr['distance']}{distance}cm_{field_abbr['pressure']}{pressure}b_{field_abbr['flow']}{flow}L_{field_abbr['equipment_type']}{equipment_type}_{field_abbr['equipment_status']}{status_str}_{field_abbr['location']}{location}{vazamento_info}"
-        filename = f"{prefix}_{timestamp}{label_str}.pkl.gz"
-        if 'metadata' not in data:
-            data['metadata'] = {}
-        data['metadata']['timestamp'] = timestamp
-        filepath = os.path.join(directory, filename)
-        with gzip.open(filepath, 'wb', compresslevel=1) as f:
-            pickle.dump(data, f)
-        # Salvar metadados em JSON
-        metadata_filename = os.path.splitext(filepath)[0] + '.json'
-        with open(metadata_filename, 'w', encoding='utf-8') as fjson:
-            json.dump(data['metadata'], fjson, indent=4, ensure_ascii=False)
-        return filepath
+        filename = f"{timestamp}{label_str}.pkl.gz"
+
+        return filename
     
     @staticmethod
     def save_demodulated_data(data: Dict[str, Any]) -> str:
@@ -166,8 +164,8 @@ class DataStore:
             Nome do arquivo onde os dados foram salvos
         """
         # Obter diretório das configurações
-        directory = DataStore.load_config().get('save_directory')
-        return DataStore.save_data(data, prefix="vazamento_demodulado", directory=directory)
+        directory = DataStore.load_last_state().get('save_directory')
+        return DataStore.save_data(data, directory=directory)
     
     @staticmethod
     def save_calibration_data(data: Dict[str, Any], filename: Optional[str] = None) -> str:
@@ -186,11 +184,11 @@ class DataStore:
             filename = DataStore.DEFAULT_CALIBRATION_FILE
             
         # Obter diretório de calibração das configurações
-        directory = DataStore.load_config().get('calibration_directory')
+        directory = DataStore.load_last_state().get('calibration_directory')
         
         # Se não houver diretório, salvar no diretório de dados padrão.
         if not directory:
-             directory = DataStore.load_config().get('save_directory')
+             directory = DataStore.load_last_state().get('save_directory')
 
         # Garantir que o diretório existe
         if directory:
@@ -253,7 +251,7 @@ class DataStore:
         calibration_files = []
         
         # Obter diretório de calibração das configurações
-        config = DataStore.load_config()
+        config = DataStore.load_last_state()
         calib_dir = config.get('calibration_directory')
 
         # Se não houver diretório configurado, não procurar por arquivos.
@@ -316,22 +314,11 @@ class DataStore:
                     raise e2
             else:
                 raise e
-            
-        # Converter para dicionário se não for
-        if not isinstance(data, dict):
-            temp_dict = {}
-            for key in dir(data):
-                if not key.startswith('__') and not callable(getattr(data, key)):
-                    temp_dict[key] = getattr(data, key)
-            data = temp_dict
-            
-        # Verificar se temos dados de tempo e criar se não existir
-        if 'waveforms' in data and 't' not in data:
-            if 'sample_frequency_effective' in data:
-                fs = data['sample_frequency_effective']
-                wf_len = data['waveforms'].shape[1]
-                data['t'] = np.arange(wf_len) / fs
-                
+
+        # create time vector
+        fs = data['sample_frequency_effective']
+        wf_len = data['waveforms'].shape[1]
+        data['t'] = np.arange(wf_len) / fs
         return data
     
     @staticmethod

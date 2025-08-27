@@ -16,20 +16,7 @@ ERROR_COLOR = '\033[31m'  # Vermelho
 if os.name == 'nt':
     os.system('color')
 
-# Armazenar manipulador global para atualizar a interface
-gui_log_handler = None
-
-def set_gui_log_handler(handler):
-    """
-    Define o manipulador para atualizar o log na GUI
-    
-    Args:
-        handler: Função que recebe uma string e atualiza a GUI
-    """
-    global gui_log_handler
-    gui_log_handler = handler
-
-def log_debug(message):
+def debug(message):
     """
     Registra uma mensagem de debug tanto no terminal quanto na GUI
     
@@ -44,12 +31,8 @@ def log_debug(message):
     # Imprimir no terminal
     print(terminal_message, file=sys.stdout, end='')
     sys.stdout.flush()  # Forçar flush para garantir que apareça imediatamente
-    
-    # Enviar para a GUI se o manipulador estiver definido
-    if gui_log_handler:
-        gui_log_handler(formatted_message)
 
-def log_info(message):
+def info(message):
     """
     Registra uma mensagem informativa tanto no terminal quanto na GUI
     
@@ -64,12 +47,8 @@ def log_info(message):
     # Imprimir no terminal
     print(terminal_message, file=sys.stdout, end='')
     sys.stdout.flush()  # Forçar flush para garantir que apareça imediatamente
-    
-    # Enviar para a GUI se o manipulador estiver definido
-    if gui_log_handler:
-        gui_log_handler(formatted_message)
 
-def log_warning(message):
+def warning(message):
     """
     Registra uma mensagem de aviso tanto no terminal quanto na GUI
     
@@ -84,12 +63,8 @@ def log_warning(message):
     # Imprimir no terminal
     print(terminal_message, file=sys.stdout, end='')
     sys.stdout.flush()  # Forçar flush para garantir que apareça imediatamente
-    
-    # Enviar para a GUI se o manipulador estiver definido
-    if gui_log_handler:
-        gui_log_handler(formatted_message)
 
-def log_error(message):
+def error(message):
     """
     Registra uma mensagem de erro tanto no terminal quanto na GUI
     
@@ -104,7 +79,3 @@ def log_error(message):
     # Imprimir no terminal
     print(terminal_message, file=sys.stderr, end='')
     sys.stderr.flush()  # Forçar flush para garantir que apareça imediatamente
-    
-    # Enviar para a GUI se o manipulador estiver definido
-    if gui_log_handler:
-        gui_log_handler(formatted_message) 

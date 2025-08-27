@@ -26,7 +26,7 @@ from app.controllers.lora_controller import LoraController
 # Importar módulo de recursos
 from app.utils.resources import apply_stylesheet
 # Importar módulo de logging
-from app.utils.debug_log import set_gui_log_handler, log_debug, log_info, log_warning, log_error
+from app.utils import log
 from app.models.data_store import DataStore
 
 def exception_hook(exctype, value, tb):
@@ -39,7 +39,7 @@ def exception_hook(exctype, value, tb):
         tb: Traceback
     """
     error_message = ''.join(traceback.format_exception(exctype, value, tb))
-    log_error(f"Exceção não tratada: {error_message}")
+    log.error(f"Exceção não tratada: {error_message}")
     
     # Verificar se a aplicação ainda está em execução
     if QApplication.instance():
@@ -50,7 +50,7 @@ def exception_hook(exctype, value, tb):
         error_dialog.setIcon(QMessageBox.Critical)
         error_dialog.exec_()
     else:
-        log_error("Erro crítico: A aplicação já está encerrando")
+        log.error("Erro crítico: A aplicação já está encerrando")
 
 class Application:
     """Classe principal da aplicação"""
@@ -87,8 +87,7 @@ class Application:
     def setup_logging(self):
         """Configurar sistema de logging"""
         # Definir o manipulador para atualizar o log na GUI
-        set_gui_log_handler(self.window.log_panel.append_log)
-        log_info("Sistema de logging inicializado")
+        log.info("Sistema de logging inicializado")
     
     def init_controllers(self):
         """Inicializa os controladores da aplicação"""
@@ -131,6 +130,7 @@ class Application:
         self.file_controller.calibrationDataLoaded.connect(self.processing_controller.set_calibration_data)
         
         # Conexões do controlador de processamento
+        self.window.analysis_panel.fit_ellipse_button.clicked.connect(self.processing_controller.set_loaded_data_as_calibration)
         self.window.analysis_panel.demodulateRequested.connect(self.processing_controller.demodulate_data)
         self.processing_controller.plotCalibrationDataRequested.connect(self.window.analysis_panel.plot_calibration_data)
         self.processing_controller.demodulationStarted.connect(self.on_demodulation_started)
@@ -184,7 +184,13 @@ class Application:
         #     self.window.show_status_message("Hardware de aquisição não disponível")
         
         # Carregar configuração da pasta de calibração
+<<<<<<< HEAD
         config = DataStore.load_config()
+=======
+        config = DataStore.load_last_state()
+
+
+>>>>>>> db4e97fd2148c52ebfbb81570be8dfceb8b2e7e1
         calib_folder = config.get('calibration_directory')
         if not calib_folder:
             # If not set, use default path from user request
@@ -200,7 +206,7 @@ class Application:
         # Inicializar lista de portas LoRa
         ports = self.lora_controller.get_available_ports()
         self.window.acquisition_panel.update_lora_ports(ports)
-        log_info("Lista de portas LoRa inicializada")
+        log.info("Lista de portas LoRa inicializada")
         set_all_input_values(self.window, config)
         
     def on_acquisition_requested(self, params):
@@ -210,26 +216,26 @@ class Application:
         Args:
             params: Parâmetros da aquisição
         """
-        log_info(f"Solicitação de aquisição recebida: {params}")
+        log.info(f"Solicitação de aquisição recebida: {params}")
         
         # Verificar se é uma calibração
         is_calibration = params.get('is_calibration', False)
         if is_calibration:
-            log_info("Modo de calibração selecionado")
+            log.info("Modo de calibração selecionado")
             self.window.show_status_message("Iniciando aquisição para calibração...")
         else:
             # Verificar se temos uma calibração válida
             if not self.processing_controller.has_calibration_data():
-                log_warning("Tentativa de aquisição sem calibração prévia")
+                log.warning("Tentativa de aquisição sem calibração prévia")
                 if QMessageBox.question(
                     self.window, 
                     "Calibração não encontrada", 
                     "Não foi encontrada uma calibração válida. Deseja continuar com a aquisição sem calibração?",
                     QMessageBox.Yes | QMessageBox.No
                 ) == QMessageBox.No:
-                    log_info("Aquisição cancelada pelo usuário devido à falta de calibração")
+                    log.info("Aquisição cancelada pelo usuário devido à falta de calibração")
                     return
-                log_info("Usuário optou por continuar sem calibração")
+                log.info("Usuário optou por continuar sem calibração")
         
         # Resetar as configurações de filtro e espectrograma na interface
         self.window.analysis_panel.reset_bandpass_filter()
@@ -239,7 +245,7 @@ class Application:
         metadata = self.window.metadata_panel.get_metadata()
         
         if params['is_series']:
-            log_info("Iniciando aquisição em série")
+            log.info("Iniciando aquisição em série")
             self.window.acquisition_panel.acquire_button.setText("Parar Aquisição")
             self.window.acquisition_panel.acquire_button.setStyleSheet("background-color: red")
             self.window.acquisition_panel.acquire_button.clicked.disconnect(self.window.acquisition_panel.request_acquisition)
@@ -251,13 +257,13 @@ class Application:
     
     def on_acquisition_started(self):
         """Manipula o evento de início de aquisição"""
-        log_info("Aquisição iniciada")
+        log.info("Aquisição iniciada")
         #self.window.acquisition_panel.set_enabled(False)
         self.window.show_status_message("Aquisição em andamento...")
     
     def stop_acquisition(self):
         # Request interruption of the acquisition thread
-        log_info("Solicitando interrupção da thread de aquisição")
+        log.info("Solicitando interrupção da thread de aquisição")
         self.acquisition_controller.stop_acquisition()
         
         # Update UI
@@ -268,7 +274,7 @@ class Application:
 
 
     def on_acquisition_finished(self, message):
-        log_info("Aquisição concluída")
+        log.info("Aquisição concluída")
         self.window.acquisition_panel.set_enabled(True)
 
         if self.processing_controller.data['is_calibration']:
@@ -278,10 +284,8 @@ class Application:
             self.processing_controller.set_calibration_data(self.processing_controller.calibration_data)
 
             # Salvar dados de calibração
-            log_info(f"Salvando arquivo de calibração: {calibration_file or 'padrão'}...")
+            log.info(f"Salvando arquivo de calibração: {calibration_file or 'padrão'}...")
             DataStore.save_calibration_data(self.processing_controller.calibration_data, calibration_file)
-
-
                 
     
     def on_new_data(self, data):
@@ -291,12 +295,16 @@ class Application:
         Args:
             data: Dados adquiridos
         """
-        log_info("Novos dados")
+        log.info(f"Novos dados")
         self.window.show_status_message("Aquisição concluída")
         
-        data['metadata'] = self.window.metadata_panel.get_metadata()
+        metadata = self.window.metadata_panel.get_metadata()
+        data.update(metadata)
+        directory = self.window.analysis_panel.dir_label.text()
+        DataStore.save_data(data, directory=directory)
         self.processing_controller.set_data(data)
         
+<<<<<<< HEAD
         
         self.file_controller
 
@@ -305,6 +313,8 @@ class Application:
         log_debug(f"Salvando dados adquiridos no diretório: {directory}")
         DataStore.save_data(data, prefix="vazamento_continuo", directory=directory)
 
+=======
+>>>>>>> db4e97fd2148c52ebfbb81570be8dfceb8b2e7e1
         if self.window.analysis_panel.autoshow_waveform.isChecked():
             self.window.acquisition_panel.set_enabled(True)
             self.window.switch_to_tab(2) 
@@ -313,7 +323,7 @@ class Application:
 
             if 'waveforms' in data and 't' in data:
                 channels = data.get('channels', [1, 2])
-                log_info(f"Exibindo dados brutos: canais {channels}")
+                log.info(f"Exibindo dados brutos: canais {channels}")
                 
                 # Obter formas de onda processadas (com ou sem média móvel)
                 waveforms = self.processing_controller.get_waveforms_for_processing()
@@ -322,62 +332,71 @@ class Application:
                 # Verificar se temos dois canais para a elipse
                 if waveforms.shape[0] >= 2:
                     ellipse_params = data.get('ellipse_params', None)
-                    log_info("Exibindo elipse")
+                    log.info("Exibindo elipse")
                     self.window.analysis_panel.show_ellipse(waveforms, ellipse_params)
             else:
-                log_warning("Não foi possível exibir dados brutos: waveforms ou vetor de tempo ausentes")
+                log.warning("Não foi possível exibir dados brutos: waveforms ou vetor de tempo ausentes")
         
         # ETAPA 1: Mostrar dados brutos adquiridos
         try:
             # Verificar o conteúdo dos dados
-            log_debug("Conteúdo dos dados adquiridos:")
+            log.debug("Conteúdo dos dados adquiridos:")
             if 'waveforms' in data:
-                log_debug(f"- Waveforms: shape={data['waveforms'].shape}")
+                log.debug(f"- Waveforms: shape={data['waveforms'].shape}")
             else:
-                log_warning("- Waveforms: não encontrado")
+                log.warning("- Waveforms: não encontrado")
                 
             if 't' in data:
-                log_debug(f"- Vetor de tempo: length={len(data['t'])}")
+                log.debug(f"- Vetor de tempo: length={len(data['t'])}")
             else:
-                log_warning("- Vetor de tempo: não encontrado")
+                log.warning("- Vetor de tempo: não encontrado")
                 
             if 'channels' in data:
-                log_debug(f"- Canais: {data['channels']}")
+                log.debug(f"- Canais: {data['channels']}")
             else:
-                log_warning("- Canais: não encontrado")
+                log.warning("- Canais: não encontrado")
             
             
         except Exception as e:
-            log_error(f"Erro ao exibir dados brutos: {str(e)}")
+            log.error(f"Erro ao exibir dados brutos: {str(e)}")
             self.window.show_status_message(f"Erro ao exibir dados brutos: {str(e)}")
         
         # ETAPA 2: Processar dados automaticamente
         if self.window.analysis_panel.autodemodulate.isChecked():
             try:
-                log_debug("Iniciando processamento automático...")
+                log.debug("Iniciando processamento automático...")
                 # Armazenar dados no controlador de processamento desde o início
                 self.window.show_status_message("Realizando processamento automático...")
                 demodulated_succeed = self.processing_controller.auto_demodulate(data)
 
             except Exception as e:
-                log_error(f"Erro no processamento automático: {str(e)}")
+                log.error(f"Erro no processamento automático: {str(e)}")
                 self.window.show_status_message(f"Erro no processamento automático: {str(e)}")
             
         if self.window.analysis_panel.autosave_demodulated_checkbox.isChecked() and demodulated_succeed:
             try:
                 filename = self.processing_controller.save_demodulated_data()
-                log_info(f"Dados processados salvos com sucesso em {filename}")
+                log.info(f"Dados processados salvos com sucesso em {filename}")
                 self.window.show_status_message(f"Dados processados salvos em {filename}")
             except Exception as e:
-                log_error(f"Erro ao salvar dados processados: {str(e)}")
+                log.error(f"Erro ao salvar dados processados: {str(e)}")
                 self.window.show_status_message(f"Erro ao salvar dados processados: {str(e)}")
     
         # ETAPA 3: Atualizar lista de arquivos
+<<<<<<< HEAD
         try:
             log_debug("Atualizando lista de arquivos...")
             self.file_controller.refresh_file_list()
         except Exception as e:
             log_error(f"Erro ao atualizar lista de arquivos: {str(e)}")
+=======
+        if not self.window.acquisition_panel.series_acquisition_checkbox.isChecked():   
+            try:
+                log.debug("Atualizando lista de arquivos...")
+                self.file_controller.refresh_file_list()
+            except Exception as e:
+                log.error(f"Erro ao atualizar lista de arquivos: {str(e)}")
+>>>>>>> db4e97fd2148c52ebfbb81570be8dfceb8b2e7e1
     
     def on_acquisition_error(self, message):
         """
@@ -386,7 +405,7 @@ class Application:
         Args:
             message: Mensagem de erro
         """
-        log_error(f"main:{message}")
+        log.error(f"main:{message}")
         self.window.acquisition_panel.set_enabled(True)
         #self.window.show_error_message("Erro na Aquisição", message)
         self.window.show_status_message(message)
@@ -401,11 +420,13 @@ class Application:
             error_message: Mensagem de erro, se houver
         """
         if connected:
-            log_info(f"Sensor conectado com sucesso: {ip}")
+            log.info(f"Sensor conectado com sucesso: {ip}")
             self.window.show_status_message(f"Sensor conectado: {ip}")
         else:
-            log_error(f"Erro ao conectar sensor {ip}: {error_message}")
-            self.window.show_status_message(f"Erro na conexão do sensor: {error_message}")
+            log.error(f"Erro ao conectar sensor {ip}: {error_message}")
+            error_message = '\n'.join([line.strip('') for line in error_message.split(':')])
+            self.window.show_error_message("Erro an conexão", error_message)
+            
         
         # Atualizar status do sensor no painel
         self.window.acquisition_panel.update_sensor_status(connected, ip, error_message)
@@ -417,17 +438,16 @@ class Application:
         Args:
             data: Dados carregados
         """
+<<<<<<< HEAD
         log_info(f"Arquivo carregado com sucesso")
         log_debug(f"on_file_loaded: Chaves disponíveis nos dados: {list(data.keys())}")
+=======
+        log.info(f"Arquivo carregado com sucesso")
+>>>>>>> db4e97fd2148c52ebfbb81570be8dfceb8b2e7e1
         self.window.show_status_message(f"Arquivo carregado")
         
         # Exibir metadados do arquivo
-        if 'metadata' in data:
-            log_debug(f"Exibindo metadados do arquivo: {data['metadata']}")
-            self.window.analysis_panel.show_metadata(data['metadata'])
-        else:
-            log_debug("Arquivo não contém metadados")
-            self.window.analysis_panel.show_metadata(None)
+        self.window.analysis_panel.show_metadata(data)
         
         # Atualizar controlador de processamento com os novos dados
         log_debug("on_file_loaded: Atualizando controlador de processamento")
@@ -442,17 +462,26 @@ class Application:
                 
                 # Obter formas de onda processadas (com ou sem média móvel)
                 waveforms = self.processing_controller.get_waveforms_for_processing()
+<<<<<<< HEAD
                 log_debug(f"on_file_loaded: Formas de onda processadas - shape={waveforms.shape if waveforms is not None else 'None'}")
                 if waveforms is not None:
                     log_debug(f"Exibindo dados brutos do arquivo (shape={waveforms.shape})")
                     self.window.analysis_panel.show_raw_data(data['t'], waveforms, channels)
                 else:
                     log_warning("on_file_loaded: Formas de onda processadas são None")
+=======
+                log.debug(f"Exibindo dados brutos do arquivo (shape={waveforms.shape})")
+                self.window.analysis_panel.show_raw_data(data['t'], waveforms, channels)
+>>>>>>> db4e97fd2148c52ebfbb81570be8dfceb8b2e7e1
                 
                 # Verificar se temos dois canais para a elipse
                 if waveforms is not None and waveforms.shape[0] >= 2:
                     ellipse_params = data.get('ellipse_params', None)
+<<<<<<< HEAD
                     log_debug(f"on_file_loaded: Exibindo elipse do arquivo - ellipse_params={ellipse_params is not None}")
+=======
+                    log.debug("Exibindo elipse do arquivo")
+>>>>>>> db4e97fd2148c52ebfbb81570be8dfceb8b2e7e1
                     self.window.analysis_panel.show_ellipse(waveforms, ellipse_params)
                 else:
                     log_warning("on_file_loaded: Não há canais suficientes para exibir elipse")
@@ -461,14 +490,22 @@ class Application:
                 
             # Verificar se temos dados demodulados
             if 'demodulated' in data and 't' in data:
+<<<<<<< HEAD
                 log_debug(f"on_file_loaded: Dados demodulados encontrados - t={len(data['t'])}, demodulated={len(data['demodulated'])}")
                 log_debug("Exibindo dados demodulados do arquivo")
+=======
+                log.debug("Exibindo dados demodulados do arquivo")
+>>>>>>> db4e97fd2148c52ebfbb81570be8dfceb8b2e7e1
                 self.window.analysis_panel.show_demodulated(data['t'], data['demodulated'])
                 
                 # Verificar se temos dados filtrados
                 if 'filtered_demodulated' in data and 'bandpass_params' in data:
+<<<<<<< HEAD
                     log_debug(f"on_file_loaded: Dados filtrados encontrados - filtered_demodulated={len(data['filtered_demodulated'])}, bandpass_params={data['bandpass_params']}")
                     log_debug("Exibindo dados filtrados do arquivo")
+=======
+                    log.debug("Exibindo dados filtrados do arquivo")
+>>>>>>> db4e97fd2148c52ebfbb81570be8dfceb8b2e7e1
                     self.window.analysis_panel.show_filtered(
                         data['t'], 
                         data['filtered_demodulated'],
@@ -496,7 +533,11 @@ class Application:
                 try:
                     # Verificar se devemos usar o sinal filtrado para o espectro
                     use_filtered = 'filtered_demodulated' in data and data.get('bandpass_params', {}).get('enabled', False)
+<<<<<<< HEAD
                     log_debug(f"on_file_loaded: Calculando espectro dos dados carregados (use_filtered={use_filtered})")
+=======
+                    log.debug(f"Calculando espectro dos dados carregados (use_filtered={use_filtered})")
+>>>>>>> db4e97fd2148c52ebfbb81570be8dfceb8b2e7e1
                     freq_axis, magnitudes, peaks = self.processing_controller.calculate_spectrum(use_filtered=use_filtered)
                     log_debug(f"on_file_loaded: Espectro calculado - freq_axis={len(freq_axis)}, magnitudes={len(magnitudes)}, peaks={len(peaks) if peaks else 0}")
                     if len(freq_axis) > 0 and len(magnitudes) > 0:
@@ -504,6 +545,7 @@ class Application:
                     else:
                         log_warning("on_file_loaded: Espectro calculado está vazio")
                 except Exception as e:
+<<<<<<< HEAD
                     log_error(f"on_file_loaded: Erro ao calcular espectro: {str(e)}")
                     import traceback
                     log_error(f"on_file_loaded: Traceback: {traceback.format_exc()}")
@@ -514,6 +556,12 @@ class Application:
             log_error(f"on_file_loaded: Erro ao exibir dados carregados: {str(e)}")
             import traceback
             log_error(f"on_file_loaded: Traceback: {traceback.format_exc()}")
+=======
+                    log.error(f"Erro ao calcular espectro: {str(e)}")
+                    
+        except Exception as e:
+            log.error(f"Erro ao exibir dados carregados: {str(e)}")
+>>>>>>> db4e97fd2148c52ebfbb81570be8dfceb8b2e7e1
             self.window.show_status_message(f"Erro ao exibir dados: {str(e)}")
     
     def on_file_error(self, message):
@@ -523,12 +571,12 @@ class Application:
         Args:
             message: Mensagem de erro
         """
-        log_error(f"Erro ao carregar arquivo: {message}")
+        log.error(f"Erro ao carregar arquivo: {message}")
         self.window.show_error_message("Erro no Arquivo", message)
     
     def on_demodulation_started(self):
         """Manipula o evento de início de demodulação"""
-        log_info("Demodulação iniciada")
+        log.info("Demodulação iniciada")
         self.window.show_status_message("Demodulação em andamento...")
     
     def on_demodulation_finished(self, data):
@@ -538,7 +586,7 @@ class Application:
         Args:
             data: Dados demodulados
         """
-        log_info("Demodulação concluída com sucesso")
+        log.info("Demodulação concluída com sucesso")
         self.window.show_status_message("Demodulação concluída")
         
         # Verificar se o filtro deve ser aplicado automaticamente
@@ -549,21 +597,21 @@ class Application:
             # Certificar-se que temos formas de onda e elipse para mostrar
             if 'waveforms' in data and 't' in data:
                 channels = data.get('channels', [1, 2])
-                log_debug("Atualizando gráfico de dados brutos após demodulação")
+                log.debug("Atualizando gráfico de dados brutos após demodulação")
                 self.window.analysis_panel.show_raw_data(data['t'], data['waveforms'], channels)
                 
                 if 'ellipse_params' in data and data['waveforms'].shape[0] >= 2:
-                    log_debug("Atualizando gráfico de elipse após demodulação")
+                    log.debug("Atualizando gráfico de elipse após demodulação")
                     self.window.analysis_panel.show_ellipse(data['waveforms'], data['ellipse_params'])
                     
             # Mostrar dados demodulados
             if 'demodulated' in data and 't' in data:
-                log_debug("Atualizando gráfico de sinal demodulado")
+                log.debug("Atualizando gráfico de sinal demodulado")
                 self.window.analysis_panel.show_demodulated(data['t'], data['demodulated'])
                 
                 # Mostrar sinal filtrado, se disponível e se o filtro estiver ativado
                 if apply_filter and 'filtered_demodulated' in data and 'bandpass_params' in data:
-                    log_debug("Atualizando gráfico de sinal filtrado")
+                    log.debug("Atualizando gráfico de sinal filtrado")
                     self.window.analysis_panel.show_filtered(
                         data['t'], 
                         data['filtered_demodulated'],
@@ -574,11 +622,11 @@ class Application:
                 try:
                     # Se o filtro estiver ativado, mostrar o espectro do sinal filtrado
                     use_filtered = apply_filter and 'filtered_demodulated' in data
-                    log_debug(f"Calculando e atualizando espectro após demodulação (use_filtered={use_filtered})")
+                    log.debug(f"Calculando e atualizando espectro após demodulação (use_filtered={use_filtered})")
                     freq_axis, magnitudes, peaks = self.processing_controller.calculate_spectrum(use_filtered=use_filtered)
                     self.window.analysis_panel.show_spectrum(freq_axis, magnitudes, peaks, use_filtered=use_filtered)
                 except Exception as e:
-                    log_error(f"Erro ao calcular espectro: {str(e)}")
+                    log.error(f"Erro ao calcular espectro: {str(e)}")
                 
                 # Ir para a aba de sinal demodulado ou filtrado conforme apropriado
                 if apply_filter and 'filtered_demodulated' in data:
@@ -587,7 +635,7 @@ class Application:
                     self.window.analysis_panel.analysis_tabs.setCurrentIndex(2)  # Aba de sinal demodulado
                 
         except Exception as e:
-            log_error(f"Erro ao exibir dados demodulados: {str(e)}")
+            log.error(f"Erro ao exibir dados demodulados: {str(e)}")
             self.window.show_status_message(f"Erro ao exibir dados demodulados: {str(e)}")
     
     def on_demodulation_error(self, message):
@@ -597,7 +645,7 @@ class Application:
         Args:
             message: Mensagem de erro
         """
-        log_error(f"Erro na demodulação: {message}")
+        log.error(f"Erro na demodulação: {message}")
         self.window.show_error_message("Erro na Demodulação", message)
     
     def on_moving_average_applied(self, data):
@@ -607,18 +655,18 @@ class Application:
         Args:
             data: Dados com média móvel aplicada
         """
-        log_info("Média móvel aplicada aos dados")
+        log.info("Média móvel aplicada aos dados")
         try:
             # Atualizar visualizações com os dados processados com média móvel
             if 'waveforms' in data and 't' in data:
                 channels = data.get('channels', [1, 2])
-                log_debug(f"Atualizando gráfico de dados brutos após aplicação de média (shape={data['waveforms'].shape})")
+                log.debug(f"Atualizando gráfico de dados brutos após aplicação de média (shape={data['waveforms'].shape})")
                 self.window.analysis_panel.show_raw_data(data['t'], data['waveforms'], channels)
                 
                 # Verificar se temos dois canais para a elipse
                 if data['waveforms'].shape[0] >= 2:
                     ellipse_params = data.get('ellipse_params', None)
-                    log_debug("Atualizando gráfico de elipse após aplicação de média")
+                    log.debug("Atualizando gráfico de elipse após aplicação de média")
                     self.window.analysis_panel.show_ellipse(data['waveforms'], ellipse_params)
                 
                 # Se temos dados demodulados, atualizar o espectro
@@ -626,16 +674,16 @@ class Application:
                     try:
                         # Calcular e mostrar espectro
                         use_filtered = 'filtered_demodulated' in data and data.get('bandpass_params', {}).get('enabled', False)
-                        log_debug(f"Atualizando espectro após aplicação de média (use_filtered={use_filtered})")
+                        log.debug(f"Atualizando espectro após aplicação de média (use_filtered={use_filtered})")
                         freq_axis, magnitudes, peaks = self.processing_controller.calculate_spectrum(use_filtered=use_filtered)
                         self.window.analysis_panel.show_spectrum(freq_axis, magnitudes, peaks, use_filtered=use_filtered)
                     except Exception as e:
-                        log_error(f"Erro ao atualizar espectro: {str(e)}")
+                        log.error(f"Erro ao atualizar espectro: {str(e)}")
             
             self.window.show_status_message("Média móvel aplicada aos dados")
                 
         except Exception as e:
-            log_error(f"Erro ao aplicar média móvel: {str(e)}")
+            log.error(f"Erro ao aplicar média móvel: {str(e)}")
             self.window.show_status_message(f"Erro ao aplicar média móvel: {str(e)}")
     
     def on_bandpass_filter_applied(self, data):
@@ -645,16 +693,13 @@ class Application:
         Args:
             data: Dados com filtro passa-banda aplicado
         """
-        log_info("Filtro passa-banda aplicado aos dados")
-        log_debug(f"on_bandpass_filter_applied: Chaves disponíveis nos dados: {list(data.keys())}")
-        
+        #log.info("Filtro passa-banda aplicado aos dados")        
         # Função de diagnóstico - verificar todos os dados recebidos
-        self.diagnose_filtered_data(data)
         
         try:
             # Mostrar sinal filtrado na aba correspondente
             if 't' in data and 'filtered_demodulated' in data and 'bandpass_params' in data:
-                log_debug(f"on_bandpass_filter_applied: Tamanho do sinal filtrado: {len(data['filtered_demodulated'])}")
+                log.debug(f"on_bandpass_filter_applied: Tamanho do sinal filtrado: {len(data['filtered_demodulated'])}")
                 self.window.analysis_panel.show_filtered(
                     data['t'], 
                     data['filtered_demodulated'],
@@ -663,24 +708,24 @@ class Application:
                 
                 # Calcular e mostrar espectro do sinal filtrado
                 try:
-                    log_debug("Calculando espectro do sinal filtrado")
+                    log.debug("Calculando espectro do sinal filtrado")
                     freq_axis, magnitudes, peaks = self.processing_controller.calculate_spectrum(use_filtered=True)
                     self.window.analysis_panel.show_spectrum(freq_axis, magnitudes, peaks, use_filtered=True)
                 except Exception as e:
-                    log_error(f"Erro ao calcular espectro do sinal filtrado: {str(e)}")
+                    log.error(f"Erro ao calcular espectro do sinal filtrado: {str(e)}")
             else:
-                log_warning(f"on_bandpass_filter_applied: Dados incompletos para exibir sinal filtrado")
+                log.warning(f"on_bandpass_filter_applied: Dados incompletos para exibir sinal filtrado")
                 if 't' not in data:
-                    log_warning("  - Vetor de tempo não encontrado")
+                    log.warning("  - Vetor de tempo não encontrado")
                 if 'filtered_demodulated' not in data:
-                    log_warning("  - Sinal filtrado não encontrado")
+                    log.warning("  - Sinal filtrado não encontrado")
                 if 'bandpass_params' not in data:
-                    log_warning("  - Parâmetros do filtro não encontrados")
+                    log.warning("  - Parâmetros do filtro não encontrados")
             
             self.window.show_status_message("Filtro passa-banda aplicado aos dados")
                 
         except Exception as e:
-            log_error(f"Erro ao aplicar filtro passa-banda: {str(e)}")
+            log.error(f"Erro ao aplicar filtro passa-banda: {str(e)}")
             self.window.show_status_message(f"Erro ao aplicar filtro passa-banda: {str(e)}")
             
     def on_spectrogram_generated(self, data, t, freqs, Sxx):
@@ -693,19 +738,19 @@ class Application:
             freqs: Vetor de frequências para o eixo y
             Sxx: Matriz do espectrograma
         """
-        log_info("Espectrograma gerado com sucesso")
+        log.info("Espectrograma gerado com sucesso")
         
         try:
             # Mostrar espectrograma
             params = data.get('spectrogram_params', {})
-            log_debug(f"on_spectrogram_generated: Parâmetros: {params}")
-            log_debug(f"on_spectrogram_generated: t={len(t)}, freqs={len(freqs)}, Sxx={Sxx.shape}")
+            log.debug(f"on_spectrogram_generated: Parâmetros: {params}")
+            log.debug(f"on_spectrogram_generated: t={len(t)}, freqs={len(freqs)}, Sxx={Sxx.shape}")
             
             self.window.analysis_panel.show_spectrogram(t, freqs, Sxx, params)
             self.window.show_status_message("Espectrograma gerado com sucesso")
                 
         except Exception as e:
-            log_error(f"Erro ao exibir espectrograma: {str(e)}")
+            log.error(f"Erro ao exibir espectrograma: {str(e)}")
             self.window.show_status_message(f"Erro ao exibir espectrograma: {str(e)}")
             
 
@@ -717,64 +762,64 @@ class Application:
         Args:
             data: Dados a serem diagnosticados
         """
-        log_debug("DIAGNÓSTICO DE DADOS FILTRADOS:")
-        log_debug(f"- Chaves disponíveis: {list(data.keys())}")
+        log.debug("DIAGNÓSTICO DE DADOS FILTRADOS:")
+        log.debug(f"- Chaves disponíveis: {list(data.keys())}")
         
         # Verificar vetor de tempo
         if 't' in data:
             t = data['t']
-            log_debug(f"- Vetor de tempo: tamanho={len(t)}, min={min(t)}, max={max(t)}")
+            log.debug(f"- Vetor de tempo: tamanho={len(t)}, min={min(t)}, max={max(t)}")
         else:
-            log_warning("- Vetor de tempo não encontrado")
+            log.warning("- Vetor de tempo não encontrado")
             
         # Verificar sinal demodulado original
         if 'demodulated' in data:
             demod = data['demodulated']
-            log_debug(f"- Sinal demodulado: tamanho={len(demod)}, min={min(demod)}, max={max(demod)}")
+            log.debug(f"- Sinal demodulado: tamanho={len(demod)}, min={min(demod)}, max={max(demod)}")
         else:
-            log_warning("- Sinal demodulado não encontrado")
+            log.warning("- Sinal demodulado não encontrado")
             
         # Verificar sinal filtrado
         if 'filtered_demodulated' in data:
             filtered = data['filtered_demodulated']
-            log_debug(f"- Sinal filtrado: tamanho={len(filtered)}, min={min(filtered)}, max={max(filtered)}")
+            log.debug(f"- Sinal filtrado: tamanho={len(filtered)}, min={min(filtered)}, max={max(filtered)}")
             
             # Verificar se o sinal filtrado é NaN ou infinito
             if np.isnan(filtered).any():
-                log_warning("  -> ALERTA: Sinal filtrado contém valores NaN")
+                log.warning("  -> ALERTA: Sinal filtrado contém valores NaN")
             if np.isinf(filtered).any():
-                log_warning("  -> ALERTA: Sinal filtrado contém valores infinitos")
+                log.warning("  -> ALERTA: Sinal filtrado contém valores infinitos")
                 
             # Verificar diferença entre original e filtrado
             if 'demodulated' in data:
                 diff = np.abs(data['demodulated'] - filtered).mean()
-                log_debug(f"- Diferença média entre original e filtrado: {diff}")
+                log.debug(f"- Diferença média entre original e filtrado: {diff}")
         else:
-            log_warning("- Sinal filtrado não encontrado")
+            log.warning("- Sinal filtrado não encontrado")
             
         # Verificar parâmetros do filtro
         if 'bandpass_params' in data:
             params = data['bandpass_params']
-            log_debug(f"- Parâmetros do filtro: {params}")
+            log.debug(f"- Parâmetros do filtro: {params}")
         else:
-            log_warning("- Parâmetros do filtro não encontrados")
+            log.warning("- Parâmetros do filtro não encontrados")
     
     def on_files_selected(self, file_list):
         """Slot para carregar múltiplos arquivos selecionados na análise"""
         # Carregar o primeiro arquivo através do file_controller para garantir 
         # que os dados sejam passados corretamente para o processing_controller
         if file_list:
-            log_info(f"Carregando arquivo selecionado: {file_list[0]}")
+            log.info(f"Carregando arquivo selecionado: {file_list[0]}")
             self.file_controller.load_file(file_list[0])
             
             # Se há múltiplos arquivos, também usar o método original para exibição múltipla
             if len(file_list) > 1:
-                log_info(f"Carregando visualização múltipla para {len(file_list)} arquivos")
+                log.info(f"Carregando visualização múltipla para {len(file_list)} arquivos")
                 self.window.analysis_panel.load_selected_file_from_list(file_list)
     
     def on_audio_file_loaded(self, data):
         """Manipula o carregamento de arquivo na aba de análise de áudio"""
-        log_info("Arquivo carregado na aba de análise de áudio")
+        log.info("Arquivo carregado na aba de análise de áudio")
         
         # Atualizar o painel de áudio
         self.window.audio_analysis_panel.on_audio_loaded(data)
@@ -784,7 +829,7 @@ class Application:
     
     def on_audio_generated_from_audio_panel(self, audio_path):
         """Manipula a geração de áudio na aba de análise de áudio"""
-        log_info(f"Áudio gerado na aba de análise de áudio: {audio_path}")
+        log.info(f"Áudio gerado na aba de análise de áudio: {audio_path}")
         
         # Atualizar o painel de áudio
         self.window.audio_analysis_panel.on_audio_generated(audio_path)
@@ -795,16 +840,16 @@ class Application:
         if audio_path:
             self.play_audio_file(audio_path)
         else:
-            log_warning("Nenhum arquivo de áudio disponível para reprodução")
+            log.warning("Nenhum arquivo de áudio disponível para reprodução")
     
     def on_audio_error(self, error_message):
         """Manipula erros do controlador de áudio"""
-        log_error(f"Erro no controlador de áudio: {error_message}")
+        log.error(f"Erro no controlador de áudio: {error_message}")
         self.window.audio_analysis_panel.on_audio_error(error_message)
     
     def on_spectrum_calculated_for_audio(self, frequencies, magnitudes):
         """Manipula o cálculo de espectro para a aba de análise de áudio"""
-        log_debug("Espectro calculado para aba de análise de áudio")
+        log.debug("Espectro calculado para aba de análise de áudio")
         self.window.audio_analysis_panel.show_spectrum(frequencies, magnitudes)
     
     def play_audio_file(self, audio_path):
@@ -814,7 +859,7 @@ class Application:
             import subprocess
             import platform
             
-            log_info(f"Reproduzindo arquivo de áudio: {audio_path}")
+            log.info(f"Reproduzindo arquivo de áudio: {audio_path}")
             
             system = platform.system()
             if system == "Windows":
@@ -826,22 +871,22 @@ class Application:
                 
         except Exception as e:
             error_msg = f"Erro ao reproduzir arquivo de áudio: {str(e)}"
-            log_error(error_msg)
+            log.error(error_msg)
             self.window.show_error_message("Erro de Reprodução", error_msg)
     
     def on_ultra_hear_data_loaded(self, data):
         """Manipula o carregamento de dados no Ultra-Hear"""
-        log_info("Dados carregados no Ultra-Hear")
+        log.info("Dados carregados no Ultra-Hear")
         self.window.ultra_hear_panel.on_data_loaded(data)
     
     def on_ultra_hear_processing_finished(self, result):
         """Manipula o fim do processamento Ultra-Hear"""
-        log_info("Processamento Ultra-Hear concluído")
+        log.info("Processamento Ultra-Hear concluído")
         self.window.ultra_hear_panel.on_processing_finished(result)
     
     def on_ultra_hear_error(self, error_message):
         """Manipula erros do Ultra-Hear"""
-        log_error(f"Erro no Ultra-Hear: {error_message}")
+        log.error(f"Erro no Ultra-Hear: {error_message}")
         self.window.ultra_hear_panel.on_error(error_message)
     
     def on_play_ultra_hear_audio(self):
@@ -850,7 +895,7 @@ class Application:
         if audio_path:
             self.play_audio_file(audio_path)
         else:
-            log_warning("Nenhum arquivo de áudio Ultra-Hear disponível para reprodução")
+            log.warning("Nenhum arquivo de áudio Ultra-Hear disponível para reprodução")
     
     # Métodos para controle LoRa
     def on_lora_ligar_requested(self, port_name):
@@ -864,17 +909,17 @@ class Application:
             # Atualizar lista de portas
             ports = self.lora_controller.get_available_ports()
             self.window.acquisition_panel.update_lora_ports(ports)
-            log_info("Lista de portas LoRa atualizada")
+            log.info("Lista de portas LoRa atualizada")
         else:
             # Ligar equipamento
-            log_info(f"Solicitação para ligar equipamento via LoRa na porta {port_name}")
+            log.info(f"Solicitação para ligar equipamento via LoRa na porta {port_name}")
             self.window.show_status_message(f"Ligando equipamento via LoRa...")
             success = self.lora_controller.ligar_equipamento(port_name)
             if success:
-                log_info("Equipamento ligado com sucesso via LoRa")
+                log.info("Equipamento ligado com sucesso via LoRa")
                 self.window.show_status_message("Equipamento ligado via LoRa")
             else:
-                log_warning("Falha ao ligar equipamento via LoRa")
+                log.warning("Falha ao ligar equipamento via LoRa")
     
     def on_lora_desligar_requested(self, port_name):
         """
@@ -883,26 +928,26 @@ class Application:
         Args:
             port_name: Nome da porta serial
         """
-        log_info(f"Solicitação para desligar equipamento via LoRa na porta {port_name}")
+        log.info(f"Solicitação para desligar equipamento via LoRa na porta {port_name}")
         self.window.show_status_message(f"Desligando equipamento via LoRa...")
         success = self.lora_controller.desligar_equipamento(port_name)
         if success:
-            log_info("Equipamento desligado com sucesso via LoRa")
+            log.info("Equipamento desligado com sucesso via LoRa")
             self.window.show_status_message("Equipamento desligado via LoRa")
         else:
-            log_warning("Falha ao desligar equipamento via LoRa")
+            log.warning("Falha ao desligar equipamento via LoRa")
     
     def on_about_to_quit(self):
         """
         Manipula o evento de fechamento da aplicação
         """
-        log_info("Aplicação OAS-GUI está sendo fechada")
+        log.info("Aplicação OAS-GUI está sendo fechada")
         
-        config = get_all_input_values(self.window)
+        last_state = get_all_input_values(self.window)
         metadata = self.window.metadata_panel.get_metadata()
         self.window.metadata_panel.save_metadata_template()
-        config['metadata'] = metadata
-        DataStore.save_config(config)
+        last_state['metadata'] = metadata
+        DataStore.save_last_state(last_state)
     
     def run(self):
         """
@@ -911,7 +956,7 @@ class Application:
         Returns:
             Código de retorno da aplicação
         """
-        log_info("Iniciando aplicação OAS-GUI")
+        log.info("Iniciando aplicação OAS-GUI")
         self.window.show()
         return self.app.exec_()
     

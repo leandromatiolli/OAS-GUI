@@ -9,9 +9,10 @@ from datetime import datetime
 from typing import Dict, Any
 import os
 import json
-from app.utils.debug_log import set_gui_log_handler, log_debug, log_info, log_warning, log_error
+from app.utils import log
 
 from app.models.data_store import DataStore
+from PyQt5.QtWidgets import QMessageBox, QInputDialog
 
 class MetadataPanel(QWidget):
     """Painel para coleta de metadados sobre o teste"""
@@ -24,9 +25,9 @@ class MetadataPanel(QWidget):
             parent: Widget pai
         """
         super().__init__(parent)
-        self.metadata = {}
-        self.metadata_widget_dict = {}
-        self.metadata_template = {}
+        self.metadata : dict = {}
+        self.metadata_widget_dict: dict = {}
+        self.metadata_template: dict = {}
         self.metadata_template_file = "config/metadata_template.json"
         self.last_state_file = "config/last_state.json"
 
@@ -164,13 +165,11 @@ class MetadataPanel(QWidget):
         new_entry_type = QComboBox()
         new_entry_type.addItems([
             "text", 
+            "text_area", 
             "float", 
             "int", 
             "filename",
             "combo",
-            "timestamp",
-            "material",
-            "tipo de teste", 
         ])
         new_entry_button = QPushButton("Adicionar")
         self.new_entry_layout.addWidget(new_entry_label)
@@ -211,6 +210,7 @@ class MetadataPanel(QWidget):
         """
         if metadata_name:
             # Create appropriate widget based on type
+            log.debug(f"Adicionando metadado: {metadata_name} do tipo {metadata_type}")
             if metadata_type[0] == "text":
                 widget = QLineEdit()
                 widget.textChanged.connect(self.update_metadata_dict(metadata_name))
@@ -226,14 +226,13 @@ class MetadataPanel(QWidget):
                 widget.setRange(-999999, 999999)
                 widget.valueChanged.connect(self.update_metadata_dict(metadata_name))
             elif metadata_type[0] == "filename":
-                widget = QPushButton("Selecionar Arquivo")
-                # You might want to add click handler for file selection
-                #widget.clicked.connect(self.update_metadata_dict(metadata_name))
-            elif metadata_type[0] == "datetime":
-                widget = QLabel()
-                self.update_timer = QTimer()
-                self.update_timer.timeout.connect(self.update_timestamp(metadata_name))
-                self.update_timer.start(1000)
+                widget = QWidget()
+                widget.setLayout(QHBoxLayout())
+                line_edit = QLineEdit()
+                browse_button = QPushButton("Selecionar Arquivos")
+                widget.layout().addWidget(line_edit)
+                widget.layout().addWidget(browse_button)
+                browse_button.clicked.connect(self.on_select_clicked(line_edit))
             elif metadata_type[0] == "combo":
                 widget = QComboBox()
                 widget.addItems(metadata_type[1])
@@ -245,7 +244,7 @@ class MetadataPanel(QWidget):
             row_count = self.metadata_form.rowCount()
 
             metadata_layout = QHBoxLayout()
-            metadata_layout.addWidget(widget)
+            metadata_layout.addWidget(widget, stretch = 2)
             remove_metadata_button = QPushButton("Remover")
             metadata_layout.addWidget(QLabel(""), stretch = 1)
             remove_metadata_button.clicked.connect(self.remove_metadata_row(metadata_layout))
@@ -279,7 +278,7 @@ class MetadataPanel(QWidget):
             metadata_layout: Layout da linha de metadado a ser removida
         """
         def remove(value):
-            print(f"Removing metadata row {metadata_layout}")
+            log.debug(f"Removing metadata row {metadata_layout}")
             widget = metadata_layout.itemAt(0).widget()  # Remove the widget
             for key, value in self.metadata_widget_dict.items():
                 if value == widget:
@@ -300,12 +299,48 @@ class MetadataPanel(QWidget):
         # Get the label name and type
         metadata_name = new_entry_label.text().strip()
         metadata_type = new_entry_type.currentText()
-    
-        self.add_metadata_form_row(metadata_name, metadata_type)
-        self.metadata_template[metadata_name] = metadata_type
+
+        if metadata_name in self.metadata_template.keys():
+            QMessageBox.warning(self, "Metadado Duplicado", "Metadado com esse nome já existe")
+            return
+        
+        self.metadata_template[metadata_name] = [metadata_type]
+        if metadata_type == "combo":
+            # create a text edit window to add options
+            #is there an option of QInputDialog that is textbox instead of line edit?
+            options, ok = QInputDialog.getText(self, "Opções do Combo", "Insira as opções separadas por vírgula:")
+            if ok and options:
+                options_list = list(set([opt.strip() for opt in options.split(',')]))
+                self.metadata_template[metadata_name].append(options_list)
+            elif not ok:
+                del self.metadata_template[metadata_name]
+                return
+
+        default_matadata_values = {
+            "text": "",
+            "text_area": "",
+            "float": 0.0,
+            "int": 0,
+            "filename": "",
+            "combo": "",
+        }
+        self.add_metadata_form_row(metadata_name, self.metadata_template[metadata_name])
+        self.metadata[metadata_name] = default_matadata_values[metadata_type]
         self.save_metadata_template()
 
-        
+    def on_select_clicked(self, line_edit: QLineEdit):
+        def on_browse(self):
+            """Abre um diálogo para selecionar arquivos manualmente (agora múltiplos)"""
+            file_paths, ok = QFileDialog.getOpenFileNames(
+                caption = "Selecionar arquivos",
+                directory = os.path.expanduser("~"),
+                filter = "Arquivos (*.*)"
+            )
+            if file_paths:
+                filenames = [os.path.split(file_path)[-1] for file_path in file_paths]
+                line_edit.setText(", ".join(filenames))
+        return on_browse
+            
     def update_metadata_dict(self, metadata_name: str):
         """
         Atualiza o dicionário de metadados com o valor do widget
@@ -315,7 +350,7 @@ class MetadataPanel(QWidget):
         """
         def update_value(new_value):
             self.metadata[metadata_name] = new_value
-            log_debug(f"Atualizando {metadata_name} para {new_value}")
+            log.debug(f"Atualizando {metadata_name} para {new_value}")
 
         return update_value
     
@@ -333,28 +368,33 @@ class MetadataPanel(QWidget):
                     self.metadata_template.update(json.load(f))
 
                 for key, value in self.metadata_template.items():
-                    log_debug(f"Carregando metadado: {key} do tipo {value}")
+                    log.debug(f"Carregando metadado: {key} do tipo {value}")
                     self.add_metadata_form_row(key, value)
 
         except Exception as e:
-            log_error(f"Erro ao carregar opções: {str(e)}")
+            log.error(f"Erro ao carregar opções: {str(e)}")
 
         try:
             if os.path.exists(self.last_state_file):
                 with open(self.last_state_file, 'r', encoding='utf-8') as f:
                     self.metadata.update(json.load(f)["metadata"])
-                    log_debug(f"Último estado carregado: {self.metadata}")
+                    log.debug(f"Último estado carregado: {self.metadata}")
 
             for key, value in self.metadata.items():
                 if key in self.metadata_widget_dict:
                     self.set_widget_value(key, value)
 
         except Exception as e:
+<<<<<<< HEAD
             log_error(f"Erro ao carregar último estado: {str(e)}")
             
         for key, value in self.metadata.items():
             pass
             #self.set_widget_value(key, value)
+=======
+            log.error(f"Erro ao carregar último estado: {str(e)}")
+
+>>>>>>> db4e97fd2148c52ebfbb81570be8dfceb8b2e7e1
 
     def save_metadata_template(self):
         """Salva os metadados atuais no arquivo de configuração"""
@@ -365,7 +405,7 @@ class MetadataPanel(QWidget):
             with open(self.metadata_template_file, 'w', encoding='utf-8') as f:
                 json.dump(self.metadata_template, f, indent=4, ensure_ascii=False)
         except Exception as e:
-            log_error(f"Erro ao salvar opções: {str(e)}")
+            log.error(f"Erro ao salvar opções: {str(e)}")
                 
     def get_metadata(self) -> Dict[str, Any]:
         """

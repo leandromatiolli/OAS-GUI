@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
 from typing import Dict, List, Tuple, Optional, Union, Any
+from PyQt5.QtCore import Qt, pyqtSignal
 
 class MplCanvas(FigureCanvas):
     """Canvas para plotagem de gráficos usando Matplotlib"""
@@ -27,6 +28,15 @@ class MplCanvas(FigureCanvas):
         """Limpa o gráfico"""
         self.axes.clear()
         self.draw()
+
+    def draw(self):
+        """Override draw to always apply tight_layout before drawing"""
+        try:
+            self.fig.tight_layout()
+        except Exception:
+            # In case tight_layout fails, continue without it
+            pass
+        super().draw()
         
     def draw_inset(self, rect=[0.65, 0.65, 0.3, 0.3]):
         """
@@ -126,7 +136,6 @@ class MplCanvas(FigureCanvas):
         
         self.axes.set_xlabel(xlabel)
         self.axes.set_ylabel(ylabel)
-        self.axes.set_title(title)
         self.axes.axis('equal')
         self.axes.grid(True)
         
@@ -231,6 +240,28 @@ class MplCanvas(FigureCanvas):
 class NavigationToolbarCustom(NavigationToolbar):
     """Barra de ferramentas de navegação personalizada"""
     
+    # Signal to emit coordinate information to status bar
+    coordinatesChanged = pyqtSignal(str)
+    
     # Lista de ícones a ocultar
     toolitems = [t for t in NavigationToolbar.toolitems if t[0] in 
                ('Home', 'Pan', 'Zoom', 'Save')] 
+    
+    def __init__(self, canvas, parent):
+        super().__init__(canvas, parent)
+        self.coordinate_label = None
+        self.setOrientation(Qt.Vertical)
+        self.setFixedWidth(50)
+    
+    def set_coordinate_label(self, label):
+        """Set the QLabel to display coordinates (kept for compatibility)"""
+        self.coordinate_label = label
+    
+    def set_message(self, s):
+        """Override to emit coordinates signal for status bar"""
+        # Emit signal for status bar
+        self.coordinatesChanged.emit(s)
+        
+        # Keep the old behavior for backward compatibility
+        if self.coordinate_label is not None:
+            self.coordinate_label.setText(f"{s}")

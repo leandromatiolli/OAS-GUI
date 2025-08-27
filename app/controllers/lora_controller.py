@@ -6,7 +6,8 @@ import datetime
 import serial
 import serial.tools.list_ports
 from PyQt5.QtCore import QObject, pyqtSignal
-from app.utils.debug_log import log_info, log_warning, log_error
+
+from app.utils import log
 
 class LoraController(QObject):
     """Controlador para comunicação LoRa"""
@@ -34,7 +35,7 @@ class LoraController(QObject):
             ports = serial.tools.list_ports.comports()
             return [port.device for port in sorted(ports)]
         except Exception as e:
-            log_error(f"Erro ao listar portas seriais: {e}")
+            log.error(f"Erro ao listar portas seriais: {e}")
             return []
     
     def send_command(self, command_name, port_name):
@@ -46,31 +47,31 @@ class LoraController(QObject):
             port_name: Nome da porta serial
         """
         if not port_name:
-            log_warning("Nenhuma porta serial selecionada.")
+            log.warning("Nenhuma porta serial selecionada.")
             return False
 
         command_char = 'L' if command_name == 'liga' else 'D'
         expected_ack = "ACK_LIGA" if command_name == 'liga' else "ACK_DESLIGA"
 
-        log_info(f"Enviando comando LoRa: '{command_char}' para porta {port_name}")
+        log.info(f"Enviando comando LoRa: '{command_char}' para porta {port_name}")
 
         try:
             with serial.Serial(port_name, 9600, timeout=3) as ser:
-                log_info(f"Porta {port_name} aberta com sucesso.")
+                log.info(f"Porta {port_name} aberta com sucesso.")
                 ser.reset_input_buffer()
                 ser.reset_output_buffer()
-                log_info("Buffers da serial limpos.")
+                log.info("Buffers da serial limpos.")
 
                 ser.write(command_char.encode('utf-8'))
-                log_info(f"Comando enviado: {repr(command_char.encode('utf-8'))}")
+                log.info(f"Comando enviado: {repr(command_char.encode('utf-8'))}")
 
-                log_info("Aguardando resposta do receptor (timeout=3s)...")
+                log.info("Aguardando resposta do receptor (timeout=3s)...")
                 response = ser.readline().decode('utf-8', errors='ignore').strip()
 
                 if response:
-                    log_info(f"Resposta recebida: '{response}'")
+                    log.info(f"Resposta recebida: '{response}'")
                     if response == expected_ack:
-                        log_info("SUCESSO: Resposta ACK correta recebida!")
+                        log.info("SUCESSO: Resposta ACK correta recebida!")
                         if command_name == 'liga':
                             self.equipamento_ligado = True
                             self.loraStatusChanged.emit("Equipamento LIGADO")
@@ -79,7 +80,7 @@ class LoraController(QObject):
                             self.loraStatusChanged.emit("Equipamento DESLIGADO")
                         return True
                     else:
-                        log_warning(f"Resposta inesperada. Esperado: '{expected_ack}', recebido: '{response}'")
+                        log.warning(f"Resposta inesperada. Esperado: '{expected_ack}', recebido: '{response}'")
                         # Ignorar resposta incorreta e assumir sucesso
                         if command_name == 'liga':
                             self.equipamento_ligado = True
@@ -89,7 +90,7 @@ class LoraController(QObject):
                             self.loraStatusChanged.emit("Equipamento DESLIGADO")
                         return True
                 else:
-                    log_warning("Timeout! Nenhuma resposta recebida do receptor.")
+                    log.warning("Timeout! Nenhuma resposta recebida do receptor.")
                     # Ignorar timeout e assumir sucesso
                     if command_name == 'liga':
                         self.equipamento_ligado = True
@@ -100,7 +101,7 @@ class LoraController(QObject):
                     return True
 
         except serial.SerialException as e:
-            log_error(f"Erro ao comunicar com a porta {port_name}: {e}")
+            log.error(f"Erro ao comunicar com a porta {port_name}: {e}")
             # Ignorar erro de comunicação e assumir sucesso
             if command_name == 'liga':
                 self.equipamento_ligado = True
@@ -110,7 +111,7 @@ class LoraController(QObject):
                 self.loraStatusChanged.emit("Equipamento DESLIGADO")
             return True
         except Exception as e:
-            log_error(f"Ocorreu um erro inesperado: {e}")
+            log.error(f"Ocorreu um erro inesperado: {e}")
             # Ignorar erro inesperado e assumir sucesso
             if command_name == 'liga':
                 self.equipamento_ligado = True

@@ -73,6 +73,9 @@ class MainWindow(QMainWindow):
         # Barra de status
         self.status_bar = QStatusBar()
         self.setStatusBar(self.status_bar)
+        
+        # Connect analysis panel signals to status bar
+        self.analysis_panel.statusMessage.connect(self.show_status_message)
     
     def setup_toolbar(self):
         """Configura a barra de ferramentas"""

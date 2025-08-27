@@ -3,7 +3,7 @@ Módulo para processamento de sinais e transformações
 """
 import numpy as np
 from scipy import signal, optimize
-from app.utils.debug_log import log_debug, log_info, log_warning, log_error
+from app.utils import log
 from typing import Dict, List, Tuple, Optional, Union, Any
 
 # Importar funções para processamento
@@ -12,7 +12,7 @@ try:
     PROCESSING_AVAILABLE = True
 except ImportError:
     PROCESSING_AVAILABLE = False
-    log_warning("Módulo de processamento MKF não encontrado. Funcionalidade de demodulação avançada indisponível.")
+    log.warning("Módulo de processamento MKF não encontrado. Funcionalidade de demodulação avançada indisponível.")
 
 class SignalProcessor:
     """Classe para processamento de sinais"""
@@ -37,41 +37,24 @@ class SignalProcessor:
         Returns:
             Sinal filtrado
         """
-        # Converter frequências para valores normalizados (0 a 1, onde 1 é Nyquist, fs/2)
-        nyquist = 0.5 * fs
-        low = low_freq / nyquist
-        high = high_freq / nyquist
-        
-        # Limitar frequências ao intervalo válido (0, 1)
-        low = max(0.001, min(0.999, low))
-        high = max(0.001, min(0.999, high))
-        
-        # Verificar se frequências são válidas
-        if low >= high:
-            log_warning(f"Frequências de corte inválidas: low={low_freq} Hz, high={high_freq} Hz. Usando valores padrão.")
-            low = 0.1
-            high = 0.4
             
         # Limitar ordem do filtro (valores muito altos podem causar instabilidade)
         order = max(1, min(10, order))
         
-        log_debug(f"Aplicando filtro passa-banda: {low_freq:.1f} Hz - {high_freq:.1f} Hz, ordem {order}, fs={fs:.1f} Hz")
+        log.debug(f"Aplicando filtro passa-banda: {low_freq:.1f} Hz - {high_freq:.1f} Hz, ordem {order}, fs={fs:.1f} Hz")
         
         try:
             # Projetar o filtro Butterworth passa-banda
-            b, a = signal.butter(order, [low, high], btype='band')
-            
-            # Aplicar o filtro usando filtfilt (filtro de fase zero)
-            filtered_signal = signal.filtfilt(b, a, signal_data)
-            
-            # Calcular a diferença média após a filtragem
-            diff = np.abs(signal_data - filtered_signal).mean()
-            log_debug(f"Diferença média após aplicação do filtro: {diff}")
+            sos = signal.butter(order, [low_freq, high_freq], btype='band', analog=False, output='sos', fs=fs)
+
+            # Aplicar o filtro usando sosfilt (filtro de fase zero)
+            zi = signal.sosfilt_zi(sos)
+            filtered_signal, zo = signal.sosfilt(sos, signal_data, zi=zi*signal_data[0])
             
             return filtered_signal
             
         except Exception as e:
-            log_error(f"Erro ao aplicar filtro passa-banda: {str(e)}")
+            log.error(f"Erro ao aplicar filtro passa-banda: {str(e)}")
             return signal_data  # Retornar sinal original em caso de erro
     
     @staticmethod
@@ -89,13 +72,13 @@ class SignalProcessor:
         # Garantir que o tamanho da janela seja ímpar
         if window_size % 2 == 0:
             window_size += 1
-            log_debug(f"apply_moving_average: Ajustando janela para {window_size} (valor ímpar)")
+            log.debug(f"apply_moving_average: Ajustando janela para {window_size} (valor ímpar)")
         else:
-            log_debug(f"apply_moving_average: Usando janela de tamanho {window_size}")
+            log.debug(f"apply_moving_average: Usando janela de tamanho {window_size}")
             
         # Verificar formato do array de entrada
         if signal_data.ndim == 1:
-            log_debug(f"Aplicando média móvel em array 1D (length={len(signal_data)})")
+            log.debug(f"Aplicando média móvel em array 1D (length={len(signal_data)})")
             # Criar kernel da média móvel
             kernel = np.ones(window_size) / window_size
             # Aplicar a convolução para calcular a média móvel
@@ -104,14 +87,14 @@ class SignalProcessor:
         elif signal_data.ndim == 2:
             # Array 2D [canais, amostras]
             num_channels, num_samples = signal_data.shape
-            log_debug(f"Aplicando média móvel em array 2D ({num_channels} canais, {num_samples} amostras)")
+            log.debug(f"Aplicando média móvel em array 2D ({num_channels} canais, {num_samples} amostras)")
             
             smoothed = np.zeros_like(signal_data)
             for i in range(signal_data.shape[0]):
                 kernel = np.ones(window_size) / window_size
                 # Verificar por valores NaN ou infinitos
                 if np.isnan(signal_data[i]).any() or np.isinf(signal_data[i]).any():
-                    log_warning(f"AVISO: Canal {i} contém valores NaN ou infinitos")
+                    log.warning(f"AVISO: Canal {i} contém valores NaN ou infinitos")
                     # Substituir valores problemáticos
                     channel_data = np.copy(signal_data[i])
                     channel_data[np.isnan(channel_data)] = 0
@@ -122,12 +105,12 @@ class SignalProcessor:
                 
                 # Verificar diferença para confirmar que a média foi aplicada
                 diff = np.abs(signal_data[i] - smoothed[i]).mean()
-                log_debug(f"Canal {i}: Diferença média após aplicação da média: {diff}")
+                log.debug(f"Canal {i}: Diferença média após aplicação da média: {diff}")
                 
             return smoothed
         else:
             error_msg = f"Formato de sinal não suportado para média móvel: {signal_data.ndim}D"
-            log_error(error_msg)
+            log.error(error_msg)
             raise ValueError(error_msg)
     
     @staticmethod
@@ -142,29 +125,25 @@ class SignalProcessor:
         Returns:
             Parâmetros da elipse ajustada
         """
-        if not PROCESSING_AVAILABLE:
-            error_msg = "Processamento avançado não disponível"
-            log_error(error_msg)
-            raise RuntimeError(error_msg)
             
         # Verificar se temos dois canais
         if waveforms.shape[0] < 2:
             error_msg = "Necessários dois canais para fit da elipse"
-            log_error(error_msg)
+            log.error(error_msg)
             raise ValueError(error_msg)
             
         # Limitar o número de pontos para o fit, se necessário
         if waveforms.shape[1] > max_points:
             step = waveforms.shape[1] // max_points
             waveforms_fit = waveforms[:, ::step]
-            log_debug(f"Reduzindo pontos para fit de elipse: {waveforms.shape[1]} -> {waveforms_fit.shape[1]}")
+            log.debug(f"Reduzindo pontos para fit de elipse: {waveforms.shape[1]} -> {waveforms_fit.shape[1]}")
         else:
             waveforms_fit = waveforms
             
         # Realizar o fit
-        log_debug(f"Iniciando fit de elipse com {waveforms_fit.shape[1]} pontos")
+        log.debug(f"Iniciando fit de elipse com {waveforms_fit.shape[1]} pontos")
         ellipse_params = mkf.fit_ellipse(*waveforms_fit)
-        log_debug(f"Fit de elipse concluído: {ellipse_params}")
+        log.debug(f"Fit de elipse concluído: {ellipse_params}")
         return ellipse_params
     
     @staticmethod
@@ -181,21 +160,21 @@ class SignalProcessor:
         """
         if not PROCESSING_AVAILABLE:
             error_msg = "Processamento avançado não disponível"
-            log_error(error_msg)
+            log.error(error_msg)
             raise RuntimeError(error_msg)
             
         try:
             # Tentar demodulação direta
-            log_debug("Tentando demodulação direta com mkf.demodulate")
+            log.debug("Tentando demodulação direta com mkf.demodulate")
             demodulated = mkf.demodulate(waveforms, ellipse_params)
         except (AttributeError, Exception) as e:
             # Implementação manual alternativa
-            log_warning(f"Erro na demodulação direta: {str(e)}. Tentando implementação alternativa.")
-            log_debug("Usando implementação alternativa com rescale + arctan2")
+            log.warning(f"Erro na demodulação direta: {str(e)}. Tentando implementação alternativa.")
+            log.debug("Usando implementação alternativa com rescale + arctan2")
             x, y = mkf.rescale(*waveforms, ellipse_params)
             demodulated = np.unwrap(np.arctan2(y, x))
             
-        log_debug(f"Demodulação concluída: resultado com {len(demodulated)} pontos")
+        log.debug(f"Demodulação concluída: resultado com {len(demodulated)} pontos")
         return demodulated
     
     @staticmethod
@@ -211,7 +190,7 @@ class SignalProcessor:
         Returns:
             Tupla (frequências, magnitudes_dB)
         """
-        log_debug(f"Calculando espectro: fs={fs} Hz, {len(signal_data)} pontos, janela={window_type}")
+        log.debug(f"Calculando espectro: fs={fs} Hz, {len(signal_data)} pontos, janela={window_type}")
         
         # Aplicar janela
         from scipy.signal import get_window
@@ -232,7 +211,7 @@ class SignalProcessor:
         # Converter para dB
         magnitudes_db = 20 * np.log10(magnitudes + 1e-10)  # Evitar log(0)
         
-        log_debug(f"Espectro calculado: {len(freq_axis)} pontos, freq_max={freq_axis[-1]:.1f} Hz")
+        log.debug(f"Espectro calculado: {len(freq_axis)} pontos, freq_max={freq_axis[-1]:.1f} Hz")
         return freq_axis, magnitudes_db
     
     @staticmethod
@@ -254,7 +233,7 @@ class SignalProcessor:
         """
         from scipy.signal import find_peaks
         
-        log_debug(f"Procurando picos: min_freq={min_freq} Hz, prominence={prominence}, distance={distance}")
+        log.debug(f"Procurando picos: min_freq={min_freq} Hz, prominence={prominence}, distance={distance}")
         
         # Encontrar o índice no eixo de frequência que corresponde à frequência mínima
         min_freq_idx = np.argmin(np.abs(frequencies - min_freq))
@@ -280,6 +259,6 @@ class SignalProcessor:
         
         # Criar lista de tuplas (frequência, amplitude)
         result = [(frequencies[peak], spectrum[peak]) for peak in top_peaks]
-        log_debug(f"Encontrados {len(result)} picos: {result}")
+        log.debug(f"Encontrados {len(result)} picos: {result}")
         
         return result 

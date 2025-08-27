@@ -10,7 +10,7 @@ import numpy as np
 import os
 
 from app.views.widgets.canvas import MplCanvas, NavigationToolbarCustom
-from app.utils.debug_log import log_debug, log_info, log_warning, log_error
+from app.utils import log
 from app.models.data_store import DataStore
 
 class AnalysisPanel(QWidget):
@@ -25,6 +25,7 @@ class AnalysisPanel(QWidget):
     movingAverageChanged = pyqtSignal(bool, int)  # Emitido quando a configuração de média móvel é alterada
     bandpassFilterChanged = pyqtSignal(bool, float, float, int)  # Emitido quando a configuração do filtro passa-banda é alterada
     spectrogramRequested = pyqtSignal(bool, int, float, float)  # Emitido quando o usuário solicita gerar espectrograma
+    statusMessage = pyqtSignal(str)  # Signal for status bar messages
     
     def __init__(self, parent=None):
         """
@@ -58,7 +59,7 @@ class AnalysisPanel(QWidget):
         self.select_dir_button.clicked.connect(self.on_select_dir_clicked)
         self.use_save_dir_button = QPushButton("Usar pasta de gravação")
         self.use_save_dir_button.clicked.connect(self.on_use_save_dir_clicked)
-        self.current_dir = DataStore.load_config().get('save_directory', os.getcwd())
+        self.current_dir = DataStore.load_last_state().get('save_directory', os.getcwd())
         self.dir_label = QLabel(self.current_dir)
         self.dir_label.setToolTip("Pasta para salvar os dado adquiridos")
         self.dir_label.setObjectName("mk_save_directory")
@@ -185,7 +186,7 @@ class AnalysisPanel(QWidget):
         
         # Aba de dados brutos
         raw_tab = QWidget()
-        raw_layout = QVBoxLayout(raw_tab)
+        raw_layout = QHBoxLayout(raw_tab)
         self.raw_canvas = MplCanvas(self, width=9, height=5)
         self.raw_toolbar = NavigationToolbarCustom(self.raw_canvas, self)
         raw_layout.addWidget(self.raw_toolbar)
@@ -194,16 +195,31 @@ class AnalysisPanel(QWidget):
         
         # Aba de elipse
         ellipse_tab = QWidget()
-        ellipse_layout = QVBoxLayout(ellipse_tab)
+        ellipse_layout = QHBoxLayout(ellipse_tab)
         self.ellipse_canvas = MplCanvas(self, width=9, height=5)
+        self.toolbars_and_buttons = QWidget()
+        ellipse_toolbars_and_buttons_layout = QVBoxLayout(self.toolbars_and_buttons)
+        
         self.ellipse_toolbar = NavigationToolbarCustom(self.ellipse_canvas, self)
-        ellipse_layout.addWidget(self.ellipse_toolbar)
+        ellipse_toolbars_and_buttons_layout.addWidget(self.ellipse_toolbar)
+        # Remove the coordinate label since we'll use status bar
+        # self.coordinate_label = QLabel("")
+        # ellipse_toolbars_and_buttons_layout.addWidget(self.coordinate_label)
+        # self.ellipse_toolbar.set_coordinate_label(self.coordinate_label)
+        self.fit_ellipse_button = QPushButton("Ajustar Elipse")
+        self.fit_ellipse_button.setFixedWidth(250)
+        ellipse_toolbars_and_buttons_layout.addWidget(self.fit_ellipse_button)
+        ellipse_toolbars_and_buttons_layout.addWidget(QLabel(''), stretch=1)
+        # align the button to the right
+        
+        ellipse_layout.addWidget(self.toolbars_and_buttons)
         ellipse_layout.addWidget(self.ellipse_canvas)
+        ellipse_layout.addWidget(QLabel(''), stretch=1)  # Spacer
         self.analysis_tabs.addTab(ellipse_tab, "Elipse")
         
         # Aba de sinal demodulado
         demodulated_tab = QWidget()
-        demodulated_layout = QVBoxLayout(demodulated_tab)
+        demodulated_layout = QHBoxLayout(demodulated_tab)
         self.demodulated_canvas = MplCanvas(self, width=9, height=5)
         self.demodulated_toolbar = NavigationToolbarCustom(self.demodulated_canvas, self)
         demodulated_layout.addWidget(self.demodulated_toolbar)
@@ -212,7 +228,7 @@ class AnalysisPanel(QWidget):
         
         # Aba de sinal filtrado
         filtered_tab = QWidget()
-        filtered_layout = QVBoxLayout(filtered_tab)
+        filtered_layout = QHBoxLayout(filtered_tab)
         self.filtered_canvas = MplCanvas(self, width=9, height=5)
         self.filtered_toolbar = NavigationToolbarCustom(self.filtered_canvas, self)
         filtered_layout.addWidget(self.filtered_toolbar)
@@ -221,7 +237,7 @@ class AnalysisPanel(QWidget):
         
         # Aba de espectro (log)
         spectrum_tab = QWidget()
-        spectrum_layout = QVBoxLayout(spectrum_tab)
+        spectrum_layout = QHBoxLayout(spectrum_tab)
         self.spectrum_canvas = MplCanvas(self, width=9, height=5)
         self.spectrum_toolbar = NavigationToolbarCustom(self.spectrum_canvas, self)
         spectrum_layout.addWidget(self.spectrum_toolbar)
@@ -230,7 +246,7 @@ class AnalysisPanel(QWidget):
         
         # Nova aba de espectro (linear)
         spectrum_linear_tab = QWidget()
-        spectrum_linear_layout = QVBoxLayout(spectrum_linear_tab)
+        spectrum_linear_layout = QHBoxLayout(spectrum_linear_tab)
         self.spectrum_linear_canvas = MplCanvas(self, width=9, height=5)
         self.spectrum_linear_toolbar = NavigationToolbarCustom(self.spectrum_linear_canvas, self)
         spectrum_linear_layout.addWidget(self.spectrum_linear_toolbar)
@@ -239,7 +255,7 @@ class AnalysisPanel(QWidget):
         
         # Aba de espectrograma
         spectrogram_tab = QWidget()
-        spectrogram_layout = QVBoxLayout(spectrogram_tab)
+        spectrogram_layout = QHBoxLayout(spectrogram_tab)
         
         # Controles do espectrograma
         spectrogram_controls = QHBoxLayout()
@@ -289,6 +305,15 @@ class AnalysisPanel(QWidget):
         
         layout.addWidget(self.analysis_tabs)
         
+        # Connect toolbar coordinate signals to status bar
+        self.raw_toolbar.coordinatesChanged.connect(self.statusMessage.emit)
+        self.ellipse_toolbar.coordinatesChanged.connect(self.statusMessage.emit)
+        self.demodulated_toolbar.coordinatesChanged.connect(self.statusMessage.emit)
+        self.filtered_toolbar.coordinatesChanged.connect(self.statusMessage.emit)
+        self.spectrum_toolbar.coordinatesChanged.connect(self.statusMessage.emit)
+        self.spectrum_linear_toolbar.coordinatesChanged.connect(self.statusMessage.emit)
+        self.spectrogram_toolbar.coordinatesChanged.connect(self.statusMessage.emit)
+        
         # Conectar sinais
         self.moving_avg_checkbox.stateChanged.connect(self.on_moving_average_changed)
         self.window_size_spinbox.valueChanged.connect(self.on_window_size_changed)
@@ -311,9 +336,9 @@ class AnalysisPanel(QWidget):
         
         # Mostrar mensagem na barra de status
         if is_checked:
-            log_info(f"Média móvel configurada com janela de {self.window_size_spinbox.value()}")
+            log.info(f"Média móvel configurada com janela de {self.window_size_spinbox.value()}")
         else:
-            log_info("Média móvel desativada")
+            log.info("Média móvel desativada")
         
         # Emitir sinal para aplicar ou remover a média móvel
         # (comentado para aplicar somente ao clicar no botão)
@@ -327,7 +352,7 @@ class AnalysisPanel(QWidget):
             value: Novo valor da janela
         """
         if self.moving_avg_checkbox.isChecked():
-            log_info(f"Tamanho da janela de média móvel alterado para {value}")
+            log.info(f"Tamanho da janela de média móvel alterado para {value}")
             # Emitir sinal (comentado para aplicar somente ao clicar no botão)
             # self.movingAverageChanged.emit(True, value)
     
@@ -350,9 +375,9 @@ class AnalysisPanel(QWidget):
             low_freq = self.low_freq_spinbox.value()
             high_freq = self.high_freq_spinbox.value()
             order = self.order_spinbox.value()
-            log_info(f"Filtro passa-banda configurado ({low_freq:.1f}Hz-{high_freq:.1f}Hz, ordem {order})")
+            log.info(f"Filtro passa-banda configurado ({low_freq:.1f}Hz-{high_freq:.1f}Hz, ordem {order})")
         else:
-            log_info("Filtro passa-banda desativado")
+            log.info("Filtro passa-banda desativado")
             # Quando o filtro é desativado, emitir sinal com enabled=False para restaurar o sinal original
             self.bandpassFilterChanged.emit(
                 False, 
@@ -377,7 +402,7 @@ class AnalysisPanel(QWidget):
             high_freq = self.high_freq_spinbox.value()
             order = self.order_spinbox.value()
             
-            log_info(f"Parâmetros do filtro passa-banda alterados: {low_freq:.1f}Hz-{high_freq:.1f}Hz, ordem {order}")
+            log.info(f"Parâmetros do filtro passa-banda alterados: {low_freq:.1f}Hz-{high_freq:.1f}Hz, ordem {order}")
             
             # NÃO emitir o sinal até que o botão seja clicado
             # self.bandpassFilterChanged.emit(True, low_freq, high_freq, order)
@@ -403,15 +428,16 @@ class AnalysisPanel(QWidget):
         
     def on_browse_clicked(self):
         """Abre um diálogo para selecionar arquivos manualmente (agora múltiplos)"""
+        
         file_paths, _ = QFileDialog.getOpenFileNames(
             self,
             "Selecionar arquivos de dados",
-            "",
+            self.dir_label.text(),
             "Arquivos pickle (*.pkl, *.pkl.gz) "
         )
         
         if file_paths:
-            log_info(f"Arquivos selecionados: {file_paths}")
+            log.info(f"Arquivos selecionados: {file_paths}")
             # Adicionar arquivos à lista, evitando duplicados
             for file_path in file_paths:
                 items = [self.file_list.item(i).text() for i in range(self.file_list.count())]
@@ -440,14 +466,20 @@ class AnalysisPanel(QWidget):
         
         if not selected_files:
             return
+<<<<<<< HEAD
             
         log_info(f"Carregando arquivos: {selected_files}")
+=======
+        # Montar caminho completo para cada arquivo
+        selected_files_full = [os.path.join(self.current_dir, f) for f in selected_files]
+        log.info(f"Carregando arquivos: {selected_files_full}")
+>>>>>>> db4e97fd2148c52ebfbb81570be8dfceb8b2e7e1
         # Emitir sinal com a lista de arquivos
         self.fileSelected.emit(selected_files)
         
     def on_demodulate_clicked(self):
         """Solicita demodulação dos dados"""
-        log_info("Solicitando demodulação do sinal")
+        log.info("Solicitando demodulação do sinal")
         self.demodulateRequested.emit()
     
     def on_demodulate(self):
@@ -492,7 +524,7 @@ class AnalysisPanel(QWidget):
             waveforms: Array de formas de onda
             channels: Lista com identificadores dos canais
         """
-        log_debug(f"show_raw_data: t={len(t)}, waveforms={waveforms.shape}, channels={channels}")
+        log.debug(f"show_raw_data: t={len(t)}, waveforms={waveforms.shape}, channels={channels}")
         try:
             # Verificar se a média móvel está ativada para adicionar ao título
             titulo = 'Dados Brutos'
@@ -501,15 +533,13 @@ class AnalysisPanel(QWidget):
                 
             self.raw_canvas.plot_timeseries(
                 t, waveforms, channels=channels,
-                title=titulo
             )
-            # Garantir que o gráfico seja atualizado
             self.raw_canvas.draw()
-            log_debug("Gráfico de dados brutos atualizado com sucesso")
+            log.debug("Gráfico de dados brutos atualizado com sucesso")
             # Certificar-se que a aba está visível
             self.analysis_tabs.setCurrentIndex(0)
         except Exception as e:
-            log_error(f"Erro ao plotar dados brutos: {e}")
+            log.error(f"Erro ao plotar dados brutos: {e}")
         
     def show_ellipse(self, waveforms, ellipse_params=None):
         """
@@ -519,7 +549,7 @@ class AnalysisPanel(QWidget):
             waveforms: Array de formas de onda [canais, amostras]
             ellipse_params: Parâmetros da elipse ajustada (opcional)
         """
-        log_debug(f"show_ellipse: waveforms={waveforms.shape}, ellipse_params={ellipse_params is not None}")
+        log.debug(f"show_ellipse: waveforms={waveforms.shape}, ellipse_params={ellipse_params is not None}")
         try:
             # Limitar número de pontos para plot
             max_points = 5000
@@ -538,18 +568,16 @@ class AnalysisPanel(QWidget):
             self.ellipse_canvas.plot_scatter(
                 waveforms_plot[0], waveforms_plot[1],
                 xlabel='Canal 1', ylabel='Canal 2', 
-                title=titulo
             )
-            
             # Se temos parâmetros da elipse, plotar a elipse ajustada
             if ellipse_params is not None:
                 self.ellipse_canvas.plot_ellipse(
                     fitted_params=ellipse_params,
                     plot_params=True
                 )
-                log_debug("Elipse ajustada plotada com sucesso")
+                log.debug("Elipse ajustada plotada com sucesso")
         except Exception as e:
-            log_error(f"Erro ao plotar elipse: {e}")
+            log.error(f"Erro ao plotar elipse: {e}")
             
     def show_demodulated(self, t, demodulated):
         """
@@ -559,7 +587,7 @@ class AnalysisPanel(QWidget):
             t: Vetor de tempo
             demodulated: Sinal demodulado
         """
-        log_debug(f"show_demodulated: t={len(t)}, demodulated={len(demodulated)}")
+        log.debug(f"show_demodulated: t={len(t)}, demodulated={len(demodulated)}")
         try:
             # Limitar número de pontos para plotagem
             max_points = 10000
@@ -581,12 +609,11 @@ class AnalysisPanel(QWidget):
             self.demodulated_canvas.axes.plot(t_plot, demod_plot)
             self.demodulated_canvas.axes.set_xlabel('Tempo (s)')
             self.demodulated_canvas.axes.set_ylabel('Fase (rad)')
-            self.demodulated_canvas.axes.set_title(titulo)
             self.demodulated_canvas.axes.grid(True)
             self.demodulated_canvas.draw()
-            log_debug("Sinal demodulado plotado com sucesso")
+            log.debug("Sinal demodulado plotado com sucesso")
         except Exception as e:
-            log_error(f"Erro ao plotar sinal demodulado: {e}")
+            log.error(f"Erro ao plotar sinal demodulado: {e}")
         
     def show_filtered(self, t, filtered, filter_params):
         """
@@ -597,35 +624,22 @@ class AnalysisPanel(QWidget):
             filtered: Sinal filtrado
             filter_params: Parâmetros do filtro (dicionário)
         """
-        log_debug(f"show_filtered: t={len(t)}, filtered={len(filtered)}, params={filter_params}")
+        log.debug(f"show_filtered: t={len(t)}, filtered={len(filtered)}, params={filter_params}")
         
         # Verificação de segurança para dados válidos
         if len(t) == 0 or len(filtered) == 0:
-            log_error("show_filtered: Dados vazios, não é possível exibir gráfico")
+            log.error("show_filtered: Dados vazios, não é possível exibir gráfico")
             self.show_message("Dados vazios, não é possível exibir gráfico", self.filtered_canvas)
             return
             
         if np.isnan(filtered).any() or np.isinf(filtered).any():
-            log_warning("show_filtered: Dados contêm valores NaN ou infinitos")
+            log.warning("show_filtered: Dados contêm valores NaN ou infinitos")
             # Corrigir dados para exibição
             filtered_safe = np.copy(filtered)
             filtered_safe[np.isnan(filtered_safe)] = 0
             filtered_safe[np.isinf(filtered_safe)] = 0
             filtered = filtered_safe
-            
-        # Salvar em arquivo temporário para diagnóstico
-        try:
-            import os
-            import pickle
-            temp_dir = os.path.join(os.getcwd(), 'temp')
-            os.makedirs(temp_dir, exist_ok=True)
-            temp_file = os.path.join(temp_dir, 'last_filtered_data.pkl.gz')
-            with open(temp_file, 'wb') as f:
-                pickle.dump({'t': t, 'filtered': filtered, 'params': filter_params}, f)
-            log_debug(f"show_filtered: Dados salvos em {temp_file}")
-        except Exception as e:
-            log_warning(f"show_filtered: Não foi possível salvar dados temporários: {str(e)}")
-            
+                        
         try:
             # Limitar número de pontos para plotagem
             max_points = 10000
@@ -633,7 +647,7 @@ class AnalysisPanel(QWidget):
                 step = len(t) // max_points
                 t_plot = t[::step]
                 filtered_plot = filtered[::step]
-                log_debug(f"show_filtered: Reduzindo pontos para plot: {len(t)} -> {len(t_plot)}")
+                log.debug(f"show_filtered: Reduzindo pontos para plot: {len(t)} -> {len(t_plot)}")
             else:
                 t_plot = t
                 filtered_plot = filtered
@@ -643,36 +657,55 @@ class AnalysisPanel(QWidget):
             high_freq = filter_params.get('high_freq', 0)
             order = filter_params.get('order', 0)
             titulo = f'Sinal Filtrado (Passa-banda {low_freq:.1f}Hz-{high_freq:.1f}Hz, ordem {order})'
-            log_debug(f"show_filtered: Título do gráfico: '{titulo}'")
             
+
+
+
             # Plotar sinal filtrado
             self.filtered_canvas.axes.clear()
-            self.filtered_canvas.axes.plot(t_plot, filtered_plot)
+            line, = self.filtered_canvas.axes.plot(t_plot, filtered_plot)
             self.filtered_canvas.axes.set_xlabel('Tempo (s)')
             self.filtered_canvas.axes.set_ylabel('Fase (rad)')
-            self.filtered_canvas.axes.set_title(titulo)
+
+            #self.filtered_canvas.axes.set_title(titulo)
             self.filtered_canvas.axes.grid(True)
             self.filtered_canvas.draw()
-            log_debug("show_filtered: Canvas atualizado")
             
-            # Habilitar botão para salvar dados filtrados
-            self.save_filtered_button.setEnabled(True)
-            
+            log.debug("show_filtered: Canvas atualizado")
+                        
+            def update_line_on_zoom(event):
+                xlim = self.filtered_canvas.axes.get_xlim()
+                # # Get a dense enough subset in current view
+
+                idx = (t >= xlim[0]) & (t <= xlim[1])
+                x_view = t[idx]
+                y_view = filtered[idx]
+
+                # # Optional: downsample only if still too dense (e.g. > 5000 points)
+                if len(x_view) > max_points:
+                     step = len(x_view) // max_points
+                     x_view = x_view[::step]
+                     y_view = y_view[::step]
+
+                line.set_data(x_view, y_view)
+                self.filtered_canvas.axes.relim()
+                # self.filtered_canvas.axes.autoscale_view()
+                # self.filtered_canvas.draw_idle()
+            self.filtered_canvas.axes.callbacks.connect('xlim_changed', update_line_on_zoom)
+
             # Mudar para a aba de sinal filtrado
-            log_debug("show_filtered: Alterando para a aba de sinal filtrado (índice 3)")
             self.analysis_tabs.setCurrentIndex(3)
             
-            log_debug("Sinal filtrado plotado com sucesso")
             
             # Verificação final para garantir que a aba está correta
             if self.analysis_tabs.currentIndex() != 3:
-                log_warning("show_filtered: Falha ao mudar para a aba de sinal filtrado!")
+                log.warning("show_filtered: Falha ao mudar para a aba de sinal filtrado!")
                 # Forçar novamente após um pequeno atraso
                 from PyQt5.QtCore import QTimer
                 QTimer.singleShot(100, lambda: self.analysis_tabs.setCurrentIndex(3))
             
         except Exception as e:
-            log_error(f"Erro ao plotar sinal filtrado: {str(e)}")
+            log.error(f"Erro ao plotar sinal filtrado: {str(e)}")
             # Tentar mostrar mensagem de erro no canvas
             try:
                 self.show_message(f"Erro ao plotar sinal filtrado: {str(e)}", self.filtered_canvas)
@@ -691,7 +724,7 @@ class AnalysisPanel(QWidget):
             peaks: Lista de tuplas (freq, mag) com picos detectados
             use_filtered: Se True, indica que o espectro é do sinal filtrado
         """
-        log_debug(f"show_spectrum: freq_axis={len(freq_axis)}, magnitudes={len(magnitudes)}, peaks={peaks is not None}, use_filtered={use_filtered}")
+        log.debug(f"show_spectrum: freq_axis={len(freq_axis)}, magnitudes={len(magnitudes)}, peaks={peaks is not None}, use_filtered={use_filtered}")
         try:
             # Preparar título
             titulo = f'Espectro FFT (Fs={freq_axis[-1]*2/1000:.1f} kHz, N={len(magnitudes)*2})'
@@ -724,32 +757,32 @@ class AnalysisPanel(QWidget):
                     inset_ax.plot(freq, mag, 'ro', markersize=4)
                     
             self.spectrum_canvas.draw()
-            log_debug("Espectro plotado com sucesso")
+            log.debug("Espectro plotado com sucesso")
         except Exception as e:
-            log_error(f"Erro ao plotar espectro: {str(e)}")
+            log.error(f"Erro ao plotar espectro: {str(e)}")
         
     def on_save_filtered_clicked(self):
         """Solicita salvar os dados filtrados"""
-        log_info("Solicitando salvar dados filtrados")
+        log.info("Solicitando salvar dados filtrados")
         self.saveFilteredRequested.emit() 
 
     def on_apply_filter_clicked(self):
         """Método para aplicar o filtro passa-banda manualmente"""
-        log_info("Aplicando filtro passa-banda manualmente")
+        log.info("Aplicando filtro passa-banda manualmente")
         self.bandpassFilterChanged.emit(True, self.low_freq_spinbox.value(), self.high_freq_spinbox.value(), self.order_spinbox.value()) 
 
 
 
-    def show_metadata(self, metadata):
+    def show_metadata(self, data):
         """
         Exibe os metadados do arquivo
         
         Args:
             metadata: Dicionário com os metadados
         """
-        if not metadata:
-            self.metadata_text.setPlainText("Sem metadados disponíveis")
-            return
+        metadata = data.copy()
+        del metadata['waveforms']  # Remover dados de onda para evitar sobrecarga
+        del metadata['t']  # Remover vetor de tempo para evitar sobrecarga
             
         # Formatar texto
         metadata_str = ""
@@ -775,9 +808,9 @@ class AnalysisPanel(QWidget):
             window_size = self.window_size_spectrogram_spinbox.value()
             overlap = self.overlap_spectrogram_spinbox.value()
             max_freq = self.max_freq_spectrogram_spinbox.value()
-            log_info(f"Espectrograma configurado (janela: {window_size}, sobreposição: {overlap:.2f}, freq_max: {max_freq:.1f}Hz)")
+            log.info(f"Espectrograma configurado (janela: {window_size}, sobreposição: {overlap:.2f}, freq_max: {max_freq:.1f}Hz)")
         else:
-            log_info("Espectrograma desativado")
+            log.info("Espectrograma desativado")
     
     def on_generate_spectrogram_clicked(self):
         """Solicita a geração do espectrograma"""
@@ -788,7 +821,7 @@ class AnalysisPanel(QWidget):
         overlap = self.overlap_spectrogram_spinbox.value()
         max_freq = self.max_freq_spectrogram_spinbox.value()
         
-        log_info(f"Gerando espectrograma (janela: {window_size}, sobreposição: {overlap:.2f}, freq_max: {max_freq:.1f}Hz)")
+        log.info(f"Gerando espectrograma (janela: {window_size}, sobreposição: {overlap:.2f}, freq_max: {max_freq:.1f}Hz)")
         self.spectrogramRequested.emit(True, window_size, overlap, max_freq)
         
     def show_spectrogram(self, t, freqs, Sxx, params=None):
@@ -801,7 +834,7 @@ class AnalysisPanel(QWidget):
             Sxx: Matriz do espectrograma
             params: Parâmetros usados para gerar o espectrograma
         """
-        log_debug(f"show_spectrogram: t={len(t)}, freqs={len(freqs)}, Sxx={Sxx.shape}")
+        log.debug(f"show_spectrogram: t={len(t)}, freqs={len(freqs)}, Sxx={Sxx.shape}")
         
         try:
             # Preparar título
@@ -828,13 +861,13 @@ class AnalysisPanel(QWidget):
             # Mudar para a aba de espectrograma
             self.analysis_tabs.setCurrentIndex(5)  # Índice da aba de espectrograma
             
-            log_debug("Espectrograma plotado com sucesso")
+            log.debug("Espectrograma plotado com sucesso")
         except Exception as e:
-            log_error(f"Erro ao plotar espectrograma: {str(e)}")
+            log.error(f"Erro ao plotar espectrograma: {str(e)}")
             
     def reset_spectrogram(self):
         """Reseta as configurações do espectrograma"""
-        log_debug("reset_spectrogram: Resetando configurações do espectrograma")
+        log.debug("reset_spectrogram: Resetando configurações do espectrograma")
         self.spectrogram_checkbox.setChecked(False)
         self.window_size_spectrogram_spinbox.setValue(256)
         self.overlap_spectrogram_spinbox.setValue(0.5)
@@ -846,7 +879,7 @@ class AnalysisPanel(QWidget):
 
     def reset_bandpass_filter(self):
         """Reseta as configurações do filtro passa-banda"""
-        log_debug("reset_bandpass_filter: Resetando configurações do filtro passa-banda")
+        log.debug("reset_bandpass_filter: Resetando configurações do filtro passa-banda")
         self.bandpass_checkbox.setChecked(False)
         self.low_freq_spinbox.setValue(50.0)
         self.high_freq_spinbox.setValue(5000.0)
@@ -959,9 +992,9 @@ class AnalysisPanel(QWidget):
 
     def plot_calibration_data(self, calibration_data):
                         
-        self.show_raw_data(calibration_data['t'], 
-                           calibration_data['waveforms'], 
-                           calibration_data['channels'])
+        # self.show_raw_data(calibration_data['t'], 
+        #                    calibration_data['waveforms'], 
+        #                    calibration_data['channels'])
         self.show_ellipse(calibration_data['waveforms'], 
                          calibration_data['ellipse_params'])
         
@@ -1004,7 +1037,7 @@ class AnalysisPanel(QWidget):
     
     def on_use_save_dir_clicked(self):
         """Usa a mesma pasta da gravação (configuração)"""
-        dir_path = DataStore.load_config().get('save_directory', os.getcwd())
+        dir_path = DataStore.load_last_state().get('save_directory', os.getcwd())
         self.current_dir = dir_path
         self.dir_label.setText(dir_path)
         self.refresh_file_list_in_dir()

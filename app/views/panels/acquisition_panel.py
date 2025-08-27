@@ -490,6 +490,7 @@ class AcquisitionPanel(QWidget):
             self.sensor_status_label.setText("Conectado")
             self.sensor_status_label.setStyleSheet("color: green;")
             self.connect_sensor_button.setText("Reconectar ao Sensor")
+<<<<<<< HEAD
             self.connect_sensor_button.setStyleSheet("background-color: lightblue;")
         else:
             if error_message:
@@ -500,3 +501,6 @@ class AcquisitionPanel(QWidget):
                 self.sensor_status_label.setStyleSheet("color: red;")
             self.connect_sensor_button.setText("Conectar ao Sensor")
             self.connect_sensor_button.setStyleSheet("")
+=======
+            self.connect_sensor_button.setStyleSheet("background-color: lightblue;")
+>>>>>>> db4e97fd2148c52ebfbb81570be8dfceb8b2e7e1
