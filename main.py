@@ -94,8 +94,8 @@ class Application:
     
     def init_controllers(self):
         """Inicializa os controladores da aplicação"""
-        self.acquisition_controller = AcquisitionController()
         self.processing_controller = ProcessingController()
+        self.acquisition_controller = AcquisitionController(processing_controller=self.processing_controller)
         self.file_controller = FileController()
         self.audio_controller = AudioController()
         self.ultra_hear_controller = UltraHearController()
@@ -280,13 +280,18 @@ class Application:
                 
                 # Verificar se temos dois canais para a elipse
                 if waveforms.shape[0] >= 2:
-                    ellipse_params = data.get('ellipse_params')
-                    if not ellipse_params and self.processing_controller.has_calibration_data():
-                        ellipse_params = self.processing_controller.calibration_data['ellipse_params']
-                    
-                    if ellipse_params:
-                        log_info("Exibindo elipse da calibração")
-                        self.window.analysis_panel.show_ellipse(waveforms, ellipse_params)
+                     ellipse_params = data.get('ellipse_params')
+                     if not ellipse_params and self.processing_controller.has_calibration_data():
+                         ellipse_params = self.processing_controller.calibration_data['ellipse_params']
+                     
+                     if ellipse_params:
+                         log_info("Exibindo elipse da calibração")
+                         self.window.analysis_panel.show_ellipse(waveforms, ellipse_params)
+                         
+                         # Tentar demodular automaticamente após calibração
+                         log_info("Iniciando demodulação automática após calibração...")
+                         # Iniciar demodulação automaticamente
+                         self.processing_controller.demodulate_data()
         else:
             log_error("Falha no processamento da calibração")
             self.window.show_error_message(
@@ -304,9 +309,6 @@ class Application:
         log_info("Aquisição concluída com sucesso")
         self.window.acquisition_panel.set_enabled(True)
         self.window.show_status_message("Aquisição concluída")
-        
-        # Armazenar dados no controlador de processamento desde o início
-        self.processing_controller.set_data(data)
         
         # Mudar para a aba de análise
         self.window.switch_to_tab(2)
@@ -334,14 +336,25 @@ class Application:
                 channels = data.get('channels', [1, 2])
                 log_info(f"Exibindo dados brutos: canais {channels}")
                 
-                # Obter formas de onda processadas (com ou sem média móvel)
-                waveforms = self.processing_controller.get_waveforms_for_processing()
+                # Usar as formas de onda diretamente dos dados
+                waveforms = data['waveforms']
                 self.window.analysis_panel.show_raw_data(data['t'], waveforms, channels)
                 
                 # Verificar se temos dois canais para a elipse
                 if waveforms.shape[0] >= 2:
-                    ellipse_params = data.get('ellipse_params', None)
-                    log_info("Exibindo elipse")
+                    # Usar parâmetros da elipse da calibração carregada
+                    ellipse_params = None
+                    if self.processing_controller.has_calibration_data():
+                        ellipse_params = self.processing_controller.calibration_data.get('ellipse_params')
+                        log_info("Exibindo elipse da calibração carregada")
+                    else:
+                        # Fallback para parâmetros dos dados (se existirem)
+                        ellipse_params = data.get('ellipse_params', None)
+                        if ellipse_params:
+                            log_info("Exibindo elipse dos dados adquiridos")
+                        else:
+                            log_warning("Nenhuma elipse disponível para exibição")
+                    
                     self.window.analysis_panel.show_ellipse(waveforms, ellipse_params)
             else:
                 log_warning("Não foi possível exibir dados brutos: waveforms ou vetor de tempo ausentes")
@@ -353,25 +366,23 @@ class Application:
             log_error(f"Erro ao exibir dados brutos: {str(e)}")
             self.window.show_status_message(f"Erro ao exibir dados brutos: {str(e)}")
         
-        # ETAPA 2: Processar dados automaticamente
+        # ETAPA 2: Configurar dados para processamento e tentar demodular automaticamente
         try:
-            log_info("Iniciando processamento automático...")
-            self.window.show_status_message("Realizando processamento automático...")
-            success = self.processing_controller.auto_demodulate(data)
+            log_info("Configurando dados para processamento...")
+            self.processing_controller.set_data(data)
+            log_info("Dados configurados para processamento")
             
-            if success:
-                try:
-                    filename = self.processing_controller.save_demodulated_data()
-                    log_info(f"Dados processados salvos com sucesso em {filename}")
-                    self.window.show_status_message(f"Dados processados salvos em {filename}")
-                except Exception as e:
-                    log_error(f"Erro ao salvar dados processados: {str(e)}")
-                    self.window.show_status_message(f"Erro ao salvar dados processados: {str(e)}")
+            # Tentar demodular automaticamente se temos dados de calibração
+            if self.processing_controller.has_calibration_data():
+                log_info("Iniciando demodulação automática após aquisição...")
+                # Iniciar demodulação automaticamente
+                self.processing_controller.demodulate_data()
             else:
-                log_warning("Processamento automático não teve sucesso")
+                log_warning("Não há dados de calibração disponíveis para demodulação automática")
+                
         except Exception as e:
-            log_error(f"Erro no processamento automático: {str(e)}")
-            self.window.show_status_message(f"Erro no processamento automático: {str(e)}")
+            log_error(f"Erro ao configurar dados para processamento: {str(e)}")
+            self.window.show_status_message(f"Erro ao configurar dados: {str(e)}")
         
         # ETAPA 3: Atualizar lista de arquivos
         try:
@@ -430,36 +441,61 @@ class Application:
                     log_debug("Exibindo elipse do arquivo")
                     self.window.analysis_panel.show_ellipse(waveforms, ellipse_params)
                 
-            # Verificar se temos dados demodulados
+            # Verificar se temos dados demodulados ou tentar demodular automaticamente
+            demodulated_data = None
             if 'demodulated' in data and 't' in data:
                 log_debug("Exibindo dados demodulados do arquivo")
-                self.window.analysis_panel.show_demodulated(data['t'], data['demodulated'])
-                
-                # Verificar se temos dados filtrados
-                if 'filtered_demodulated' in data and 'bandpass_params' in data:
-                    log_debug("Exibindo dados filtrados do arquivo")
-                    self.window.analysis_panel.show_filtered(
-                        data['t'], 
-                        data['filtered_demodulated'],
-                        data['bandpass_params']
-                    )
+                demodulated_data = data['demodulated']
+                self.window.analysis_panel.show_demodulated(data['t'], demodulated_data)
+            else:
+                # Tentar demodular automaticamente usando os parâmetros da elipse do arquivo
+                log_debug("Tentando demodular dados automaticamente com parâmetros da elipse do arquivo")
+                try:
+                    # Verificar se temos parâmetros da elipse nos metadados
+                    metadata = data.get('metadata', {})
+                    has_ellipse_in_metadata = False
+
+                    if 'calibration_info' in metadata and metadata['calibration_info'].get('ellipse_params'):
+                        log_info("Encontrados parâmetros da elipse nos metadados TOML")
+                        has_ellipse_in_metadata = True
+                    elif 'ellipse_params' in metadata:
+                        log_info("Encontrados parâmetros da elipse nos metadados (formato antigo)")
+                        has_ellipse_in_metadata = True
+
+                    if has_ellipse_in_metadata:
+                        log_info("Iniciando demodulação automática com parâmetros da elipse do arquivo...")
+                        # Iniciar demodulação que usará os parâmetros da elipse dos metadados
+                        self.processing_controller.demodulate_data()
+                    else:
+                        log_warning("Arquivo não contém parâmetros da elipse nos metadados - não é possível demodular automaticamente")
+                except Exception as e:
+                    log_error(f"Erro na demodulação automática: {str(e)}")
                     
-                    # Atualizar a interface de filtro passa-banda com os parâmetros salvos no arquivo
-                    params = data['bandpass_params']
-                    if 'enabled' in params and 'low_freq' in params and 'high_freq' in params and 'order' in params:
-                        # Atualizar a interface sem emitir sinais (será feito manualmente)
-                        self.window.analysis_panel.bandpass_checkbox.setChecked(params['enabled'])
-                        self.window.analysis_panel.low_freq_spinbox.setValue(params['low_freq'])
-                        self.window.analysis_panel.high_freq_spinbox.setValue(params['high_freq'])
-                        self.window.analysis_panel.order_spinbox.setValue(params['order'])
-                        
-                        # Habilitar/desabilitar os spinboxes conforme necessário
-                        self.window.analysis_panel.low_freq_spinbox.setEnabled(params['enabled'])
-                        self.window.analysis_panel.high_freq_spinbox.setEnabled(params['enabled'])
-                        self.window.analysis_panel.order_spinbox.setEnabled(params['enabled'])
-                        self.window.analysis_panel.apply_filter_button.setEnabled(params['enabled'])
+            # Verificar se temos dados filtrados
+            if 'filtered_demodulated' in data and 'bandpass_params' in data:
+                log_debug("Exibindo dados filtrados do arquivo")
+                self.window.analysis_panel.show_filtered(
+                    data['t'], 
+                    data['filtered_demodulated'],
+                    data['bandpass_params']
+                )
                 
-                # Calcular e mostrar espectro
+                # Atualizar a interface de filtro passa-banda com os parâmetros salvos no arquivo
+                params = data['bandpass_params']
+                if 'enabled' in params and 'low_freq' in params and 'high_freq' in params and 'order' in params:
+                    # Atualizar a interface sem emitir sinais (será feito manualmente)
+                    self.window.analysis_panel.bandpass_checkbox.setChecked(params['enabled'])
+                    self.window.analysis_panel.low_freq_spinbox.setValue(params['low_freq'])
+                    self.window.analysis_panel.high_freq_spinbox.setValue(params['high_freq'])
+                    self.window.analysis_panel.order_spinbox.setValue(params['order'])
+                    
+                    # Habilitar/desabilitar os spinboxes conforme necessário
+                    self.window.analysis_panel.low_freq_spinbox.setEnabled(params['enabled'])
+                    self.window.analysis_panel.high_freq_spinbox.setEnabled(params['enabled'])
+                    self.window.analysis_panel.order_spinbox.setEnabled(params['enabled'])
+                    self.window.analysis_panel.apply_filter_button.setEnabled(params['enabled'])
+            
+            # Calcular e mostrar espectro
                 try:
                     # Verificar se devemos usar o sinal filtrado para o espectro
                     use_filtered = 'filtered_demodulated' in data and data.get('bandpass_params', {}).get('enabled', False)
@@ -542,6 +578,7 @@ class Application:
                     self.window.analysis_panel.analysis_tabs.setCurrentIndex(3)  # Aba de sinal filtrado
                 else:
                     self.window.analysis_panel.analysis_tabs.setCurrentIndex(2)  # Aba de sinal demodulado
+                    log_info("Navegando automaticamente para a aba de dados demodulados")
                 
         except Exception as e:
             log_error(f"Erro ao exibir dados demodulados: {str(e)}")
@@ -718,16 +755,83 @@ class Application:
     
     def on_files_selected(self, file_list):
         """Slot para carregar múltiplos arquivos selecionados na análise"""
-        # Carregar o primeiro arquivo através do file_controller para garantir 
-        # que os dados sejam passados corretamente para o processing_controller
-        if file_list:
-            log_info(f"Carregando arquivo selecionado: {file_list[0]}")
-            self.file_controller.load_file(file_list[0])
+        if not file_list:
+            return
             
-            # Se há múltiplos arquivos, também usar o método original para exibição múltipla
-            if len(file_list) > 1:
-                log_info(f"Carregando visualização múltipla para {len(file_list)} arquivos")
-                self.window.analysis_panel.load_selected_file_from_list(file_list)
+        # Carregar o primeiro arquivo através do file_controller
+        filepath = file_list[0]
+        log_info(f"Carregando arquivo selecionado: {filepath}")
+        
+        try:
+            # Carregar dados usando o controlador de arquivos
+            data = self.file_controller.load_file(filepath)
+            if data:
+                # Configurar dados no controlador de processamento
+                self.processing_controller.set_data(data)
+                
+                # Exibir dados na interface
+                if 't' in data and 'waveforms' in data:
+                    channels = data.get('channels', [1, 2])
+                    self.window.analysis_panel.show_raw_data(data['t'], data['waveforms'], channels)
+                
+                # Mostrar elipse usando parâmetros dos metadados do arquivo ou calibração
+                ellipse_params = None
+                if 'metadata' in data:
+                    # Primeiro, tentar usar parâmetros da elipse dos metadados do arquivo
+                    if 'calibration_info' in data['metadata'] and data['metadata']['calibration_info'].get('ellipse_params'):
+                        ellipse_params = data['metadata']['calibration_info']['ellipse_params']
+                        log_info("Usando parâmetros da elipse dos metadados TOML do arquivo")
+                    elif 'ellipse_params' in data['metadata']:
+                        ellipse_params = data['metadata']['ellipse_params']
+                        log_info("Usando parâmetros da elipse dos metadados (formato antigo) do arquivo")
+
+                # Se não encontrou nos metadados, tentar usar calibração carregada
+                if not ellipse_params and self.processing_controller.has_calibration_data():
+                    ellipse_params = self.processing_controller.calibration_data.get('ellipse_params')
+                    if ellipse_params:
+                        log_info("Usando parâmetros da elipse da calibração carregada")
+
+                # Mostrar elipse se temos parâmetros
+                if ellipse_params and 'waveforms' in data:
+                    self.window.analysis_panel.show_ellipse(data['waveforms'], ellipse_params)
+
+                # Mostrar metadados se disponíveis
+                if 'metadata' in data:
+                    self.window.analysis_panel.show_metadata(data['metadata'])
+
+                # Atualizar status
+                self.window.show_status_message(f"Arquivo carregado: {os.path.basename(filepath)}")
+
+                # Verificar se há parâmetros da elipse para demodulação automática
+                metadata = data.get('metadata', {})
+                has_ellipse_params = False
+
+                if 'calibration_info' in metadata and metadata['calibration_info'].get('ellipse_params'):
+                    has_ellipse_params = True
+                    log_info("Parâmetros da elipse encontrados nos metadados TOML")
+                elif 'ellipse_params' in metadata:
+                    has_ellipse_params = True
+                    log_info("Parâmetros da elipse encontrados nos metadados (formato antigo)")
+
+                if has_ellipse_params:
+                    log_info("Parâmetros da elipse disponíveis - iniciando demodulação automática...")
+                    # Iniciar demodulação automaticamente
+                    self.processing_controller.demodulate_data()
+                elif self.processing_controller.has_calibration_data():
+                    log_info("Usando calibração carregada para demodulação automática...")
+                    self.processing_controller.demodulate_data()
+                else:
+                    log_info("Nenhum parâmetro de elipse disponível para demodulação automática")
+                
+                # Se há múltiplos arquivos, também usar o método original para exibição múltipla
+                if len(file_list) > 1:
+                    log_info(f"Carregando visualização múltipla para {len(file_list)} arquivos")
+                    self.window.analysis_panel.load_selected_file_from_list(file_list)
+            else:
+                self.window.show_status_message("Erro ao carregar arquivo")
+        except Exception as e:
+            log_error(f"Erro ao carregar arquivo: {str(e)}")
+            self.window.show_status_message(f"Erro ao carregar arquivo: {str(e)}")
     
     def on_audio_file_loaded(self, data):
         """Manipula o carregamento de arquivo na aba de análise de áudio"""
