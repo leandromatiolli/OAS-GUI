@@ -36,6 +36,10 @@ class ProcessingController(QObject):
         self.filtered_data = None
         self.calibration_data = None
         
+        # Cache para dados demodulados
+        self._demodulated_cache = {}
+        self._demodulation_params = {}
+        
         # Configuração da média móvel
         self.use_moving_average = False
         self.moving_average_window = 11
@@ -91,6 +95,48 @@ class ProcessingController(QObject):
         # Aplicar filtro passa-banda se os dados demodulados existirem
         if self.use_bandpass_filter and self.demodulated_data is not None and 'demodulated' in self.demodulated_data:
             self.apply_bandpass_filter()
+    
+    def get_demodulated_data(self, force_recalculate: bool = False) -> Optional[Dict[str, Any]]:
+        """
+        Obtém dados demodulados com cache automático
+        
+        Args:
+            force_recalculate: Se deve recalcular mesmo se já estiver em cache
+            
+        Returns:
+            Dicionário com dados demodulados ou None se não for possível demodular
+        """
+        if self.data is None:
+            log_warning("get_demodulated_data: Nenhum dado disponível para demodulação")
+            return None
+            
+        # Verificar se já temos dados demodulados em cache
+        if not force_recalculate and self.demodulated_data is not None:
+            log_debug("get_demodulated_data: Retornando dados demodulados do cache")
+            return self.demodulated_data
+            
+        # Verificar se temos dados de calibração
+        if self.calibration_data is None:
+            log_warning("get_demodulated_data: Nenhum dado de calibração disponível")
+            return None
+            
+        # Verificar se temos parâmetros da elipse nos metadados
+        metadata = self.data.get('metadata', {})
+        if isinstance(metadata, dict) and 'calibration_info' in metadata:
+            ellipse_params = metadata['calibration_info'].get('ellipse_params', {})
+        else:
+            # Fallback para metadados antigos
+            ellipse_params = metadata.get('ellipse_params', {})
+            
+        if not ellipse_params:
+            log_warning("get_demodulated_data: Parâmetros da elipse não encontrados nos metadados")
+            return None
+            
+        # Demodular dados
+        log_info("get_demodulated_data: Iniciando demodulação automática")
+        self.demodulate_data()
+        
+        return self.demodulated_data
     
     def set_calibration_data(self, calibration_data: Optional[Dict[str, Any]]):
         """
@@ -358,6 +404,76 @@ class ProcessingController(QObject):
         # Caso contrário, usar o sinal demodulado original
         return self.demodulated_data['demodulated']
         
+    def _convert_ellipse_params(self, ellipse_params):
+        """
+        Converte parâmetros da elipse para o formato esperado pelo demodulador
+
+        Args:
+            ellipse_params: Parâmetros da elipse em qualquer formato (dict, list, tuple)
+
+        Returns:
+            numpy.ndarray: Parâmetros no formato (p, q, r, s, alpha)
+        """
+        import numpy as np
+
+        if ellipse_params is None or ellipse_params == {} or ellipse_params == []:
+            log_error("Parâmetros da elipse são None ou vazios")
+            return None
+
+        if isinstance(ellipse_params, dict):
+            # Novo formato: dicionário com chaves nomeadas
+            if 'center_x' in ellipse_params and 'center_y' in ellipse_params:
+                try:
+                    p = float(ellipse_params['center_x'])
+                    q = float(ellipse_params['center_y'])
+                    r = float(ellipse_params.get('width', 1.0))
+                    s = float(ellipse_params.get('height', 1.0))
+                    alpha = float(ellipse_params.get('angle', 0.0))
+                except (ValueError, TypeError) as e:
+                    log_error(f"Erro ao converter dicionário de parâmetros da elipse: {e}")
+                    return None
+            else:
+                # Tentar mapear chaves alternativas
+                try:
+                    p = float(ellipse_params.get('p', ellipse_params.get('center_x', 0)))
+                    q = float(ellipse_params.get('q', ellipse_params.get('center_y', 0)))
+                    r = float(ellipse_params.get('r', ellipse_params.get('width', 1.0)))
+                    s = float(ellipse_params.get('s', ellipse_params.get('height', 1.0)))
+                    alpha = float(ellipse_params.get('alpha', ellipse_params.get('angle', 0.0)))
+                except (ValueError, TypeError) as e:
+                    log_error(f"Erro ao converter dicionário alternativo de parâmetros da elipse: {e}")
+                    return None
+        elif isinstance(ellipse_params, (list, tuple)):
+            # Formato antigo: lista/tupla com valores numéricos ou strings
+            if len(ellipse_params) >= 5:
+                try:
+                    # Converter strings para float se necessário
+                    p = float(ellipse_params[0])
+                    q = float(ellipse_params[1])
+                    r = float(ellipse_params[2])
+                    s = float(ellipse_params[3])
+                    alpha = float(ellipse_params[4])
+                except (ValueError, TypeError, IndexError) as e:
+                    log_error(f"Erro ao converter lista de parâmetros da elipse: {e}")
+                    return None
+            else:
+                log_error(f"Parâmetros da elipse incompletos: {len(ellipse_params)} elementos")
+                return None
+        elif isinstance(ellipse_params, np.ndarray):
+            # Já está no formato correto
+            if ellipse_params.shape[0] >= 5:
+                return ellipse_params[:5]
+            else:
+                log_error(f"Array de parâmetros da elipse muito pequeno: {ellipse_params.shape}")
+                return None
+        else:
+            log_error(f"Formato de parâmetros da elipse não suportado: {type(ellipse_params)} - {ellipse_params}")
+            return None
+
+        result = np.array([p, q, r, s, alpha], dtype=np.float64)
+        log_debug(f"Parâmetros da elipse convertidos com sucesso: {result}")
+        return result
+
     @pyqtSlot()
     def demodulate_data(self):
         """Demodula os dados atuais, usando calibração se disponível"""
@@ -365,7 +481,7 @@ class ProcessingController(QObject):
             log_warning("demodulate_data: Sem dados para demodular")
             self.demodulationError.emit("Sem dados para demodular")
             return
-            
+
         # Verificar se temos os dados necessários
         if 'waveforms' not in self.data or self.data['waveforms'] is None:
             log_warning("demodulate_data: Sem formas de onda para demodular")
@@ -398,19 +514,44 @@ class ProcessingController(QObject):
             
             # Determinar se usamos parâmetros de elipse da calibração ou calculamos novos
             ellipse_params = None
-            
-            # Verificar se temos dados de calibração disponíveis
-            if self.has_calibration_data():
-                log_debug("demodulate_data: Usando parâmetros de elipse da calibração")
-                ellipse_params = self.calibration_data['ellipse_params']
-            elif 'ellipse_params' in self.data and self.data['ellipse_params'] is not None:
-                log_debug("demodulate_data: Usando parâmetros de elipse existentes nos dados")
-                ellipse_params = self.data['ellipse_params']
-            else:
-                log_debug("demodulate_data: Calculando novos parâmetros de elipse")
+            ellipse_source = "nenhum"
+
+            # Primeiro, verificar se temos parâmetros da elipse nos metadados
+            metadata = self.data.get('metadata', {})
+            log_debug(f"demodulate_data: Metadados disponíveis: {list(metadata.keys()) if isinstance(metadata, dict) else 'Nenhum'}")
+
+            if isinstance(metadata, dict) and 'calibration_info' in metadata:
+                ellipse_params_raw = metadata['calibration_info'].get('ellipse_params', {})
+                if ellipse_params_raw is not None and ellipse_params_raw != {} and ellipse_params_raw != []:
+                    log_info("demodulate_data: Usando parâmetros de elipse dos metadados TOML")
+                    ellipse_source = "metadados TOML"
+                    ellipse_params = self._convert_ellipse_params(ellipse_params_raw)
+            elif 'ellipse_params' in metadata:
+                ellipse_params_raw = metadata['ellipse_params']
+                if ellipse_params_raw is not None and ellipse_params_raw != {} and ellipse_params_raw != []:
+                    log_info("demodulate_data: Usando parâmetros de elipse dos metadados (formato antigo)")
+                    ellipse_source = "metadados antigo"
+                    ellipse_params = self._convert_ellipse_params(ellipse_params_raw)
+
+            # Se não encontrou nos metadados, verificar dados de calibração
+            if ellipse_params is None and self.has_calibration_data():
+                log_info("demodulate_data: Usando parâmetros de elipse da calibração carregada")
+                ellipse_params_raw = self.calibration_data['ellipse_params']
+                ellipse_source = "calibração carregada"
+                ellipse_params = self._convert_ellipse_params(ellipse_params_raw)
+            elif ellipse_params is None and 'ellipse_params' in self.data and self.data['ellipse_params'] is not None:
+                log_info("demodulate_data: Usando parâmetros de elipse existentes nos dados")
+                ellipse_params_raw = self.data['ellipse_params']
+                ellipse_source = "dados existentes"
+                ellipse_params = self._convert_ellipse_params(ellipse_params_raw)
+            elif ellipse_params is None:
+                log_info("demodulate_data: Calculando novos parâmetros de elipse")
+                ellipse_source = "cálculo novo"
                 # Calcular parâmetros da elipse a partir dos dados
                 ellipse_params = SignalProcessor.fit_ellipse(waveforms)
-            
+
+            log_info(f"demodulate_data: Fonte dos parâmetros da elipse: {ellipse_source}")
+
             # Demodular os dados usando os parâmetros da elipse
             log_debug("demodulate_data: Demodulando o sinal usando os parâmetros da elipse")
             demodulated = SignalProcessor.demodulate(waveforms, ellipse_params)

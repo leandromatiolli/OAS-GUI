@@ -117,7 +117,7 @@ class FileController(QObject):
     @pyqtSlot(str)
     def load_file(self, filename: str):
         """
-        Carrega um arquivo
+        Carrega um arquivo com metadados TOML
         
         Args:
             filename: Nome do arquivo a ser carregado
@@ -127,7 +127,8 @@ class FileController(QObject):
                 self.fileError.emit(f"Arquivo não encontrado: {filename}")
                 return
                 
-            data = DataStore.load_data(filename)
+            # Carregar dados brutos e metadados TOML
+            data = DataStore.load_data_with_metadata(filename)
             self.fileLoaded.emit(data)
             
         except Exception as e:

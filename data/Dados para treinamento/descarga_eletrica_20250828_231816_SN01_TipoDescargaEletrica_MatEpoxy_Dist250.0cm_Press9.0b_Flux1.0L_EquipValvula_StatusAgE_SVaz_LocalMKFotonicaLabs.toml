@@ -1,0 +1,55 @@
+[acquisition_info]
+timestamp = "20250828_231816"
+sample_frequency = 125000000.0
+decimation = 64
+effective_sample_rate = 1953125.0
+acquisition_time = 4.294967296
+channels = [ 1, 2,]
+
+[hardware_info]
+redpitaya_model = "STEMlab 125-14"
+firmware_version = "1.04"
+ip_address = ""
+
+[calibration_info]
+calibration_file = ""
+calibration_timestamp = ""
+calibration_file_used = ""
+calibration_timestamp_used = ""
+
+[test_metadata]
+sensor_sn = "01"
+test_type = "Descarga Elétrica"
+material = "Epoxy"
+location = "MKFotonica Labs"
+pressure = 9.0
+pressure_unit = "bar"
+flow = 1.0
+flow_unit = "L/min"
+distance = 250.0
+distance_unit = "cm"
+equipment_type = "Válvula"
+equipment_status = [ "Água Estática", "Sem Vazamento",]
+comments = "teste 1"
+timestamp = "20250828_231816"
+timestamp_iso = "2025-08-28T23:18:06.070549+00:00"
+save_directory = "data/Dados para treinamento"
+
+[file_info]
+data_shape = [ 2, 8388608,]
+data_type = "int16"
+file_size_bytes = 100663663
+
+[custom_variables]
+espessura = "65"
+espessura_unit = "mm"
+temperatura = "50"
+temperatura_unit = "C"
+is_calibration = false
+
+[calibration_info.ellipse_params]
+center_x = 2888.212817935039
+center_y = 2982.0638627173425
+width = 0.9911090135574341
+height = 2861.972669518986
+angle = 0.4827854922227688

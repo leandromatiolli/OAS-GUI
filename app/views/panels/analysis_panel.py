@@ -4,7 +4,7 @@ Módulo com o painel de análise e visualização de dados
 from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QTabWidget, QPushButton,
                            QComboBox, QLabel, QFileDialog, QMessageBox, QSplitter,
                            QCheckBox, QSpinBox, QDoubleSpinBox, QGroupBox, QFormLayout,
-                           QTextEdit, QListWidget)
+                           QTextEdit, QListWidget, QListWidgetItem, QApplication)
 from PyQt5.QtCore import Qt, pyqtSignal
 import numpy as np
 import os
@@ -69,6 +69,10 @@ class AnalysisPanel(QWidget):
         self.current_dir = DataStore.load_config().get('save_directory', os.getcwd())
         self.dir_label = QLabel(self.current_dir)
         
+        # Label de status para mostrar progresso
+        self.status_label = QLabel("Pronto para carregar arquivos")
+        self.status_label.setStyleSheet("color: blue; font-weight: bold;")
+        
         file_selection.addWidget(QLabel("Arquivo(s):"))
         file_selection.addWidget(self.file_list)
         file_selection.addWidget(self.refresh_button)
@@ -77,6 +81,7 @@ class AnalysisPanel(QWidget):
         file_selection.addWidget(self.select_dir_button)
         file_selection.addWidget(self.use_save_dir_button)
         file_selection.addWidget(self.dir_label)
+        file_selection.addWidget(self.status_label)
         
         left_layout.addLayout(file_selection)
 
@@ -366,7 +371,9 @@ class AnalysisPanel(QWidget):
         """
         self.file_list.clear()
         for file in files:
-            self.file_list.addItem(file)
+            item = QListWidgetItem(file)
+            item.setData(Qt.UserRole, file)  # Caminho completo
+            self.file_list.addItem(item)
             
     def on_refresh_clicked(self):
         """Solicita atualização da lista de arquivos na pasta atual"""
@@ -385,12 +392,17 @@ class AnalysisPanel(QWidget):
             log_info(f"Arquivos selecionados: {file_paths}")
             # Adicionar arquivos à lista, evitando duplicados
             for file_path in file_paths:
-                items = [self.file_list.item(i).text() for i in range(self.file_list.count())]
-                if file_path not in items:
-                    self.file_list.addItem(file_path)
+                # Verificar se o arquivo já existe na lista
+                existing_items = [self.file_list.item(i).data(Qt.UserRole) for i in range(self.file_list.count())]
+                if file_path not in existing_items:
+                    item = QListWidgetItem(os.path.basename(file_path))
+                    item.setData(Qt.UserRole, file_path)  # Caminho completo
+                    self.file_list.addItem(item)
+            
             # Selecionar todos os arquivos recém-adicionados
             for i in range(self.file_list.count()):
                 self.file_list.item(i).setSelected(True)
+            
             # Carregar os arquivos selecionados
             self.on_load_clicked()
             
@@ -399,12 +411,19 @@ class AnalysisPanel(QWidget):
         if self.file_list.count() == 0:
             return
         # Obter todos os arquivos selecionados
-        selected_files = [item.text() for item in self.file_list.selectedItems()]
-        if not selected_files:
+        selected_items = self.file_list.selectedItems()
+        if not selected_items:
             return
-        # Montar caminho completo para cada arquivo
-        selected_files_full = [os.path.join(self.current_dir, f) for f in selected_files]
+        
+        # Obter caminhos completos dos arquivos selecionados
+        selected_files_full = [item.data(Qt.UserRole) for item in selected_items]
         log_info(f"Carregando arquivos: {selected_files_full}")
+        
+        # Atualizar interface para mostrar que arquivos estão sendo carregados
+        if hasattr(self, 'status_label'):
+            self.status_label.setText(f"Carregando {len(selected_files_full)} arquivo(s)...")
+            QApplication.processEvents()  # Atualizar interface imediatamente
+        
         # Emitir sinal com a lista de arquivos
         self.fileSelected.emit(selected_files_full)
         
@@ -824,13 +843,23 @@ class AnalysisPanel(QWidget):
         import pickle
         import numpy as np
         from scipy.signal import get_window
+        
+        log_info(f"Carregando {len(file_list)} arquivos para análise múltipla...")
         self.multiple_demodulated_data = []
         self.multiple_metadata = []  # Lista para armazenar metadados de todos os arquivos
         
-        for filename in file_list:
+        # Atualizar status
+        if hasattr(self, 'status_label'):
+            self.status_label.setText(f"Carregando {len(file_list)} arquivos...")
+            QApplication.processEvents()
+        
+        for idx, filename in enumerate(file_list):
             try:
+                log_info(f"Carregando arquivo {idx + 1}/{len(file_list)}: {os.path.basename(filename)}")
+                
                 with open(filename, 'rb') as f:
                     data = pickle.load(f)
+                
                 # Converter para dict se necessário
                 if not isinstance(data, dict):
                     temp_dict = {}
@@ -838,6 +867,7 @@ class AnalysisPanel(QWidget):
                         if not key.startswith('__') and not callable(getattr(data, key)):
                             temp_dict[key] = getattr(data, key)
                     data = temp_dict
+                
                 if 'demodulated' in data:
                     self.multiple_demodulated_data.append(data)
                     # Coletar metadados do arquivo
@@ -852,7 +882,9 @@ class AnalysisPanel(QWidget):
                         self.show_raw_data(data['t'], data['waveforms'], channels)
                     if 't' in data and 'demodulated' in data:
                         self.show_demodulated(data['t'], data['demodulated'])
+                        
             except Exception as e:
+                log_error(f"Erro ao carregar arquivo {filename}: {str(e)}")
                 from PyQt5.QtWidgets import QMessageBox
                 import traceback
                 traceback.print_exc()
@@ -860,16 +892,31 @@ class AnalysisPanel(QWidget):
         
         # Após carregar todos, plotar espectros múltiplos e mostrar metadados
         if self.multiple_demodulated_data:
+            log_info(f"Carregados {len(self.multiple_demodulated_data)} arquivos com sucesso")
             # Plotar todos os sinais demodulados sobrepostos
             self.plot_demodulated_multiple()
             self.plot_spectrum_multiple()
             self.show_metadata_multiple(self.multiple_metadata)
+            
+            # Atualizar status
+            if hasattr(self, 'status_label'):
+                self.status_label.setText(f"{len(self.multiple_demodulated_data)} arquivos carregados com sucesso")
+        else:
+            log_warning("Nenhum arquivo com dados demodulados foi carregado")
+            if hasattr(self, 'status_label'):
+                self.status_label.setText("Nenhum arquivo válido carregado")
 
     def plot_spectrum_multiple(self):
         """Plota o espectro de todos os arquivos carregados, com cores e transparências diferentes"""
         import numpy as np
         from scipy.signal import get_window
-        
+
+        if not getattr(self, 'multiple_demodulated_data', None):
+            log_warning("plot_spectrum_multiple: Nenhum dado múltiplo disponível")
+            return
+
+        log_info(f"plot_spectrum_multiple: Calculando espectros para {len(self.multiple_demodulated_data)} arquivos")
+
         # Plotar em ambas as abas (log e linear)
         for canvas, is_log in [(self.spectrum_canvas, True), (self.spectrum_linear_canvas, False)]:
             ax = canvas.axes
@@ -972,22 +1019,53 @@ class AnalysisPanel(QWidget):
         self.refresh_file_list_in_dir()
     
     def refresh_file_list_in_dir(self):
-        """Atualiza a lista de arquivos demodulados (.pkl) na pasta atual de análise, sem duplicatas e só o nome do arquivo"""
+        """Atualiza a lista de arquivos (.pkl) na pasta atual de análise"""
         self.file_list.clear()
-        # Procurar apenas arquivos demodulados na pasta selecionada
-        demod_files = [f for f in os.listdir(self.current_dir)
-                       if f.startswith("vazamento_demodulado_") and f.endswith('.pkl')]
-        # Remover duplicatas
-        demod_files = list(sorted(set(demod_files), key=lambda x: os.path.getmtime(os.path.join(self.current_dir, x)), reverse=True))
-        for file in demod_files:
-            self.file_list.addItem(file) 
+        
+        if not self.current_dir or not os.path.exists(self.current_dir):
+            log_warning(f"Diretório não existe ou não foi definido: {self.current_dir}")
+            return
+        
+        try:
+            # Procurar todos os arquivos .pkl na pasta selecionada
+            pkl_files = [f for f in os.listdir(self.current_dir) if f.endswith('.pkl')]
+            
+            # Ordenar por data de modificação (mais recentes primeiro)
+            pkl_files.sort(key=lambda x: os.path.getmtime(os.path.join(self.current_dir, x)), reverse=True)
+            
+            for file in pkl_files:
+                item = QListWidgetItem(file)
+                item.setData(Qt.UserRole, os.path.join(self.current_dir, file))  # Caminho completo
+                self.file_list.addItem(item)
+                
+            log_info(f"Lista atualizada: {len(pkl_files)} arquivos encontrados em {self.current_dir}")
+            
+            # Atualizar status
+            if hasattr(self, 'status_label'):
+                self.status_label.setText(f"{len(pkl_files)} arquivos encontrados")
+                
+        except Exception as e:
+            log_error(f"Erro ao atualizar lista de arquivos: {e}")
+            QMessageBox.critical(self, "Erro", f"Erro ao atualizar lista de arquivos: {e}") 
 
     def plot_demodulated_multiple(self):
         """Plota os sinais demodulados de todos os arquivos carregados simultaneamente."""
         import numpy as np
 
         if not getattr(self, 'multiple_demodulated_data', None):
+            log_warning("plot_demodulated_multiple: Nenhum dado múltiplo disponível")
             return
+
+        log_info(f"plot_demodulated_multiple: Plotando {len(self.multiple_demodulated_data)} sinais demodulados")
+
+        # Debug: verificar dados disponíveis
+        for idx, data in enumerate(self.multiple_demodulated_data):
+            log_debug(f"Arquivo {idx+1}: keys={list(data.keys()) if isinstance(data, dict) else 'Não é dict'}")
+            if 'demodulated' in data:
+                demod_shape = data['demodulated'].shape if hasattr(data['demodulated'], 'shape') else len(data['demodulated']) if hasattr(data['demodulated'], '__len__') else 'Desconhecido'
+                log_debug(f"Arquivo {idx+1}: demodulated shape={demod_shape}")
+            else:
+                log_warning(f"Arquivo {idx+1}: sem dados demodulados")
 
         ax = self.demodulated_canvas.axes
         ax.clear()

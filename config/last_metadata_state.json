@@ -1,9 +1,9 @@
 {
     "sensor_sn": "01",
-    "test_type": "Vazamento de Água",
+    "test_type": "Descarga Elétrica",
     "material": "Epoxy",
     "location": "MKFotonica Labs",
-    "pressure": 10.0,
+    "pressure": 9.0,
     "flow": 1.0,
     "distance": 250.0,
     "equipment_type": "Válvula",
@@ -11,7 +11,7 @@
         "Água Estática",
         "Sem Vazamento"
     ],
-    "comments": "falando longe\n",
+    "comments": "teste 1",
     "custom_labels": [
         {
             "nome": "espessura",
@@ -20,7 +20,7 @@
         },
         {
             "nome": "temperatura",
-            "valor": "",
+            "valor": "50",
             "unidade": "C"
         }
     ]

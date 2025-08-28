@@ -8,6 +8,7 @@ import pickle
 from datetime import datetime
 from typing import Dict, List, Tuple, Optional, Union, Any
 import json
+import toml
 import unicodedata
 from app.utils.time_utils import get_formatted_internet_timestamp
 
@@ -54,14 +55,15 @@ class DataStore:
             return {}
     
     @staticmethod
-    def save_data(data: Dict[str, Any], prefix: str = "vazamento_continuo", directory: str = None) -> str:
+    def save_data(data: Dict[str, Any], prefix: str = None, directory: str = None, calibration_data: Dict[str, Any] = None) -> str:
         """
-        Salva dados em arquivo pickle
+        Salva dados brutos em arquivo pickle e metadados em TOML
         
         Args:
             data: Dicionário contendo os dados
             prefix: Prefixo para o nome do arquivo
             directory: Diretório onde salvar o arquivo
+            calibration_data: Dados de calibração opcionais para incluir nos metadados
             
         Returns:
             Nome do arquivo onde os dados foram salvos
@@ -71,6 +73,7 @@ class DataStore:
             s = ''.join(c for c in unicodedata.normalize('NFD', str(s)) if unicodedata.category(c) != 'Mn')
             s = s.replace(' ', '').replace('/', '-').replace(':', '-')
             return s
+            
         # Dicionário de abreviações para status
         status_abbr = {
             'Água Circulante': 'AgC',
@@ -84,6 +87,7 @@ class DataStore:
             'Com Vazamento': 'CVaz',
             'Sem Vazamento': 'SVaz',
         }
+        
         # Abreviações para campos principais
         field_abbr = {
             'sensor_sn': 'SN',
@@ -96,13 +100,16 @@ class DataStore:
             'equipment_status': 'Status',
             'location': 'Local',
         }
+        
         if directory is None:
             directory = DataStore.load_config().get('save_directory')
         if directory is None:
             directory = os.getcwd()
         os.makedirs(directory, exist_ok=True)
+        
         timestamp = get_formatted_internet_timestamp("%Y%m%d_%H%M%S")
         metadata = data.get('metadata', {})
+        
         # Extrair e abreviar campos
         sensor_sn = clean(metadata.get('sensor_sn', ''))
         test_type = clean(metadata.get('test_type', ''))
@@ -117,6 +124,7 @@ class DataStore:
         else:
             status_str = status_abbr.get(str(equipment_status), clean(equipment_status))
         location = clean(metadata.get('location', ''))
+        
         # Procurar informação de vazamento/não vazamento nos metadados
         vazamento_info = ''
         for key in metadata:
@@ -134,19 +142,132 @@ class DataStore:
                 elif 'vazamento' in val:
                     vazamento_info = '_Vazamento'
                     break
+                    
+        # Determinar o prefixo correto baseado no tipo de teste
+        if prefix is not None:
+            file_prefix = prefix
+        else:
+            test_type_lower = test_type.lower()
+            if 'vazamento' in test_type_lower:
+                if 'agua' in test_type_lower or 'água' in test_type_lower:
+                    file_prefix = "vazamento_agua"
+                elif 'ar' in test_type_lower:
+                    file_prefix = "vazamento_ar"
+                elif 'gas' in test_type_lower or 'gás' in test_type_lower:
+                    file_prefix = "vazamento_gas"
+                else:
+                    file_prefix = "vazamento"
+            elif 'descarga' in test_type_lower or 'eletrica' in test_type_lower or 'elétrica' in test_type_lower:
+                file_prefix = "descarga_eletrica"
+            elif 'ruido' in test_type_lower or 'ruído' in test_type_lower or 'mecanico' in test_type_lower or 'mecânico' in test_type_lower:
+                file_prefix = "ruido_mecanico"
+            elif 'controle' in test_type_lower or 'sem vazamento' in test_type_lower:
+                file_prefix = "controle_sem_vazamento"
+            else:
+                file_prefix = "teste"
+        
         # Montar string de labels abreviados
         label_str = f"_{field_abbr['sensor_sn']}{sensor_sn}_{field_abbr['test_type']}{test_type}_{field_abbr['material']}{material}_{field_abbr['distance']}{distance}cm_{field_abbr['pressure']}{pressure}b_{field_abbr['flow']}{flow}L_{field_abbr['equipment_type']}{equipment_type}_{field_abbr['equipment_status']}{status_str}_{field_abbr['location']}{location}{vazamento_info}"
-        filename = f"{prefix}_{timestamp}{label_str}.pkl"
+        filename = f"{file_prefix}_{timestamp}{label_str}.pkl"
+        
+        # Preparar dados brutos para salvar (sem dados demodulados)
+        raw_data = {
+            'waveforms': data.get('waveforms'),
+            't': data.get('t'),
+            'channels': data.get('channels'),
+            'sample_frequency': data.get('sample_frequency'),
+            'decimation': data.get('decimation'),
+            'acquisition_time': data.get('acquisition_time'),
+            'ip_address': data.get('ip_address')
+        }
+        
+        # Adicionar timestamp aos metadados
         if 'metadata' not in data:
             data['metadata'] = {}
         data['metadata']['timestamp'] = timestamp
+        
+        # Incluir parâmetros da elipse do arquivo de calibração se disponível
+        if calibration_data and 'ellipse_params' in calibration_data:
+            data['metadata']['ellipse_params'] = calibration_data['ellipse_params']
+            data['metadata']['calibration_file_used'] = calibration_data.get('calibration_file', '')
+            data['metadata']['calibration_timestamp_used'] = calibration_data.get('calibration_timestamp', '')
+        
+        # Salvar dados brutos em pickle
         filepath = os.path.join(directory, filename)
         with open(filepath, 'wb') as f:
-            pickle.dump(data, f)
-        # Salvar metadados em JSON
-        metadata_filename = os.path.splitext(filepath)[0] + '.json'
-        with open(metadata_filename, 'w', encoding='utf-8') as fjson:
-            json.dump(data['metadata'], fjson, indent=4, ensure_ascii=False)
+            pickle.dump(raw_data, f)
+            
+        # Criar estrutura TOML para metadados
+        toml_metadata = {
+            'acquisition_info': {
+                'timestamp': timestamp,
+                'sample_frequency': data.get('sample_frequency'),
+                'decimation': data.get('decimation'),
+                'effective_sample_rate': data.get('sample_frequency', 0) / data.get('decimation', 1),
+                'acquisition_time': data.get('acquisition_time'),
+                'channels': data.get('channels', [])
+            },
+            'hardware_info': {
+                'redpitaya_model': 'STEMlab 125-14',
+                'firmware_version': '1.04',
+                'ip_address': data.get('ip_address', '')
+            },
+            'calibration_info': {
+                'calibration_file': metadata.get('calibration_file', ''),
+                'ellipse_params': DataStore._ensure_ellipse_params_numeric(metadata.get('ellipse_params', {})),
+                'calibration_timestamp': metadata.get('calibration_timestamp', ''),
+                'calibration_file_used': metadata.get('calibration_file_used', ''),
+                'calibration_timestamp_used': metadata.get('calibration_timestamp_used', '')
+            },
+            'test_metadata': {
+                'sensor_sn': metadata.get('sensor_sn', ''),
+                'test_type': metadata.get('test_type', ''),
+                'material': metadata.get('material', ''),
+                'location': metadata.get('location', ''),
+                'pressure': metadata.get('pressure', 0.0),
+                'pressure_unit': metadata.get('pressure_unit', 'bar'),
+                'flow': metadata.get('flow', 0.0),
+                'flow_unit': metadata.get('flow_unit', 'L/min'),
+                'distance': metadata.get('distance', 0.0),
+                'distance_unit': metadata.get('distance_unit', 'cm'),
+                'equipment_type': metadata.get('equipment_type', ''),
+                'equipment_status': metadata.get('equipment_status', []),
+                'comments': metadata.get('comments', ''),
+                'timestamp': metadata.get('timestamp', ''),
+                'timestamp_iso': metadata.get('timestamp_iso', ''),
+                'save_directory': metadata.get('save_directory', '')
+            },
+            'file_info': {
+                'data_shape': list(data.get('waveforms', np.array([])).shape) if data.get('waveforms') is not None else [],
+                'data_type': str(data.get('waveforms', np.array([])).dtype) if data.get('waveforms') is not None else 'float64',
+                'file_size_bytes': os.path.getsize(filepath) if os.path.exists(filepath) else 0
+            }
+        }
+        
+        # Adicionar variáveis personalizadas se existirem
+        custom_variables = {}
+        for key, value in metadata.items():
+            if key not in ['sensor_sn', 'test_type', 'material', 'location', 'pressure', 'pressure_unit',
+                          'flow', 'flow_unit', 'distance', 'distance_unit', 'equipment_type',
+                          'equipment_status', 'comments', 'timestamp', 'timestamp_iso', 'save_directory',
+                          'calibration_file', 'ellipse_params', 'calibration_timestamp', 'calibration_file_used',
+                          'calibration_timestamp_used', 'calibration_ellipse_params', 'setup_photos']:
+                custom_variables[key] = value
+        
+        if custom_variables:
+            toml_metadata['custom_variables'] = custom_variables
+        
+        # Adicionar informações de fotos se existirem
+        if 'setup_photos' in metadata:
+            toml_metadata['setup_info'] = {
+                'setup_photos': metadata['setup_photos']
+            }
+        
+        # Salvar metadados em TOML
+        toml_filename = os.path.splitext(filepath)[0] + '.toml'
+        with open(toml_filename, 'w', encoding='utf-8') as ftoml:
+            toml.dump(toml_metadata, ftoml)
+            
         return filepath
     
     @staticmethod
@@ -163,7 +284,66 @@ class DataStore:
         # Obter diretório das configurações
         directory = DataStore.load_config().get('save_directory')
         return DataStore.save_data(data, prefix="vazamento_demodulado", directory=directory)
-    
+
+    @staticmethod
+    def _ensure_ellipse_params_numeric(ellipse_params: Any) -> Dict[str, float]:
+        """
+        Garante que os parâmetros da elipse sejam números, convertendo strings se necessário
+
+        Args:
+            ellipse_params: Parâmetros da elipse em qualquer formato
+
+        Returns:
+            Dicionário com parâmetros numéricos
+        """
+        if not ellipse_params:
+            return {}
+
+        # Se já é um dicionário com valores numéricos, retornar como está
+        if isinstance(ellipse_params, dict):
+            try:
+                # Tentar converter para float
+                result = {}
+                for key, value in ellipse_params.items():
+                    if isinstance(value, str):
+                        result[key] = float(value)
+                    else:
+                        result[key] = float(value)
+                return result
+            except (ValueError, TypeError):
+                # Se não conseguir converter, tentar formato alternativo
+                pass
+
+        # Se é uma lista/tupla, converter para dicionário
+        if isinstance(ellipse_params, (list, tuple)) and len(ellipse_params) >= 5:
+            try:
+                return {
+                    'center_x': float(ellipse_params[0]),
+                    'center_y': float(ellipse_params[1]),
+                    'width': float(ellipse_params[2]),
+                    'height': float(ellipse_params[3]),
+                    'angle': float(ellipse_params[4])
+                }
+            except (ValueError, TypeError, IndexError):
+                pass
+
+        # Se é um array numpy, converter
+        try:
+            import numpy as np
+            if isinstance(ellipse_params, np.ndarray) and ellipse_params.shape[0] >= 5:
+                return {
+                    'center_x': float(ellipse_params[0]),
+                    'center_y': float(ellipse_params[1]),
+                    'width': float(ellipse_params[2]),
+                    'height': float(ellipse_params[3]),
+                    'angle': float(ellipse_params[4])
+                }
+        except ImportError:
+            pass
+
+        # Fallback: retornar dicionário vazio
+        return {}
+
     @staticmethod
     def save_calibration_data(data: Dict[str, Any], filename: Optional[str] = None) -> str:
         """
@@ -194,6 +374,10 @@ class DataStore:
         else:
             filepath = filename
         
+        # Garantir que os parâmetros da elipse sejam numéricos antes de salvar
+        if 'ellipse_params' in data:
+            data['ellipse_params'] = DataStore._ensure_ellipse_params_numeric(data['ellipse_params'])
+
         # Salvar arquivo
         with open(filepath, 'wb') as f:
             pickle.dump(data, f)
@@ -224,7 +408,11 @@ class DataStore:
             # Verificar se é um arquivo de calibração válido
             if not calibration_data.get('is_calibration', False) or 'ellipse_params' not in calibration_data:
                 return None
-                
+
+            # Garantir que os parâmetros da elipse sejam numéricos
+            if 'ellipse_params' in calibration_data:
+                calibration_data['ellipse_params'] = DataStore._ensure_ellipse_params_numeric(calibration_data['ellipse_params'])
+
             return calibration_data
         except Exception:
             return None
@@ -306,6 +494,41 @@ class DataStore:
                 data['t'] = np.arange(wf_len) / fs
                 
         return data
+    
+    @staticmethod
+    def load_data_with_metadata(filepath: str) -> Dict[str, Any]:
+        """
+        Carrega dados brutos e metadados TOML
+        
+        Args:
+            filepath: Caminho para o arquivo .pkl
+            
+        Returns:
+            Dicionário com dados brutos e metadados
+        """
+        try:
+            # Carregar dados brutos
+            data = DataStore.load_data(filepath)
+            
+            # Carregar metadados TOML
+            toml_filepath = os.path.splitext(filepath)[0] + '.toml'
+            if os.path.exists(toml_filepath):
+                with open(toml_filepath, 'r', encoding='utf-8') as f:
+                    metadata = toml.load(f)
+                data['metadata'] = metadata
+            else:
+                # Fallback para JSON se TOML não existir
+                json_filepath = os.path.splitext(filepath)[0] + '.json'
+                if os.path.exists(json_filepath):
+                    with open(json_filepath, 'r', encoding='utf-8') as f:
+                        data['metadata'] = json.load(f)
+                else:
+                    data['metadata'] = {}
+                    
+            return data
+        except Exception as e:
+            print(f"Erro ao carregar dados com metadados: {str(e)}")
+            return {}
     
     @staticmethod
     def get_available_files(include_all: bool = True) -> List[str]:

@@ -6,6 +6,7 @@ import os
 
 from app.models.hardware.redpitaya_client import RedPitayaClient
 from app.models.data_store import DataStore
+from app.utils.time_utils import get_formatted_internet_timestamp
 from typing import Dict, Any, Optional
 
 class AcquisitionThread(QThread):
@@ -14,7 +15,7 @@ class AcquisitionThread(QThread):
     progress = pyqtSignal(str)   # Sinal para atualizar o status
     error = pyqtSignal(str)      # Sinal para reportar erros
 
-    def __init__(self, ip, duration, sample_rate, decimation, channels, is_calibration=False, calibration_file=None, metadata=None):
+    def __init__(self, ip, duration, sample_rate, decimation, channels, is_calibration=False, calibration_file=None, metadata=None, calibration_data=None):
         """
         Inicializa a thread de aquisição
         
@@ -37,6 +38,7 @@ class AcquisitionThread(QThread):
         self.is_calibration = is_calibration
         self.calibration_file = calibration_file
         self.metadata = metadata or {}
+        self.calibration_data = calibration_data
 
     def run(self):
         """Executa a aquisição em thread separada"""
@@ -64,19 +66,48 @@ class AcquisitionThread(QThread):
             if self.calibration_file:
                 data['calibration_file'] = self.calibration_file
             
+            # Se for calibração, calcular parâmetros da elipse e adicionar aos metadados
+            if self.is_calibration:
+                self.progress.emit("Calculando parâmetros da elipse...")
+                try:
+                    from app.models.processing import SignalProcessor
+                    if 'waveforms' in data and data['waveforms'] is not None:
+                        ellipse_params_raw = SignalProcessor.fit_ellipse(data['waveforms'])
+
+                        # Converter para dicionário para melhor compatibilidade
+                        ellipse_params_dict = {
+                            'center_x': float(ellipse_params_raw[0]),
+                            'center_y': float(ellipse_params_raw[1]),
+                            'width': float(ellipse_params_raw[2]),
+                            'height': float(ellipse_params_raw[3]),
+                            'angle': float(ellipse_params_raw[4])
+                        }
+
+                        data['ellipse_params'] = ellipse_params_dict
+                        # Adicionar aos metadados também
+                        if 'metadata' not in data:
+                            data['metadata'] = {}
+                        data['metadata']['ellipse_params'] = ellipse_params_dict
+                        data['metadata']['calibration_timestamp'] = get_formatted_internet_timestamp()
+                        self.progress.emit("Parâmetros da elipse calculados com sucesso")
+                except Exception as e:
+                    self.progress.emit(f"Aviso: Erro ao calcular elipse: {str(e)}")
+            
             # Se for calibração, salvar com o nome específico fornecido
             if self.is_calibration:
                 self.progress.emit(f"Salvando dados de calibração como {self.calibration_file}...")
                 prefix = os.path.splitext(self.calibration_file)[0] if self.calibration_file else "calibracao"
             else:
                 self.progress.emit("Salvando dados...")
-                prefix = "vazamento_continuo"
+                # O prefixo será determinado automaticamente pelo tipo de teste nos metadados
+                prefix = None
                 
             # Salvar dados usando o DataStore
             save_directory = None
             if 'metadata' in data and isinstance(data['metadata'], dict):
                 save_directory = data['metadata'].get('save_directory')
-            filename = DataStore.save_data(data, prefix=prefix, directory=save_directory)
+            
+            filename = DataStore.save_data(data, prefix=prefix, directory=save_directory, calibration_data=self.calibration_data)
             self.progress.emit(f"Dados salvos em {filename}")
             
             # Emitir sinal de conclusão com os dados
@@ -95,15 +126,17 @@ class AcquisitionController(QObject):
     acquisitionError = pyqtSignal(str)
     calibrationFinished = pyqtSignal(dict)  # Sinal específico para calibração concluída
     
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, processing_controller=None):
         """
         Inicializa o controlador de aquisição
         
         Args:
             parent: Objeto pai
+            processing_controller: Referência ao controlador de processamento
         """
         super().__init__(parent)
         self.acquisition_thread = None
+        self.processing_controller = processing_controller
         
     @pyqtSlot(dict)
     def start_acquisition(self, params: Dict[str, Any], metadata: Dict[str, Any] = None):
@@ -142,7 +175,8 @@ class AcquisitionController(QObject):
             params['channels'],
             is_calibration,
             calibration_file,
-            metadata
+            metadata,
+            self.processing_controller.calibration_data if self.processing_controller else None
         )
         
         # Conectar sinais
