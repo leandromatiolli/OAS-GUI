@@ -280,18 +280,23 @@ class Application:
                 
                 # Verificar se temos dois canais para a elipse
                 if waveforms.shape[0] >= 2:
-                     ellipse_params = data.get('ellipse_params')
-                     if not ellipse_params and self.processing_controller.has_calibration_data():
-                         ellipse_params = self.processing_controller.calibration_data['ellipse_params']
-                     
-                     if ellipse_params:
-                         log_info("Exibindo elipse da calibração")
-                         self.window.analysis_panel.show_ellipse(waveforms, ellipse_params)
-                         
-                         # Tentar demodular automaticamente após calibração
-                         log_info("Iniciando demodulação automática após calibração...")
-                         # Iniciar demodulação automaticamente
-                         self.processing_controller.demodulate_data()
+                    ellipse_params = data.get('ellipse_params')
+                    if not ellipse_params and self.processing_controller.has_calibration_data():
+                        ellipse_params = self.processing_controller.calibration_data['ellipse_params']
+                    
+                    if ellipse_params:
+                        log_info("Exibindo elipse da calibração")
+                        log_debug(f"Tipo dos parâmetros da elipse: {type(ellipse_params)}")
+                        if isinstance(ellipse_params, dict):
+                            log_debug(f"Conteúdo dos parâmetros: {ellipse_params}")
+                            for key, value in ellipse_params.items():
+                                log_debug(f"  {key}: {value} (tipo: {type(value)})")
+                        self.window.analysis_panel.show_ellipse(waveforms, ellipse_params)
+
+                        # Tentar demodular automaticamente após calibração
+                        log_info("Iniciando demodulação automática após calibração...")
+                        # Iniciar demodulação automaticamente
+                        self.processing_controller.demodulate_data()
         else:
             log_error("Falha no processamento da calibração")
             self.window.show_error_message(
@@ -347,15 +352,26 @@ class Application:
                     if self.processing_controller.has_calibration_data():
                         ellipse_params = self.processing_controller.calibration_data.get('ellipse_params')
                         log_info("Exibindo elipse da calibração carregada")
+                        log_debug(f"Tipo dos parâmetros da elipse (calibração): {type(ellipse_params)}")
+                        if isinstance(ellipse_params, dict):
+                            log_debug(f"Conteúdo dos parâmetros (calibração): {ellipse_params}")
+                            for key, value in ellipse_params.items():
+                                log_debug(f"  {key}: {value} (tipo: {type(value)})")
                     else:
                         # Fallback para parâmetros dos dados (se existirem)
                         ellipse_params = data.get('ellipse_params', None)
                         if ellipse_params:
                             log_info("Exibindo elipse dos dados adquiridos")
+                            log_debug(f"Tipo dos parâmetros da elipse (dados): {type(ellipse_params)}")
+                            if isinstance(ellipse_params, dict):
+                                log_debug(f"Conteúdo dos parâmetros (dados): {ellipse_params}")
+                                for key, value in ellipse_params.items():
+                                    log_debug(f"  {key}: {value} (tipo: {type(value)})")
                         else:
                             log_warning("Nenhuma elipse disponível para exibição")
-                    
-                    self.window.analysis_panel.show_ellipse(waveforms, ellipse_params)
+
+                    if ellipse_params:
+                        self.window.analysis_panel.show_ellipse(waveforms, ellipse_params)
             else:
                 log_warning("Não foi possível exibir dados brutos: waveforms ou vetor de tempo ausentes")
                 
@@ -470,32 +486,32 @@ class Application:
                         log_warning("Arquivo não contém parâmetros da elipse nos metadados - não é possível demodular automaticamente")
                 except Exception as e:
                     log_error(f"Erro na demodulação automática: {str(e)}")
-                    
-            # Verificar se temos dados filtrados
-            if 'filtered_demodulated' in data and 'bandpass_params' in data:
-                log_debug("Exibindo dados filtrados do arquivo")
-                self.window.analysis_panel.show_filtered(
-                    data['t'], 
-                    data['filtered_demodulated'],
-                    data['bandpass_params']
-                )
                 
-                # Atualizar a interface de filtro passa-banda com os parâmetros salvos no arquivo
-                params = data['bandpass_params']
-                if 'enabled' in params and 'low_freq' in params and 'high_freq' in params and 'order' in params:
-                    # Atualizar a interface sem emitir sinais (será feito manualmente)
-                    self.window.analysis_panel.bandpass_checkbox.setChecked(params['enabled'])
-                    self.window.analysis_panel.low_freq_spinbox.setValue(params['low_freq'])
-                    self.window.analysis_panel.high_freq_spinbox.setValue(params['high_freq'])
-                    self.window.analysis_panel.order_spinbox.setValue(params['order'])
+                # Verificar se temos dados filtrados
+                if 'filtered_demodulated' in data and 'bandpass_params' in data:
+                    log_debug("Exibindo dados filtrados do arquivo")
+                    self.window.analysis_panel.show_filtered(
+                        data['t'], 
+                        data['filtered_demodulated'],
+                        data['bandpass_params']
+                    )
                     
-                    # Habilitar/desabilitar os spinboxes conforme necessário
-                    self.window.analysis_panel.low_freq_spinbox.setEnabled(params['enabled'])
-                    self.window.analysis_panel.high_freq_spinbox.setEnabled(params['enabled'])
-                    self.window.analysis_panel.order_spinbox.setEnabled(params['enabled'])
-                    self.window.analysis_panel.apply_filter_button.setEnabled(params['enabled'])
-            
-            # Calcular e mostrar espectro
+                    # Atualizar a interface de filtro passa-banda com os parâmetros salvos no arquivo
+                    params = data['bandpass_params']
+                    if 'enabled' in params and 'low_freq' in params and 'high_freq' in params and 'order' in params:
+                        # Atualizar a interface sem emitir sinais (será feito manualmente)
+                        self.window.analysis_panel.bandpass_checkbox.setChecked(params['enabled'])
+                        self.window.analysis_panel.low_freq_spinbox.setValue(params['low_freq'])
+                        self.window.analysis_panel.high_freq_spinbox.setValue(params['high_freq'])
+                        self.window.analysis_panel.order_spinbox.setValue(params['order'])
+                        
+                        # Habilitar/desabilitar os spinboxes conforme necessário
+                        self.window.analysis_panel.low_freq_spinbox.setEnabled(params['enabled'])
+                        self.window.analysis_panel.high_freq_spinbox.setEnabled(params['enabled'])
+                        self.window.analysis_panel.order_spinbox.setEnabled(params['enabled'])
+                        self.window.analysis_panel.apply_filter_button.setEnabled(params['enabled'])
+                
+                # Calcular e mostrar espectro
                 try:
                     # Verificar se devemos usar o sinal filtrado para o espectro
                     use_filtered = 'filtered_demodulated' in data and data.get('bandpass_params', {}).get('enabled', False)
@@ -757,23 +773,32 @@ class Application:
         """Slot para carregar múltiplos arquivos selecionados na análise"""
         if not file_list:
             return
-            
-        # Carregar o primeiro arquivo através do file_controller
-        filepath = file_list[0]
-        log_info(f"Carregando arquivo selecionado: {filepath}")
-        
+
+        log_info(f"Carregando {len(file_list)} arquivo(s) selecionado(s)")
+
+        if len(file_list) == 1:
+            # Para um único arquivo, usar o fluxo normal
+            self._load_single_file(file_list[0])
+        else:
+            # Para múltiplos arquivos, usar o método de carregamento múltiplo
+            self._load_multiple_files(file_list)
+
+    def _load_single_file(self, filepath):
+        """Carrega um único arquivo"""
+        log_info(f"Carregando arquivo único: {filepath}")
+
         try:
             # Carregar dados usando o controlador de arquivos
             data = self.file_controller.load_file(filepath)
             if data:
                 # Configurar dados no controlador de processamento
                 self.processing_controller.set_data(data)
-                
+
                 # Exibir dados na interface
                 if 't' in data and 'waveforms' in data:
                     channels = data.get('channels', [1, 2])
                     self.window.analysis_panel.show_raw_data(data['t'], data['waveforms'], channels)
-                
+
                 # Mostrar elipse usando parâmetros dos metadados do arquivo ou calibração
                 ellipse_params = None
                 if 'metadata' in data:
@@ -822,16 +847,244 @@ class Application:
                     self.processing_controller.demodulate_data()
                 else:
                     log_info("Nenhum parâmetro de elipse disponível para demodulação automática")
-                
-                # Se há múltiplos arquivos, também usar o método original para exibição múltipla
-                if len(file_list) > 1:
-                    log_info(f"Carregando visualização múltipla para {len(file_list)} arquivos")
-                    self.window.analysis_panel.load_selected_file_from_list(file_list)
             else:
                 self.window.show_status_message("Erro ao carregar arquivo")
         except Exception as e:
             log_error(f"Erro ao carregar arquivo: {str(e)}")
             self.window.show_status_message(f"Erro ao carregar arquivo: {str(e)}")
+
+    def _load_multiple_files(self, file_list):
+        """Carrega múltiplos arquivos e processa cada um individualmente para demodulação"""
+        log_info(f"Iniciando carregamento de {len(file_list)} arquivos múltiplos")
+
+        # Listas para armazenar dados de todos os arquivos
+        all_demodulated_data = []
+        all_metadata = []
+
+        for idx, filepath in enumerate(file_list):
+            log_info(f"Processando arquivo {idx + 1}/{len(file_list)}: {os.path.basename(filepath)}")
+
+            try:
+                # Carregar dados usando o controlador de arquivos
+                data = self.file_controller.load_file(filepath)
+                if data:
+                    # Configurar dados no controlador de processamento
+                    self.processing_controller.set_data(data)
+
+                    # Verificar se há parâmetros da elipse para demodulação
+                    metadata = data.get('metadata', {})
+                    has_ellipse_params = False
+
+                    if 'calibration_info' in metadata and metadata['calibration_info'].get('ellipse_params'):
+                        has_ellipse_params = True
+                        log_info(f"Arquivo {idx + 1}: Parâmetros da elipse encontrados nos metadados TOML")
+                    elif 'ellipse_params' in metadata:
+                        has_ellipse_params = True
+                        log_info(f"Arquivo {idx + 1}: Parâmetros da elipse encontrados nos metadados (formato antigo)")
+
+                    if has_ellipse_params:
+                        log_info(f"Arquivo {idx + 1}: Iniciando demodulação...")
+
+                        # Criar uma flag para controlar quando a demodulação terminou
+                        demodulation_completed = [False]
+                        demod_data_collected = [None]
+
+                        # Conectar ao sinal de demodulação terminada
+                        def on_demodulation_finished(demod_data):
+                            log_info(f"Arquivo {idx + 1}: Demodulação terminada, coletando dados...")
+                            demodulation_completed[0] = True
+                            demod_data_collected[0] = demod_data
+
+                        # Conectar sinal temporariamente
+                        self.processing_controller.demodulationFinished.connect(on_demodulation_finished)
+
+                        try:
+                            # Iniciar demodulação
+                            self.processing_controller.demodulate_data()
+
+                            # Aguardar até que a demodulação seja concluída (máximo 10 segundos)
+                            import time
+                            max_wait_time = 10.0
+                            wait_time = 0.0
+                            wait_interval = 0.05
+
+                            while not demodulation_completed[0] and wait_time < max_wait_time:
+                                time.sleep(wait_interval)
+                                wait_time += wait_interval
+
+                            if demodulation_completed[0] and demod_data_collected[0]:
+                                demod_data = demod_data_collected[0]
+                                if isinstance(demod_data, dict) and 'demodulated' in demod_data:
+                                    # Criar cópia dos dados para evitar problemas de referência
+                                    demod_data_copy = {
+                                        'demodulated': demod_data['demodulated'].copy() if hasattr(demod_data['demodulated'], 'copy') else demod_data['demodulated'],
+                                        't': demod_data['t'].copy() if hasattr(demod_data['t'], 'copy') else demod_data['t'],
+                                        'waveforms': demod_data['waveforms'].copy() if hasattr(demod_data['waveforms'], 'copy') else demod_data['waveforms'],
+                                        'sample_frequency': demod_data.get('sample_frequency'),
+                                        'decimation': demod_data.get('decimation'),
+                                        'sample_frequency_effective': demod_data.get('sample_frequency_effective'),
+                                        'channels': demod_data.get('channels', [1, 2]),
+                                        'ellipse_params': demod_data.get('ellipse_params'),
+                                        'metadata': demod_data.get('metadata', {}),
+                                        'bandpass_params': demod_data.get('bandpass_params', {}),
+                                        'original_file': filepath
+                                    }
+                                    all_demodulated_data.append(demod_data_copy)
+                                    log_info(f"Arquivo {idx + 1}: Dados demodulados coletados com sucesso")
+                                else:
+                                    log_warning(f"Arquivo {idx + 1}: Dados demodulados incompletos ou vazios")
+                            else:
+                                log_warning(f"Arquivo {idx + 1}: Demodulação não foi concluída no tempo esperado")
+
+                        finally:
+                            # Sempre desconectar o sinal
+                            try:
+                                self.processing_controller.demodulationFinished.disconnect(on_demodulation_finished)
+                            except:
+                                pass  # Ignorar erros de desconexão
+
+                    elif self.processing_controller.has_calibration_data():
+                        log_info(f"Arquivo {idx + 1}: Usando calibração carregada para demodulação...")
+
+                        # Mesmo processo para calibração
+                        demodulation_completed = [False]
+                        demod_data_collected = [None]
+
+                        def on_demodulation_finished_cal(demod_data):
+                            log_info(f"Arquivo {idx + 1}: Demodulação com calibração terminada")
+                            demodulation_completed[0] = True
+                            demod_data_collected[0] = demod_data
+
+                        self.processing_controller.demodulationFinished.connect(on_demodulation_finished_cal)
+
+                        try:
+                            self.processing_controller.demodulate_data()
+
+                            # Aguardar até que a demodulação seja concluída
+                            import time
+                            max_wait_time = 10.0
+                            wait_time = 0.0
+                            wait_interval = 0.05
+
+                            while not demodulation_completed[0] and wait_time < max_wait_time:
+                                time.sleep(wait_interval)
+                                wait_time += wait_interval
+
+                            if demodulation_completed[0] and demod_data_collected[0]:
+                                demod_data = demod_data_collected[0]
+                                if isinstance(demod_data, dict) and 'demodulated' in demod_data:
+                                    demod_data_copy = {
+                                        'demodulated': demod_data['demodulated'].copy() if hasattr(demod_data['demodulated'], 'copy') else demod_data['demodulated'],
+                                        't': demod_data['t'].copy() if hasattr(demod_data['t'], 'copy') else demod_data['t'],
+                                        'waveforms': demod_data['waveforms'].copy() if hasattr(demod_data['waveforms'], 'copy') else demod_data['waveforms'],
+                                        'sample_frequency': demod_data.get('sample_frequency'),
+                                        'decimation': demod_data.get('decimation'),
+                                        'sample_frequency_effective': demod_data.get('sample_frequency_effective'),
+                                        'channels': demod_data.get('channels', [1, 2]),
+                                        'ellipse_params': demod_data.get('ellipse_params'),
+                                        'metadata': demod_data.get('metadata', {}),
+                                        'bandpass_params': demod_data.get('bandpass_params', {}),
+                                        'original_file': filepath
+                                    }
+                                    all_demodulated_data.append(demod_data_copy)
+                                    log_info(f"Arquivo {idx + 1}: Dados demodulados coletados com calibração")
+                                else:
+                                    log_warning(f"Arquivo {idx + 1}: Dados demodulados incompletos ou vazios (calibração)")
+                            else:
+                                log_warning(f"Arquivo {idx + 1}: Demodulação com calibração não foi concluída no tempo esperado")
+
+                        finally:
+                            try:
+                                self.processing_controller.demodulationFinished.disconnect(on_demodulation_finished_cal)
+                            except:
+                                pass
+                    else:
+                        log_warning(f"Arquivo {idx + 1}: Nenhum parâmetro de elipse disponível")
+
+                    # Coletar metadados
+                    if 'metadata' in data:
+                        file_metadata = data['metadata'].copy()
+                        file_metadata['filename'] = filepath
+                        all_metadata.append(file_metadata)
+
+                else:
+                    log_error(f"Erro ao carregar arquivo {idx + 1}: {filepath}")
+
+            except Exception as e:
+                log_error(f"Erro ao processar arquivo {idx + 1} ({filepath}): {str(e)}")
+
+        # Log detalhado sobre os dados coletados
+        log_info(f"Resumo do processamento múltiplo:")
+        log_info(f"  - Total de arquivos processados: {len(file_list)}")
+        log_info(f"  - Arquivos com dados demodulados: {len(all_demodulated_data)}")
+        log_info(f"  - Arquivos com metadados: {len(all_metadata)}")
+
+        for i, demod_data in enumerate(all_demodulated_data):
+            log_info(f"  - Arquivo {i+1}: {os.path.basename(demod_data.get('original_file', 'desconhecido'))}")
+
+        # Se temos dados demodulados de múltiplos arquivos, mostrar na interface
+        if len(all_demodulated_data) > 1:
+            log_info(f"Exibindo dados demodulados de {len(all_demodulated_data)} arquivos")
+
+            # Preparar dados para plot múltiplo
+            self.window.analysis_panel.multiple_demodulated_data = all_demodulated_data
+            self.window.analysis_panel.multiple_metadata = all_metadata
+
+            # Mostrar dados do primeiro arquivo como referência
+            if all_demodulated_data:
+                first_data = all_demodulated_data[0]
+                if 't' in first_data and 'waveforms' in first_data:
+                    channels = first_data.get('channels', [1, 2])
+                    self.window.analysis_panel.show_raw_data(first_data['t'], first_data['waveforms'], channels)
+
+                if 't' in first_data and 'demodulated' in first_data:
+                    self.window.analysis_panel.show_demodulated(first_data['t'], first_data['demodulated'])
+
+            # Plotar múltiplos sinais demodulados
+            log_info(f"Preparando plot múltiplo com {len(all_demodulated_data)} dados demodulados")
+
+            # Debug: verificar estrutura dos dados
+            for i, data in enumerate(all_demodulated_data):
+                log_debug(f"Dados {i+1}: keys={list(data.keys()) if isinstance(data, dict) else 'Não é dict'}")
+                if 'demodulated' in data:
+                    log_debug(f"Dados {i+1}: demodulated shape={data['demodulated'].shape if hasattr(data['demodulated'], 'shape') else 'Sem shape'}")
+
+            try:
+                self.window.analysis_panel.plot_demodulated_multiple()
+                log_info("Plot múltiplo de sinais demodulados executado com sucesso")
+            except Exception as e:
+                log_error(f"Erro ao plotar sinais demodulados múltiplos: {e}")
+                import traceback
+                log_error(f"Traceback: {traceback.format_exc()}")
+
+            try:
+                self.window.analysis_panel.plot_spectrum_multiple()
+                log_info("Plot múltiplo de espectros executado com sucesso")
+            except Exception as e:
+                log_error(f"Erro ao plotar espectros múltiplos: {e}")
+                import traceback
+                log_error(f"Traceback: {traceback.format_exc()}")
+
+            try:
+                self.window.analysis_panel.show_metadata_multiple(all_metadata)
+                log_info("Metadados múltiplos exibidos com sucesso")
+            except Exception as e:
+                log_error(f"Erro ao exibir metadados múltiplos: {e}")
+                import traceback
+                log_error(f"Traceback: {traceback.format_exc()}")
+
+            self.window.show_status_message(f"{len(all_demodulated_data)} arquivos processados com sucesso")
+
+        elif len(all_demodulated_data) == 1:
+            # Se só temos um arquivo com dados demodulados, mostrar normalmente
+            log_info("Apenas um arquivo com dados demodulados - mostrando normalmente")
+            single_data = all_demodulated_data[0]
+            if 't' in single_data and 'demodulated' in single_data:
+                self.window.analysis_panel.show_demodulated(single_data['t'], single_data['demodulated'])
+            self.window.show_status_message("1 arquivo processado com sucesso")
+        else:
+            log_warning("Nenhum arquivo pôde ser demodulado")
+            self.window.show_status_message("Nenhum arquivo pôde ser processado")
     
     def on_audio_file_loaded(self, data):
         """Manipula o carregamento de arquivo na aba de análise de áudio"""
