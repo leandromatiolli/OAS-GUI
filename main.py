@@ -6,6 +6,11 @@ Programa principal para detecção e análise de vazamentos ...
 import sys
 import os
 import traceback
+
+# Configurar matplotlib antes de importar PyQt5
+import matplotlib
+matplotlib.use('Qt5Agg')
+
 from PyQt5.QtWidgets import QApplication, QMessageBox
 import numpy as np
 

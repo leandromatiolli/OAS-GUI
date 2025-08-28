@@ -191,9 +191,10 @@ class LogPanel(QWidget):
     def save_logs(self):
         """Salva logs em um arquivo"""
         from datetime import datetime
+        from app.utils.time_utils import get_formatted_internet_timestamp
         
         # Gerar nome padrão com data e hora
-        default_name = f"logs_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt"
+        default_name = f"logs_{get_formatted_internet_timestamp('%Y%m%d_%H%M%S')}.txt"
         
         # Abrir diálogo para salvar
         filename, _ = QFileDialog.getSaveFileName(

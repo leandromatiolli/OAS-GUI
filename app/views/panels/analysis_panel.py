@@ -41,11 +41,19 @@ class AnalysisPanel(QWidget):
         # Layout principal
         layout = QVBoxLayout(self)
         
+        # Criar splitter principal para distribuir espaço entre controles e gráficos
+        main_splitter = QSplitter(Qt.Horizontal)
+        
+        # Painel esquerdo para controles
+        left_panel = QWidget()
+        left_layout = QVBoxLayout(left_panel)
+        
         # Widget para selecionar arquivo
         file_selection = QHBoxLayout()
         self.file_list = QListWidget()
         self.file_list.setSelectionMode(QListWidget.MultiSelection)
-        self.file_list.setMinimumWidth(400)
+        self.file_list.setMinimumWidth(300)
+        self.file_list.setMaximumWidth(400)
         self.refresh_button = QPushButton("Atualizar")
         self.refresh_button.clicked.connect(self.on_refresh_clicked)
         self.load_button = QPushButton("Carregar")
@@ -70,18 +78,18 @@ class AnalysisPanel(QWidget):
         file_selection.addWidget(self.use_save_dir_button)
         file_selection.addWidget(self.dir_label)
         
-        layout.addLayout(file_selection)
+        left_layout.addLayout(file_selection)
 
         # Área de metadados
         metadata_group = QGroupBox("Metadados do Arquivo")
         metadata_layout = QVBoxLayout()
         self.metadata_text = QTextEdit()
         self.metadata_text.setReadOnly(True)
-        self.metadata_text.setMaximumHeight(150)
+        self.metadata_text.setMaximumHeight(120)
         self.metadata_text.setStyleSheet("font-family: monospace;")
         metadata_layout.addWidget(self.metadata_text)
         metadata_group.setLayout(metadata_layout)
-        layout.addWidget(metadata_group)
+        left_layout.addWidget(metadata_group)
 
         # Layout para os controles de processamento
         processing_layout = QHBoxLayout()
@@ -135,7 +143,10 @@ class AnalysisPanel(QWidget):
         bandpass_group.setLayout(bandpass_layout)
         processing_layout.addWidget(bandpass_group)
         
-        layout.addLayout(processing_layout)
+        left_layout.addLayout(processing_layout)
+        
+        # Adicionar painel esquerdo ao splitter
+        main_splitter.addWidget(left_panel)
         
         # SubAbas para diferentes visualizações
         self.analysis_tabs = QTabWidget()
@@ -143,7 +154,7 @@ class AnalysisPanel(QWidget):
         # Aba de dados brutos
         raw_tab = QWidget()
         raw_layout = QVBoxLayout(raw_tab)
-        self.raw_canvas = MplCanvas(self, width=9, height=5)
+        self.raw_canvas = MplCanvas(self, width=12, height=7)  # Aumentado 50%
         self.raw_toolbar = NavigationToolbarCustom(self.raw_canvas, self)
         raw_layout.addWidget(self.raw_toolbar)
         raw_layout.addWidget(self.raw_canvas)
@@ -152,7 +163,7 @@ class AnalysisPanel(QWidget):
         # Aba de elipse
         ellipse_tab = QWidget()
         ellipse_layout = QVBoxLayout(ellipse_tab)
-        self.ellipse_canvas = MplCanvas(self, width=9, height=5)
+        self.ellipse_canvas = MplCanvas(self, width=12, height=7)  # Aumentado 50%
         self.ellipse_toolbar = NavigationToolbarCustom(self.ellipse_canvas, self)
         ellipse_layout.addWidget(self.ellipse_toolbar)
         ellipse_layout.addWidget(self.ellipse_canvas)
@@ -161,7 +172,7 @@ class AnalysisPanel(QWidget):
         # Aba de sinal demodulado
         demodulated_tab = QWidget()
         demodulated_layout = QVBoxLayout(demodulated_tab)
-        self.demodulated_canvas = MplCanvas(self, width=9, height=5)
+        self.demodulated_canvas = MplCanvas(self, width=12, height=7)  # Aumentado 50%
         self.demodulated_toolbar = NavigationToolbarCustom(self.demodulated_canvas, self)
         demodulated_layout.addWidget(self.demodulated_toolbar)
         demodulated_layout.addWidget(self.demodulated_canvas)
@@ -170,7 +181,7 @@ class AnalysisPanel(QWidget):
         # Aba de sinal filtrado
         filtered_tab = QWidget()
         filtered_layout = QVBoxLayout(filtered_tab)
-        self.filtered_canvas = MplCanvas(self, width=9, height=5)
+        self.filtered_canvas = MplCanvas(self, width=12, height=7)  # Aumentado 50%
         self.filtered_toolbar = NavigationToolbarCustom(self.filtered_canvas, self)
         filtered_layout.addWidget(self.filtered_toolbar)
         filtered_layout.addWidget(self.filtered_canvas)
@@ -179,7 +190,7 @@ class AnalysisPanel(QWidget):
         # Aba de espectro (log)
         spectrum_tab = QWidget()
         spectrum_layout = QVBoxLayout(spectrum_tab)
-        self.spectrum_canvas = MplCanvas(self, width=9, height=5)
+        self.spectrum_canvas = MplCanvas(self, width=12, height=7)  # Aumentado 50%
         self.spectrum_toolbar = NavigationToolbarCustom(self.spectrum_canvas, self)
         spectrum_layout.addWidget(self.spectrum_toolbar)
         spectrum_layout.addWidget(self.spectrum_canvas)
@@ -188,7 +199,7 @@ class AnalysisPanel(QWidget):
         # Nova aba de espectro (linear)
         spectrum_linear_tab = QWidget()
         spectrum_linear_layout = QVBoxLayout(spectrum_linear_tab)
-        self.spectrum_linear_canvas = MplCanvas(self, width=9, height=5)
+        self.spectrum_linear_canvas = MplCanvas(self, width=12, height=7)  # Aumentado 50%
         self.spectrum_linear_toolbar = NavigationToolbarCustom(self.spectrum_linear_canvas, self)
         spectrum_linear_layout.addWidget(self.spectrum_linear_toolbar)
         spectrum_linear_layout.addWidget(self.spectrum_linear_canvas)
@@ -237,14 +248,21 @@ class AnalysisPanel(QWidget):
         
         spectrogram_layout.addLayout(spectrogram_controls)
         
-        self.spectrogram_canvas = MplCanvas(self, width=9, height=5)
+        self.spectrogram_canvas = MplCanvas(self, width=12, height=7)  # Aumentado 50%
         self.spectrogram_toolbar = NavigationToolbarCustom(self.spectrogram_canvas, self)
         spectrogram_layout.addWidget(self.spectrogram_toolbar)
         spectrogram_layout.addWidget(self.spectrogram_canvas)
         
         self.analysis_tabs.addTab(spectrogram_tab, "Espectrograma")
         
-        layout.addWidget(self.analysis_tabs)
+        # Adicionar painel de gráficos ao splitter
+        main_splitter.addWidget(self.analysis_tabs)
+        
+        # Configurar proporções do splitter (30% controles, 70% gráficos)
+        main_splitter.setSizes([300, 700])
+        
+        # Adicionar splitter ao layout principal
+        layout.addWidget(main_splitter)
         
         # Conectar sinais
         self.moving_avg_checkbox.stateChanged.connect(self.on_moving_average_changed)

@@ -12,5 +12,16 @@
         "Sem Vazamento"
     ],
     "comments": "falando longe\n",
-    "custom_labels": ""
+    "custom_labels": [
+        {
+            "nome": "espessura",
+            "valor": "65",
+            "unidade": "mm"
+        },
+        {
+            "nome": "temperatura",
+            "valor": "",
+            "unidade": "C"
+        }
+    ]
 }

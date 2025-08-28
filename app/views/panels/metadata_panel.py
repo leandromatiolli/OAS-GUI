@@ -3,14 +3,72 @@ Módulo com o painel de metadados para informações do teste
 """
 from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QFormLayout, QGroupBox,
                            QComboBox, QLineEdit, QDoubleSpinBox, QLabel, QPushButton,
-                           QFileDialog, QTextEdit, QCheckBox)
-from PyQt5.QtCore import Qt
+                           QFileDialog, QTextEdit, QCheckBox, QSpinBox, QScrollArea)
+from PyQt5.QtCore import Qt, QTimer
 from datetime import datetime
-from typing import Dict, Any
+from typing import Dict, Any, List
 import os
 import json
 
 from app.models.data_store import DataStore
+from app.utils.time_utils import get_formatted_internet_timestamp, get_iso_internet_timestamp, get_brasilia_timestamp
+
+class VariableInputWidget(QWidget):
+    """Widget para entrada de uma variável personalizada"""
+    
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setup_ui()
+        
+    def setup_ui(self):
+        """Configura a interface do widget"""
+        layout = QHBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        
+        # Campo para nome da variável
+        self.name_edit = QLineEdit()
+        self.name_edit.setPlaceholderText("Nome da variável")
+        self.name_edit.setMinimumWidth(120)
+        
+        # Campo para valor
+        self.value_edit = QLineEdit()
+        self.value_edit.setPlaceholderText("Valor")
+        self.value_edit.setMinimumWidth(100)
+        
+        # Campo para unidade
+        self.unit_edit = QLineEdit()
+        self.unit_edit.setPlaceholderText("Unidade")
+        self.unit_edit.setMinimumWidth(80)
+        
+
+        
+        # Botão para remover esta variável
+        self.remove_button = QPushButton("X")
+        self.remove_button.setMaximumWidth(30)
+        self.remove_button.setStyleSheet("QPushButton { background-color: #ff6b6b; color: white; border: none; border-radius: 3px; }")
+        
+        layout.addWidget(QLabel("Nome:"))
+        layout.addWidget(self.name_edit)
+        layout.addWidget(QLabel("Valor:"))
+        layout.addWidget(self.value_edit)
+        layout.addWidget(QLabel("Unidade:"))
+        layout.addWidget(self.unit_edit)
+        layout.addWidget(self.remove_button)
+        layout.addStretch(1)
+        
+    def get_data(self) -> Dict[str, Any]:
+        """Retorna os dados da variável"""
+        return {
+            'nome': self.name_edit.text().strip(),
+            'valor': self.value_edit.text().strip(),
+            'unidade': self.unit_edit.text().strip()
+        }
+        
+    def set_data(self, data: Dict[str, Any]):
+        """Define os dados da variável"""
+        self.name_edit.setText(str(data.get('nome', '')))
+        self.value_edit.setText(str(data.get('valor', '')))
+        self.unit_edit.setText(str(data.get('unidade', '')))
 
 class MetadataPanel(QWidget):
     """Painel para coleta de metadados sobre o teste"""
@@ -25,9 +83,15 @@ class MetadataPanel(QWidget):
         super().__init__(parent)
         self.config_file = "config/metadata_options.json"
         self.last_state_file = "config/last_metadata_state.json"
+        self.variable_widgets: List[VariableInputWidget] = []
         self.setup_ui()
         self.load_options()
         self.load_last_state()
+        
+        # Configurar timer para atualizar timestamp
+        self.timestamp_timer = QTimer()
+        self.timestamp_timer.timeout.connect(self.update_timestamp)
+        self.timestamp_timer.start(1000)  # Atualizar a cada segundo
         
     def setup_ui(self):
         """Configura a interface do painel"""
@@ -102,29 +166,52 @@ class MetadataPanel(QWidget):
         self.setup_photos_label = QLabel("Nenhuma foto carregada")
         metadata_form.addRow("Fotos:", self.setup_photos_label)
 
+        # Timestamp atual
+        self.timestamp_label = QLabel()
+        self.timestamp_label.setStyleSheet("QLabel { background-color: #f0f0f0; padding: 5px; border: 1px solid #ccc; border-radius: 3px; }")
+        self.update_timestamp()
+        metadata_form.addRow("Timestamp Atual:", self.timestamp_label)
+        
         # Comentários
         self.comments_edit = QTextEdit()
         self.comments_edit.setAcceptRichText(False)  # Desabilitar formatação rica
         self.comments_edit.setPlaceholderText("Digite seus comentários aqui...")
         self.comments_edit.setAlignment(Qt.AlignLeft | Qt.AlignTop)
-        self.comments_edit.setMinimumHeight(400)
+        self.comments_edit.setMinimumHeight(200)
         metadata_form.addRow("Comentários:", self.comments_edit)
 
-        # Labels Personalizados
-        self.custom_labels_edit = QTextEdit()
-        self.custom_labels_edit.setAcceptRichText(False)
-        self.custom_labels_edit.setPlaceholderText('Exemplo:\n{"nome": "Temperatura", "valor": 25.3, "unidade": "C"}\n{"nome": "RPM", "valor": 1500, "unidade": "rpm"}')
-        self.custom_labels_edit.setMinimumHeight(100)
-        metadata_form.addRow("Labels Personalizados:", self.custom_labels_edit)
+        # Variáveis Personalizadas
+        variables_group = QGroupBox("Variáveis Personalizadas")
+        variables_layout = QVBoxLayout()
+        
+        # Área de scroll para as variáveis
+        scroll_area = QScrollArea()
+        scroll_area.setWidgetResizable(True)
+        scroll_area.setMaximumHeight(300)
+        
+        self.variables_container = QWidget()
+        self.variables_container_layout = QVBoxLayout(self.variables_container)
+        
+        scroll_area.setWidget(self.variables_container)
+        variables_layout.addWidget(scroll_area)
+        
+        # Botão para adicionar nova variável
+        self.add_variable_button = QPushButton("+ Adicionar Nova Variável")
+        self.add_variable_button.clicked.connect(self.add_variable_widget)
+        self.add_variable_button.setStyleSheet("QPushButton { background-color: #4CAF50; color: white; border: none; padding: 8px; border-radius: 4px; }")
+        variables_layout.addWidget(self.add_variable_button)
+        
         # Texto explicativo
-        self.custom_labels_help = QLabel(
-            'Para criar novos labels, escreva um por linha no formato:\n'
-            '{"nome": "Temperatura", "valor": 25.3, "unidade": "C"}\n'
-            '{"nome": "RPM", "valor": 1500, "unidade": "rpm"}\n'
-            'Você pode adicionar quantos quiser. Eles serão salvos nos metadados e carregados na próxima vez.'
+        variables_help = QLabel(
+            'Adicione variáveis personalizadas para incluir nos metadados.\n'
+            'Para cada variável, especifique: Nome, Valor e Unidade.\n'
+            'Clique no botão "+" para adicionar mais variáveis.'
         )
-        self.custom_labels_help.setWordWrap(True)
-        metadata_form.addRow("", self.custom_labels_help)
+        variables_help.setWordWrap(True)
+        variables_layout.addWidget(variables_help)
+        
+        variables_group.setLayout(variables_layout)
+        metadata_form.addRow("", variables_group)
 
         # Botão para selecionar pasta de salvamento
         self.save_dir_button = QPushButton("Selecionar Pasta de Destino")
@@ -161,6 +248,32 @@ class MetadataPanel(QWidget):
         
         # Adicionar espaço vazio para expansão
         layout.addStretch(1)
+        
+        # Adicionar uma variável inicial
+        self.add_variable_widget()
+        
+    def add_variable_widget(self):
+        """Adiciona um novo widget de variável"""
+        variable_widget = VariableInputWidget()
+        variable_widget.remove_button.clicked.connect(lambda: self.remove_variable_widget(variable_widget))
+        
+        self.variable_widgets.append(variable_widget)
+        self.variables_container_layout.addWidget(variable_widget)
+        
+    def remove_variable_widget(self, widget):
+        """Remove um widget de variável"""
+        if len(self.variable_widgets) > 1:  # Manter pelo menos um widget
+            self.variable_widgets.remove(widget)
+            widget.deleteLater()
+        
+    def get_variables_data(self) -> List[Dict[str, Any]]:
+        """Retorna os dados de todas as variáveis"""
+        variables = []
+        for widget in self.variable_widgets:
+            data = widget.get_data()
+            if data['nome']:  # Só incluir se tiver nome
+                variables.append(data)
+        return variables
         
     def load_options(self):
         """Carrega as opções disponíveis do arquivo de configuração"""
@@ -241,7 +354,22 @@ class MetadataPanel(QWidget):
                 if 'comments' in state:
                     self.comments_edit.setPlainText(state['comments'])
                 if 'custom_labels' in state:
-                    self.custom_labels_edit.setPlainText(state['custom_labels'])
+                    # Carregar variáveis personalizadas do estado salvo
+                    custom_labels = state['custom_labels']
+                    if isinstance(custom_labels, list) and custom_labels:
+                        # Limpar widgets existentes (exceto o primeiro)
+                        while len(self.variable_widgets) > 1:
+                            widget = self.variable_widgets.pop()
+                            widget.deleteLater()
+                        
+                        # Configurar o primeiro widget
+                        if len(custom_labels) > 0:
+                            self.variable_widgets[0].set_data(custom_labels[0])
+                        
+                        # Adicionar widgets adicionais se necessário
+                        for i in range(1, len(custom_labels)):
+                            self.add_variable_widget()
+                            self.variable_widgets[-1].set_data(custom_labels[i])
         except Exception as e:
             print(f"Erro ao carregar último estado: {str(e)}")
             
@@ -262,7 +390,7 @@ class MetadataPanel(QWidget):
                 'equipment_type': self.equipment_type_combo.currentText(),
                 'equipment_status': checked_status,
                 'comments': self.comments_edit.toPlainText(),
-                'custom_labels': self.custom_labels_edit.toPlainText()
+                'custom_labels': self.get_variables_data() # Changed to get_variables_data
             }
             
             with open(self.last_state_file, 'w', encoding='utf-8') as f:
@@ -302,18 +430,8 @@ class MetadataPanel(QWidget):
             Dicionário com os metadados
         """
         checked_status = [cb.text() for cb in self.status_checkboxes if cb.isChecked()]
-        # Parse custom labels
-        custom_labels_raw = self.custom_labels_edit.toPlainText().strip()
-        custom_labels = []
-        if custom_labels_raw:
-            for line in custom_labels_raw.splitlines():
-                line = line.strip()
-                if line:
-                    try:
-                        label = json.loads(line)
-                        custom_labels.append(label)
-                    except Exception:
-                        pass  # Ignora linhas inválidas
+        # Obter variáveis personalizadas
+        custom_labels = self.get_variables_data()
         metadata = {
             "sensor_sn": self.sensor_sn_edit.text(),
             "test_type": self.test_type_combo.currentText(),
@@ -328,21 +446,29 @@ class MetadataPanel(QWidget):
             "equipment_type": self.equipment_type_combo.currentText(),
             "equipment_status": checked_status,
             "comments": self.comments_edit.toPlainText(),
-            "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "timestamp": get_brasilia_timestamp(),
+            "timestamp_iso": get_iso_internet_timestamp(),
             "save_directory": self.save_directory
         }
-        # Adicionar labels personalizados no mesmo nível
+        
+        # Adicionar variáveis personalizadas no mesmo nível
         for label in custom_labels:
             if isinstance(label, dict) and 'nome' in label:
                 nome = label['nome']
                 valor = label.get('valor', None)
                 unidade = label.get('unidade', None)
+                
+                # Adicionar a variável principal
                 metadata[nome] = valor
+                
+                # Adicionar unidade se especificada
                 if unidade is not None:
                     metadata[f"{nome}_unit"] = unidade
+        
         # Adicionar fotos se existirem
         if hasattr(self, 'setup_photos'):
             metadata['setup_photos'] = self.setup_photos
+            
         # Salvar último estado
         self.save_last_state()
         return metadata
@@ -357,6 +483,25 @@ class MetadataPanel(QWidget):
         self.flow_spin.setValue(0.0)
         self.distance_spin.setValue(0.0)
         self.comments_edit.clear()
+        
+        # Limpar variáveis personalizadas
+        for widget in self.variable_widgets:
+            widget.name_edit.clear()
+            widget.value_edit.clear()
+            widget.unit_edit.clear()
+        
         if hasattr(self, 'setup_photos'):
             delattr(self, 'setup_photos')
-        self.setup_photos_label.setText("Nenhuma foto carregada") 
+        self.setup_photos_label.setText("Nenhuma foto carregada")
+    
+    def update_timestamp(self):
+        """Atualiza o timestamp exibido na interface"""
+        try:
+            # Tentar obter horário da internet
+            utc_timestamp = get_formatted_internet_timestamp()
+            brasilia_timestamp = get_brasilia_timestamp()
+            self.timestamp_label.setText(f"{brasilia_timestamp} (Brasília - Internet)")
+        except Exception as e:
+            # Fallback para timestamp local se não conseguir internet
+            local_timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            self.timestamp_label.setText(f"{local_timestamp} (PC Local)") 

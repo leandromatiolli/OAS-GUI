@@ -1,3 +1,3 @@
 """
-Pacote de utilitários da aplicação OAS
+Módulo utilitário da aplicação OAS
 """ 

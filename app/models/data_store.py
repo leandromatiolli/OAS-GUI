@@ -9,6 +9,7 @@ from datetime import datetime
 from typing import Dict, List, Tuple, Optional, Union, Any
 import json
 import unicodedata
+from app.utils.time_utils import get_formatted_internet_timestamp
 
 class DataStore:
     """Classe para gerenciamento de dados de aquisição e análise"""
@@ -100,7 +101,7 @@ class DataStore:
         if directory is None:
             directory = os.getcwd()
         os.makedirs(directory, exist_ok=True)
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        timestamp = get_formatted_internet_timestamp("%Y%m%d_%H%M%S")
         metadata = data.get('metadata', {})
         # Extrair e abreviar campos
         sensor_sn = clean(metadata.get('sensor_sn', ''))

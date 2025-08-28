@@ -12,6 +12,7 @@ from PyQt5.QtCore import Qt, QThread, pyqtSignal
 import glob
 import pickle
 from datetime import datetime
+from app.utils.time_utils import get_formatted_internet_timestamp
 from scipy import signal
 
 # Importar nossas funções dos outros módulos
@@ -372,7 +373,7 @@ class OASGui(QMainWindow):
             "flow": self.flow_spin.value(),
             "distance": self.distance_spin.value(),
             "comments": self.comments_edit.text(),
-            "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            "timestamp": get_formatted_internet_timestamp()
         }
         
         # Desabilitar interface durante a aquisição
@@ -409,7 +410,7 @@ class OASGui(QMainWindow):
         
         if success:
             # Salvar dados com demodulação incluída
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            timestamp = get_formatted_internet_timestamp("%Y%m%d_%H%M%S")
             filename = f"vazamento_demodulado_{timestamp}.pkl"
             
             with open(filename, 'wb') as f:
@@ -761,7 +762,7 @@ class OASGui(QMainWindow):
         
         try:
             # Criar nome de arquivo com timestamp
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            timestamp = get_formatted_internet_timestamp("%Y%m%d_%H%M%S")
             filename = f"vazamento_demodulado_{timestamp}.pkl"
             
             with open(filename, 'wb') as f:
