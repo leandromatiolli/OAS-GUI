@@ -11,7 +11,7 @@ import os
 import json
 
 from app.models.data_store import DataStore
-from app.utils.time_utils import get_formatted_internet_timestamp, get_iso_internet_timestamp, get_brasilia_timestamp
+from app.utils.time_utils import get_formatted_internet_timestamp, get_iso_brasilia_timestamp, get_brasilia_timestamp
 
 class VariableInputWidget(QWidget):
     """Widget para entrada de uma variável personalizada"""
@@ -447,7 +447,7 @@ class MetadataPanel(QWidget):
             "equipment_status": checked_status,
             "comments": self.comments_edit.toPlainText(),
             "timestamp": get_brasilia_timestamp(),
-            "timestamp_iso": get_iso_internet_timestamp(),
+            "timestamp_iso": get_iso_brasilia_timestamp(),
             "save_directory": self.save_directory
         }
         

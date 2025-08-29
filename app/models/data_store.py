@@ -10,7 +10,7 @@ from typing import Dict, List, Tuple, Optional, Union, Any
 import json
 import toml
 import unicodedata
-from app.utils.time_utils import get_formatted_internet_timestamp
+from app.utils.time_utils import get_formatted_internet_timestamp, get_brasilia_timestamp
 
 class DataStore:
     """Classe para gerenciamento de dados de aquisição e análise"""
@@ -107,7 +107,7 @@ class DataStore:
             directory = os.getcwd()
         os.makedirs(directory, exist_ok=True)
         
-        timestamp = get_formatted_internet_timestamp("%Y%m%d_%H%M%S")
+        timestamp = get_brasilia_timestamp("%Y%m%d_%H%M%S")
         metadata = data.get('metadata', {})
         
         # Extrair e abreviar campos

@@ -169,12 +169,24 @@ def get_brasilia_timestamp(format_str: str = "%Y-%m-%d %H:%M:%S") -> str:
         local_time = datetime.now()
         return local_time.strftime(format_str)
 
-def get_iso_internet_timestamp() -> str:
+def get_iso_brasilia_timestamp() -> str:
     """
-    Função de conveniência para obter timestamp ISO da internet
+    Função de conveniência para obter timestamp ISO no horário de Brasília
     
     Returns:
-        String com timestamp ISO
+        String com timestamp ISO no horário de Brasília
     """
-    return time_sync.get_iso_timestamp()
+    try:
+        # Tentar obter timestamp UTC da internet
+        utc_timestamp = time_sync.get_synced_timestamp()
+        
+        # Converter para horário de Brasília (UTC-3)
+        brasilia_offset = timedelta(hours=3)
+        brasilia_time = utc_timestamp - brasilia_offset
+        
+        return brasilia_time.isoformat()
+    except Exception:
+        # Se falhar, usar horário local do PC
+        local_time = datetime.now()
+        return local_time.isoformat()
 

@@ -6,7 +6,7 @@ import os
 
 from app.models.hardware.redpitaya_client import RedPitayaClient
 from app.models.data_store import DataStore
-from app.utils.time_utils import get_formatted_internet_timestamp
+from app.utils.time_utils import get_formatted_internet_timestamp, get_brasilia_timestamp
 from typing import Dict, Any, Optional
 
 class AcquisitionThread(QThread):
@@ -88,7 +88,7 @@ class AcquisitionThread(QThread):
                         if 'metadata' not in data:
                             data['metadata'] = {}
                         data['metadata']['ellipse_params'] = ellipse_params_dict
-                        data['metadata']['calibration_timestamp'] = get_formatted_internet_timestamp()
+                        data['metadata']['calibration_timestamp'] = get_brasilia_timestamp()
                         self.progress.emit("Parâmetros da elipse calculados com sucesso")
                 except Exception as e:
                     self.progress.emit(f"Aviso: Erro ao calcular elipse: {str(e)}")

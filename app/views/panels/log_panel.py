@@ -194,7 +194,7 @@ class LogPanel(QWidget):
         from app.utils.time_utils import get_formatted_internet_timestamp
         
         # Gerar nome padrão com data e hora
-        default_name = f"logs_{get_formatted_internet_timestamp('%Y%m%d_%H%M%S')}.txt"
+        default_name = f"logs_{get_brasilia_timestamp('%Y%m%d_%H%M%S')}.txt"
         
         # Abrir diálogo para salvar
         filename, _ = QFileDialog.getSaveFileName(
