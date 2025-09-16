@@ -117,6 +117,13 @@ class Application:
         self.acquisition_controller.acquisitionProgress.connect(self.window.show_status_message)
         self.acquisition_controller.acquisitionError.connect(self.on_acquisition_error)
         
+        # Conexões para aquisições automáticas
+        self.window.acquisition_panel.automaticAcquisitionRequested.connect(self.on_automatic_acquisition_requested)
+        self.window.acquisition_panel.cancelAutomaticAcquisitionRequested.connect(self.on_cancel_automatic_acquisition_requested)
+        self.acquisition_controller.automaticAcquisitionStarted.connect(self.on_automatic_acquisition_started)
+        self.acquisition_controller.automaticAcquisitionFinished.connect(self.on_automatic_acquisition_finished)
+        self.acquisition_controller.automaticAcquisitionProgress.connect(self.on_automatic_acquisition_progress)
+        
         # Conexões do controlador de arquivos
         self.window.analysis_panel.fileSelected.connect(self.on_files_selected)
         self.window.analysis_panel.refreshFilesRequested.connect(self.file_controller.refresh_file_list)
@@ -1205,6 +1212,89 @@ class Application:
             self.window.show_status_message("Equipamento desligado via LoRa")
         else:
             log_warning("Falha ao desligar equipamento via LoRa")
+    
+    # Métodos para aquisições automáticas
+    def on_automatic_acquisition_requested(self, params):
+        """
+        Manipula o evento de solicitação de aquisições automáticas
+        
+        Args:
+            params: Parâmetros das aquisições automáticas
+        """
+        log_info(f"Solicitação de aquisições automáticas recebida: {params}")
+        
+        # Verificar se é uma calibração
+        is_calibration = params.get('is_calibration', False)
+        if is_calibration:
+            log_info("Modo de calibração selecionado para aquisições automáticas")
+            self.window.show_status_message("Iniciando aquisições automáticas para calibração...")
+        else:
+            # Verificar se temos uma calibração válida
+            if not self.processing_controller.has_calibration_data():
+                log_warning("Tentativa de aquisições automáticas sem calibração prévia")
+                if QMessageBox.question(
+                    self.window, 
+                    "Calibração não encontrada", 
+                    "Não foi encontrada uma calibração válida. Deseja continuar com as aquisições automáticas sem calibração?",
+                    QMessageBox.Yes | QMessageBox.No
+                ) == QMessageBox.No:
+                    log_info("Aquisições automáticas canceladas pelo usuário devido à falta de calibração")
+                    return
+                log_info("Usuário optou por continuar sem calibração")
+        
+        # Resetar as configurações de filtro e espectrograma na interface
+        self.window.analysis_panel.reset_bandpass_filter()
+        self.window.analysis_panel.reset_spectrogram()
+        
+        # Obter metadados
+        metadata = self.window.metadata_panel.get_metadata()
+        
+        # Iniciar aquisições automáticas
+        self.acquisition_controller.start_acquisition(params, metadata)
+    
+    def on_cancel_automatic_acquisition_requested(self):
+        """Manipula o evento de cancelamento de aquisições automáticas"""
+        log_info("Solicitação de cancelamento de aquisições automáticas")
+        self.acquisition_controller.cancel_automatic_acquisition()
+    
+    def on_automatic_acquisition_started(self, params):
+        """
+        Manipula o evento de início de aquisições automáticas
+        
+        Args:
+            params: Parâmetros das aquisições automáticas
+        """
+        log_info("Aquisições automáticas iniciadas")
+        self.window.acquisition_panel.set_enabled(False)
+        self.window.show_status_message("Aquisições automáticas em andamento...")
+    
+    def on_automatic_acquisition_finished(self, data):
+        """
+        Manipula o evento de conclusão de aquisições automáticas
+        
+        Args:
+            data: Dados das aquisições automáticas
+        """
+        if data.get('cancelled', False):
+            log_info("Aquisições automáticas canceladas")
+            self.window.show_status_message("Aquisições automáticas canceladas")
+        else:
+            total = data.get('total_acquisitions', 0)
+            log_info(f"Aquisições automáticas concluídas: {total} aquisições")
+            self.window.show_status_message(f"Aquisições automáticas concluídas: {total} aquisições")
+        
+        self.window.acquisition_panel.set_enabled(True)
+    
+    def on_automatic_acquisition_progress(self, current, total):
+        """
+        Manipula o evento de progresso das aquisições automáticas
+        
+        Args:
+            current: Número da aquisição atual
+            total: Total de aquisições
+        """
+        log_info(f"Progresso das aquisições automáticas: {current}/{total}")
+        self.window.show_status_message(f"Aquisições automáticas: {current}/{total}")
     
 
     
