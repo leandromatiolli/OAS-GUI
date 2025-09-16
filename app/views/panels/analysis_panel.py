@@ -921,47 +921,71 @@ class AnalysisPanel(QWidget):
         for canvas, is_log in [(self.spectrum_canvas, True), (self.spectrum_linear_canvas, False)]:
             ax = canvas.axes
             ax.clear()
-            colors = ['blue', 'red', 'green', 'orange', 'purple']
-            alphas = [1.0, 0.5, 0.7, 0.7, 0.7]
+            colors = ['blue', 'red', 'green', 'orange', 'purple', 'brown', 'cyan', 'magenta']
+            alphas = [1.0, 0.6, 0.6, 0.6, 0.6, 0.6, 0.6, 0.6]
+            
+            max_fs = 0  # Para configurar o limite do eixo x
             
             for idx, data in enumerate(self.multiple_demodulated_data):
-                if 'demodulated' not in data:
+                if 'demodulated' not in data or data['demodulated'] is None:
+                    log_warning(f"Arquivo {idx+1}: sem dados demodulados para espectro")
                     continue
-                demodulated = data['demodulated']
-                # Determinar a taxa de amostragem
-                if 'sample_frequency' in data and 'decimation' in data:
-                    fs = data['sample_frequency'] / data['decimation']
-                elif 'sample_frequency_effective' in data:
-                    fs = data['sample_frequency_effective']
-                elif 't' in data and len(data['t']) >= 2:
-                    t = data['t']
-                    dt = t[1] - t[0]
-                    fs = 1 / dt
-                else:
-                    fs = 1.953125e6
-                window = get_window('blackman', len(demodulated))
-                signal_windowed = demodulated * window
-                N = len(signal_windowed)
-                fft_result = np.fft.fft(signal_windowed)
-                fft_result = fft_result / N
-                magnitudes = np.abs(fft_result[:N//2])
-                freq_axis = np.arange(N//2) * fs / N
-                
-                if is_log:
-                    # Escala logarítmica em dB
-                    magnitudes_plot = 20 * np.log10(magnitudes + 1e-10)
-                    ylabel = 'Amplitude (dB)'
-                else:
-                    # Escala linear
-                    magnitudes_plot = magnitudes
-                    ylabel = 'Amplitude'
-                
-                label = f"Arquivo {idx+1}"
-                ax.plot(freq_axis, magnitudes_plot, color=colors[idx % len(colors)], alpha=alphas[idx % len(alphas)], label=label)
+                    
+                try:
+                    demodulated = data['demodulated']
+                    
+                    # Determinar a taxa de amostragem
+                    if 'sample_frequency' in data and 'decimation' in data:
+                        fs = data['sample_frequency'] / data['decimation']
+                    elif 'sample_frequency_effective' in data:
+                        fs = data['sample_frequency_effective']
+                    elif 't' in data and len(data['t']) >= 2:
+                        t = data['t']
+                        dt = t[1] - t[0]
+                        fs = 1 / dt
+                    else:
+                        fs = 1.953125e6
+                    
+                    max_fs = max(max_fs, fs)
+                    
+                    # Aplicar janela e calcular FFT
+                    window = get_window('blackman', len(demodulated))
+                    signal_windowed = demodulated * window
+                    N = len(signal_windowed)
+                    fft_result = np.fft.fft(signal_windowed)
+                    fft_result = fft_result / N
+                    magnitudes = np.abs(fft_result[:N//2])
+                    freq_axis = np.arange(N//2) * fs / N
+                    
+                    if is_log:
+                        # Escala logarítmica em dB
+                        magnitudes_plot = 20 * np.log10(magnitudes + 1e-10)
+                        ylabel = 'Amplitude (dB)'
+                    else:
+                        # Escala linear
+                        magnitudes_plot = magnitudes
+                        ylabel = 'Amplitude'
+                    
+                    # Obter nome do arquivo para o label
+                    filename = data.get('original_file', f'arquivo_{idx+1}')
+                    if isinstance(filename, str):
+                        import os
+                        filename = os.path.basename(filename)
+                    else:
+                        filename = f'Arquivo {idx + 1}'
+                    
+                    label = filename
+                    ax.plot(freq_axis, magnitudes_plot, color=colors[idx % len(colors)], alpha=alphas[idx % len(alphas)], label=label)
+                    log_debug(f"Arquivo {idx+1}: espectro calculado com {len(freq_axis)} pontos")
+                    
+                except Exception as e:
+                    log_error(f"Erro ao calcular espectro do arquivo {idx+1}: {str(e)}")
+                    continue
             
             # Configurar escala logarítmica no eixo x para ambas as abas
             ax.set_xscale('log')
-            ax.set_xlim(10, fs/2)  # Começa em 10 Hz e vai até metade da frequência de amostragem
+            if max_fs > 0:
+                ax.set_xlim(10, max_fs/2)  # Começa em 10 Hz e vai até metade da frequência de amostragem
             
             # Configurar título e labels
             if is_log:
@@ -1078,32 +1102,52 @@ class AnalysisPanel(QWidget):
         for idx, data in enumerate(self.multiple_demodulated_data):
             demod = data.get('demodulated')
             if demod is None:
+                log_warning(f"Arquivo {idx+1}: dados demodulados são None")
                 continue
 
-            # Recuperar eixo de tempo ou calcular
-            if 't' in data:
-                t = np.asarray(data['t'])
-            else:
-                # Determinar fs
-                if 'sample_frequency' in data and 'decimation' in data:
-                    fs = data['sample_frequency'] / data['decimation']
-                elif 'sample_frequency_effective' in data:
-                    fs = data['sample_frequency_effective']
+            try:
+                # Recuperar eixo de tempo ou calcular
+                if 't' in data and data['t'] is not None:
+                    t = np.asarray(data['t'])
                 else:
-                    fs = 1.0  # fallback
-                t = np.arange(len(demod)) / fs
+                    # Determinar fs
+                    if 'sample_frequency' in data and 'decimation' in data:
+                        fs = data['sample_frequency'] / data['decimation']
+                    elif 'sample_frequency_effective' in data:
+                        fs = data['sample_frequency_effective']
+                    else:
+                        fs = 1.0  # fallback
+                    t = np.arange(len(demod)) / fs
 
-            # Reduzir pontos se necessário
-            if len(t) > max_points:
-                step = len(t) // max_points
-                t_plot = t[::step]
-                d_plot = demod[::step]
-            else:
-                t_plot = t
-                d_plot = demod
+                # Reduzir pontos se necessário
+                if len(t) > max_points:
+                    step = len(t) // max_points
+                    t_plot = t[::step]
+                    d_plot = demod[::step]
+                else:
+                    t_plot = t
+                    d_plot = demod
 
-            label = f"Arquivo {idx + 1}"
-            ax.plot(t_plot, d_plot, color=colors[idx % len(colors)], alpha=alphas[idx % len(alphas)], label=label)
+                # Verificar se os dados são válidos
+                if len(t_plot) == 0 or len(d_plot) == 0:
+                    log_warning(f"Arquivo {idx+1}: dados vazios após processamento")
+                    continue
+
+                # Obter nome do arquivo para o label
+                filename = data.get('original_file', f'arquivo_{idx+1}')
+                if isinstance(filename, str):
+                    import os
+                    filename = os.path.basename(filename)
+                else:
+                    filename = f'Arquivo {idx + 1}'
+
+                label = filename
+                ax.plot(t_plot, d_plot, color=colors[idx % len(colors)], alpha=alphas[idx % len(alphas)], label=label)
+                log_debug(f"Arquivo {idx+1}: plotado com {len(t_plot)} pontos")
+
+            except Exception as e:
+                log_error(f"Erro ao plotar arquivo {idx+1}: {str(e)}")
+                continue
 
         ax.set_xlabel('Tempo (s)')
         ax.set_ylabel('Fase (rad)')

@@ -125,14 +125,17 @@ class FileController(QObject):
         try:
             if not os.path.exists(filename):
                 self.fileError.emit(f"Arquivo não encontrado: {filename}")
-                return
+                return None
                 
             # Carregar dados brutos e metadados TOML
             data = DataStore.load_data_with_metadata(filename)
             self.fileLoaded.emit(data)
+            # Retornar os dados para fluxos síncronos (ex.: carregamento múltiplo)
+            return data
             
         except Exception as e:
             self.fileError.emit(f"Erro ao carregar arquivo: {str(e)}")
+            return None
     
     @pyqtSlot(str)
     def set_calibration_directory(self, directory: str):

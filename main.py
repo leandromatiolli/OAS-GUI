@@ -875,9 +875,6 @@ class Application:
                 # Carregar dados usando o controlador de arquivos
                 data = self.file_controller.load_file(filepath)
                 if data:
-                    # Configurar dados no controlador de processamento
-                    self.processing_controller.set_data(data)
-
                     # Verificar se há parâmetros da elipse para demodulação
                     metadata = data.get('metadata', {})
                     has_ellipse_params = False
@@ -889,8 +886,11 @@ class Application:
                         has_ellipse_params = True
                         log_info(f"Arquivo {idx + 1}: Parâmetros da elipse encontrados nos metadados (formato antigo)")
 
-                    if has_ellipse_params:
+                    if has_ellipse_params or self.processing_controller.has_calibration_data():
                         log_info(f"Arquivo {idx + 1}: Iniciando demodulação...")
+
+                        # Configurar dados no controlador de processamento
+                        self.processing_controller.set_data(data)
 
                         # Criar uma flag para controlar quando a demodulação terminou
                         demodulation_completed = [False]
@@ -909,15 +909,17 @@ class Application:
                             # Iniciar demodulação
                             self.processing_controller.demodulate_data()
 
-                            # Aguardar até que a demodulação seja concluída (máximo 10 segundos)
+                            # Aguardar até que a demodulação seja concluída (máximo 15 segundos)
                             import time
-                            max_wait_time = 10.0
+                            max_wait_time = 15.0
                             wait_time = 0.0
-                            wait_interval = 0.05
+                            wait_interval = 0.1
 
                             while not demodulation_completed[0] and wait_time < max_wait_time:
                                 time.sleep(wait_interval)
                                 wait_time += wait_interval
+                                # Processar eventos da GUI para manter responsividade
+                                QApplication.processEvents()
 
                             if demodulation_completed[0] and demod_data_collected[0]:
                                 demod_data = demod_data_collected[0]
@@ -949,62 +951,6 @@ class Application:
                                 self.processing_controller.demodulationFinished.disconnect(on_demodulation_finished)
                             except:
                                 pass  # Ignorar erros de desconexão
-
-                    elif self.processing_controller.has_calibration_data():
-                        log_info(f"Arquivo {idx + 1}: Usando calibração carregada para demodulação...")
-
-                        # Mesmo processo para calibração
-                        demodulation_completed = [False]
-                        demod_data_collected = [None]
-
-                        def on_demodulation_finished_cal(demod_data):
-                            log_info(f"Arquivo {idx + 1}: Demodulação com calibração terminada")
-                            demodulation_completed[0] = True
-                            demod_data_collected[0] = demod_data
-
-                        self.processing_controller.demodulationFinished.connect(on_demodulation_finished_cal)
-
-                        try:
-                            self.processing_controller.demodulate_data()
-
-                            # Aguardar até que a demodulação seja concluída
-                            import time
-                            max_wait_time = 10.0
-                            wait_time = 0.0
-                            wait_interval = 0.05
-
-                            while not demodulation_completed[0] and wait_time < max_wait_time:
-                                time.sleep(wait_interval)
-                                wait_time += wait_interval
-
-                            if demodulation_completed[0] and demod_data_collected[0]:
-                                demod_data = demod_data_collected[0]
-                                if isinstance(demod_data, dict) and 'demodulated' in demod_data:
-                                    demod_data_copy = {
-                                        'demodulated': demod_data['demodulated'].copy() if hasattr(demod_data['demodulated'], 'copy') else demod_data['demodulated'],
-                                        't': demod_data['t'].copy() if hasattr(demod_data['t'], 'copy') else demod_data['t'],
-                                        'waveforms': demod_data['waveforms'].copy() if hasattr(demod_data['waveforms'], 'copy') else demod_data['waveforms'],
-                                        'sample_frequency': demod_data.get('sample_frequency'),
-                                        'decimation': demod_data.get('decimation'),
-                                        'sample_frequency_effective': demod_data.get('sample_frequency_effective'),
-                                        'channels': demod_data.get('channels', [1, 2]),
-                                        'ellipse_params': demod_data.get('ellipse_params'),
-                                        'metadata': demod_data.get('metadata', {}),
-                                        'bandpass_params': demod_data.get('bandpass_params', {}),
-                                        'original_file': filepath
-                                    }
-                                    all_demodulated_data.append(demod_data_copy)
-                                    log_info(f"Arquivo {idx + 1}: Dados demodulados coletados com calibração")
-                                else:
-                                    log_warning(f"Arquivo {idx + 1}: Dados demodulados incompletos ou vazios (calibração)")
-                            else:
-                                log_warning(f"Arquivo {idx + 1}: Demodulação com calibração não foi concluída no tempo esperado")
-
-                        finally:
-                            try:
-                                self.processing_controller.demodulationFinished.disconnect(on_demodulation_finished_cal)
-                            except:
-                                pass
                     else:
                         log_warning(f"Arquivo {idx + 1}: Nenhum parâmetro de elipse disponível")
 

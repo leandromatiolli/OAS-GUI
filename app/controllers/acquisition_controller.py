@@ -125,6 +125,9 @@ class AcquisitionController(QObject):
     acquisitionProgress = pyqtSignal(str)
     acquisitionError = pyqtSignal(str)
     calibrationFinished = pyqtSignal(dict)  # Sinal específico para calibração concluída
+    automaticAcquisitionStarted = pyqtSignal(dict)  # Sinal para início de aquisições automáticas
+    automaticAcquisitionFinished = pyqtSignal(dict)  # Sinal para fim de aquisições automáticas
+    automaticAcquisitionProgress = pyqtSignal(int, int)  # Sinal para progresso (atual, total)
     
     def __init__(self, parent=None, processing_controller=None):
         """
@@ -137,6 +140,12 @@ class AcquisitionController(QObject):
         super().__init__(parent)
         self.acquisition_thread = None
         self.processing_controller = processing_controller
+        
+        # Variáveis para aquisições automáticas
+        self.is_automatic_acquisition_running = False
+        self.automatic_acquisition_params = None
+        self.automatic_acquisition_count = 0
+        self.automatic_acquisition_total = 0
         
     @pyqtSlot(dict)
     def start_acquisition(self, params: Dict[str, Any], metadata: Dict[str, Any] = None):
@@ -156,6 +165,11 @@ class AcquisitionController(QObject):
         if self.acquisition_thread and self.acquisition_thread.isRunning():
             self.acquisitionError.emit("Uma aquisição já está em andamento")
             return
+        
+        # Verificar se é uma aquisição automática
+        is_automatic = params.get('is_automatic', False)
+        if is_automatic:
+            return self._start_automatic_acquisition(params, metadata)
         
         # Verificar se é uma aquisição para calibração
         is_calibration = params.get('is_calibration', False)
@@ -216,10 +230,136 @@ class AcquisitionController(QObject):
         Args:
             data: Dados adquiridos
         """
+        # Verificar se é uma aquisição automática
+        if self.is_automatic_acquisition_running:
+            self._handle_automatic_acquisition_finished(data)
+            return
+        
         # Verificar se é uma aquisição de calibração
         if data.get('is_calibration', False):
             # Emitir sinal específico para calibração concluída
             self.calibrationFinished.emit(data)
         else:
             # Emitir sinal normal para aquisição concluída
-            self.acquisitionFinished.emit(data) 
+            self.acquisitionFinished.emit(data)
+    
+    def _start_automatic_acquisition(self, params: Dict[str, Any], metadata: Dict[str, Any] = None):
+        """
+        Inicia uma sequência de aquisições automáticas
+        
+        Args:
+            params: Dicionário com os parâmetros de aquisição
+            metadata: Metadados opcionais para incluir nos dados
+        """
+        if self.is_automatic_acquisition_running:
+            self.acquisitionError.emit("Já existe uma sequência de aquisições automáticas em andamento")
+            return
+        
+        # Configurar parâmetros das aquisições automáticas
+        self.is_automatic_acquisition_running = True
+        self.automatic_acquisition_params = params.copy()
+        self.automatic_acquisition_count = 0
+        self.automatic_acquisition_total = params.get('num_acquisitions', 1)
+        
+        # Emitir sinal de início
+        self.automaticAcquisitionStarted.emit(params)
+        
+        # Iniciar primeira aquisição
+        self._execute_next_automatic_acquisition(metadata)
+    
+    def _execute_next_automatic_acquisition(self, metadata: Dict[str, Any] = None):
+        """
+        Executa a próxima aquisição na sequência automática
+        
+        Args:
+            metadata: Metadados opcionais para incluir nos dados
+        """
+        if not self.is_automatic_acquisition_running:
+            return
+        
+        # Incrementar contador
+        self.automatic_acquisition_count += 1
+        
+        # Atualizar progresso
+        self.automaticAcquisitionProgress.emit(self.automatic_acquisition_count, self.automatic_acquisition_total)
+        
+        # Criar parâmetros para aquisição individual (remover flags automáticas)
+        individual_params = self.automatic_acquisition_params.copy()
+        individual_params.pop('is_automatic', None)
+        individual_params.pop('num_acquisitions', None)
+        individual_params.pop('interval_seconds', None)
+        
+        # Criar e iniciar thread de aquisição
+        self.acquisition_thread = AcquisitionThread(
+            individual_params['ip'], 
+            individual_params['duration'], 
+            individual_params['sample_rate'], 
+            individual_params['decimation'], 
+            individual_params['channels'],
+            individual_params.get('is_calibration', False),
+            individual_params.get('calibration_file'),
+            metadata,
+            self.processing_controller.calibration_data if self.processing_controller else None
+        )
+        
+        # Conectar sinais
+        self.acquisition_thread.progress.connect(self.handle_progress)
+        self.acquisition_thread.error.connect(self.handle_error)
+        self.acquisition_thread.finished.connect(self.handle_finished)
+        
+        # Iniciar a thread
+        self.acquisition_thread.start()
+        self.acquisitionStarted.emit()
+    
+    def _handle_automatic_acquisition_finished(self, data: Dict[str, Any]):
+        """
+        Manipula a conclusão de uma aquisição individual na sequência automática
+        
+        Args:
+            data: Dados adquiridos
+        """
+        # Emitir sinal de aquisição individual concluída
+        self.acquisitionFinished.emit(data)
+        
+        # Verificar se é a última aquisição
+        if self.automatic_acquisition_count >= self.automatic_acquisition_total:
+            # Finalizar sequência automática
+            self._finish_automatic_acquisition()
+        else:
+            # Programar próxima aquisição após o intervalo
+            from PyQt5.QtCore import QTimer
+            interval_ms = int(self.automatic_acquisition_params.get('interval_seconds', 10) * 1000)
+            QTimer.singleShot(interval_ms, lambda: self._execute_next_automatic_acquisition(data.get('metadata')))
+    
+    def _finish_automatic_acquisition(self):
+        """
+        Finaliza a sequência de aquisições automáticas
+        """
+        self.is_automatic_acquisition_running = False
+        self.automatic_acquisition_params = None
+        self.automatic_acquisition_count = 0
+        self.automatic_acquisition_total = 0
+        
+        # Emitir sinal de conclusão
+        self.automaticAcquisitionFinished.emit({'total_acquisitions': self.automatic_acquisition_total})
+    
+    def cancel_automatic_acquisition(self):
+        """
+        Cancela a sequência de aquisições automáticas em andamento
+        """
+        if not self.is_automatic_acquisition_running:
+            return
+        
+        # Parar thread atual se estiver rodando
+        if self.acquisition_thread and self.acquisition_thread.isRunning():
+            self.acquisition_thread.terminate()
+            self.acquisition_thread.wait()
+        
+        # Resetar estado
+        self.is_automatic_acquisition_running = False
+        self.automatic_acquisition_params = None
+        self.automatic_acquisition_count = 0
+        self.automatic_acquisition_total = 0
+        
+        # Emitir sinal de cancelamento
+        self.automaticAcquisitionFinished.emit({'cancelled': True}) 
