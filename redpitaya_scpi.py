@@ -19,6 +19,7 @@ class scpi (object):
         self.timeout = timeout
         self.delimiter = delimiter
 
+        self._socket = None
         try:
             self._socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
@@ -28,11 +29,33 @@ class scpi (object):
             self._socket.connect((host, port))
 
         except socket.error as e:
-            print('SCPI >> connect({!s:s}:{:d}) failed: {!s:s}'.format(host, port, e))
+            error_msg = 'SCPI >> connect({!s:s}:{:d}) failed: {!s:s}'.format(host, port, e)
+            print(error_msg)
+            # Fechar socket se foi criado
+            if self._socket:
+                try:
+                    self._socket.close()
+                except:
+                    pass
+                self._socket = None
+            # Re-raise com mensagem mais clara
+            if "getaddrinfo failed" in str(e) or "Failed to resolve" in str(e):
+                raise ConnectionError(f"Não foi possível resolver o hostname '{host}'. Verifique se o Red Pitaya está ligado e acessível na rede.")
+            elif "timed out" in str(e).lower() or "timeout" in str(e).lower():
+                raise TimeoutError(f"Timeout ao conectar ao Red Pitaya em {host}:{port}. Verifique se o dispositivo está ligado e acessível.")
+            else:
+                raise ConnectionError(f"Erro ao conectar ao Red Pitaya em {host}:{port}: {e}")
+        
+        # Só tentar idn_q se a conexão foi bem-sucedida
+        if self._socket is None:
+            raise ConnectionError(f"Falha ao estabelecer conexão com {host}:{port}")
+            
         try:
             ans = self.idn_q()
-        except TimeoutError: 
-            raise TimeoutError(f"Timed out! Is the delimiter right?")
+        except (TimeoutError, socket.timeout) as e: 
+            raise TimeoutError(f"Timeout ao comunicar com Red Pitaya. Verifique se o servidor SCPI está rodando e se o delimitador está correto.")
+        except Exception as e:
+            raise ConnectionError(f"Erro ao comunicar com Red Pitaya após conexão: {e}")
         print(f"Connected to {ans}")
 
     def __del__(self):
@@ -46,6 +69,8 @@ class scpi (object):
 
     def rx_txt(self, chunksize = 4096):
         """Receive text string and return it after removing the delimiter."""
+        if self._socket is None:
+            raise ConnectionError("Socket não está conectado. Verifique se a conexão com o Red Pitaya foi estabelecida.")
         msg = ''
         delimiter_len = len(self.delimiter)
         while 1:
@@ -94,6 +119,8 @@ class scpi (object):
 
     def tx_txt(self, msg):
         """Send text string ending and append delimiter."""
+        if self._socket is None:
+            raise ConnectionError("Socket não está conectado. Verifique se a conexão com o Red Pitaya foi estabelecida.")
         return self._socket.sendall((msg + self.delimiter).encode('utf-8')) # was send(().encode('utf-8'))
 
     def tx_txt_check_error(self, msg,stop = True):

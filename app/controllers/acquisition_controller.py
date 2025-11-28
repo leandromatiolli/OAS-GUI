@@ -114,7 +114,34 @@ class AcquisitionThread(QThread):
             self.finished.emit(data)
             
         except Exception as e:
-            self.error.emit(f"Erro na aquisição: {str(e)}")
+            error_msg = str(e)
+            
+            # Melhorar mensagens de erro para problemas de conexão
+            if "getaddrinfo failed" in error_msg or "Failed to resolve" in error_msg:
+                hostname = getattr(self, 'ip', 'Red Pitaya')
+                error_msg = f"Não foi possível conectar ao Red Pitaya ({hostname}).\n" \
+                           f"Verifique se:\n" \
+                           f"- O Red Pitaya está ligado e conectado à rede\n" \
+                           f"- O endereço IP/hostname está correto\n" \
+                           f"- O computador está na mesma rede que o Red Pitaya\n" \
+                           f"Erro original: {error_msg}"
+            elif "Timed out" in error_msg or "timeout" in error_msg.lower():
+                error_msg = f"Timeout ao conectar ao Red Pitaya.\n" \
+                           f"Verifique se:\n" \
+                           f"- O Red Pitaya está respondendo\n" \
+                           f"- A conexão de rede está estável\n" \
+                           f"- O servidor SCPI está rodando no Red Pitaya\n" \
+                           f"Erro original: {error_msg}"
+            elif "Connection refused" in error_msg or "Connection reset" in error_msg:
+                error_msg = f"Conexão recusada pelo Red Pitaya.\n" \
+                           f"Verifique se:\n" \
+                           f"- O servidor SCPI está rodando no Red Pitaya\n" \
+                           f"- A porta está correta (padrão: 5000)\n" \
+                           f"Erro original: {error_msg}"
+            else:
+                error_msg = f"Erro na aquisição: {error_msg}"
+            
+            self.error.emit(error_msg)
 
 class AcquisitionController(QObject):
     """Controlador para aquisição de dados"""
