@@ -6,6 +6,7 @@ from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QFormLayout, QGr
                            QLabel, QMessageBox, QFileDialog, QSpinBox, QProgressBar)
 from PyQt5.QtCore import Qt, pyqtSignal, QTimer
 import os
+from app.models.data_store import DataStore
 
 class AcquisitionPanel(QWidget):
     """Painel de configurações para aquisição de dados"""
@@ -70,6 +71,16 @@ class AcquisitionPanel(QWidget):
         self.effective_rate_label = QLabel()
         acquisition_form.addRow("Taxa efetiva:", self.effective_rate_label)
         self.update_effective_rate()  # Inicializa o rótulo
+        
+        # Diretório de salvamento de dados
+        save_dir_layout = QHBoxLayout()
+        self.save_dir_label = QLabel("Nenhuma pasta selecionada")
+        self.save_dir_label.setToolTip("Pasta onde os dados de aquisição serão salvos")
+        self.select_save_dir_button = QPushButton("Selecionar Pasta")
+        self.select_save_dir_button.clicked.connect(self.select_save_directory)
+        save_dir_layout.addWidget(self.save_dir_label, 1)
+        save_dir_layout.addWidget(self.select_save_dir_button)
+        acquisition_form.addRow("Pasta de Dados:", save_dir_layout)
         
         # Canais
         self.ch1_check = QCheckBox("Canal 1")
@@ -263,16 +274,52 @@ class AcquisitionPanel(QWidget):
         else:
             self.effective_rate_label.setStyleSheet("")
     
+    def select_save_directory(self):
+        """Abre um diálogo para selecionar a pasta de salvamento de dados"""
+        current_dir = self.save_dir_label.text()
+        if not os.path.isdir(current_dir) or current_dir == "Nenhuma pasta selecionada":
+            current_dir = os.getcwd()
+            
+        directory = QFileDialog.getExistingDirectory(self, "Selecione a Pasta para Salvar Dados", current_dir)
+        if directory:
+            self.set_save_directory(directory)
+    
+    def set_save_directory(self, folder_path: str):
+        """Atualiza a label da pasta de salvamento de dados e salva a configuração"""
+        if folder_path and os.path.isdir(folder_path):
+            self.save_dir_label.setText(folder_path)
+            self.save_dir_label.setStyleSheet("")
+            
+            # Salvar configuração
+            config = DataStore.load_config()
+            config['save_directory'] = folder_path
+            DataStore.save_config(config)
+        else:
+            self.save_dir_label.setText("Nenhuma pasta selecionada")
+            self.save_dir_label.setStyleSheet("color: orange;")
+    
+    def get_save_directory(self) -> str:
+        """Retorna o diretório de salvamento de dados configurado"""
+        dir_path = self.save_dir_label.text()
+        if dir_path and dir_path != "Nenhuma pasta selecionada" and os.path.isdir(dir_path):
+            return dir_path
+        return None
+    
     def select_calibration_folder(self):
         """Abre um diálogo para selecionar a pasta de calibrações"""
         current_dir = self.calib_folder_label.text()
-        if not os.path.isdir(current_dir):
-            current_dir = os.getcwd() # default to current dir if not set
+        if not os.path.isdir(current_dir) or current_dir == "Nenhuma pasta selecionada":
+            current_dir = os.getcwd()
             
         directory = QFileDialog.getExistingDirectory(self, "Selecione a Pasta de Calibrações", current_dir)
         if directory:
-            self.set_calibration_folder(directory) # use a new method
+            self.set_calibration_folder(directory)
             self.calibrationFolderChanged.emit(directory)
+            
+            # Salvar configuração
+            config = DataStore.load_config()
+            config['calibration_directory'] = directory
+            DataStore.save_config(config)
 
     def set_calibration_folder(self, folder_path: str):
         """Atualiza a label da pasta de calibração"""

@@ -398,11 +398,22 @@ class DataStore:
         # Determinar nome do arquivo
         calibration_file = filename if filename else DataStore.DEFAULT_CALIBRATION_FILE
         
-        if not os.path.exists(calibration_file):
+        # Se o filename já é um caminho completo, usar diretamente
+        if os.path.isabs(calibration_file) or os.path.dirname(calibration_file):
+            filepath = calibration_file
+        else:
+            # Obter diretório de calibração das configurações
+            directory = DataStore.load_config().get('calibration_directory')
+            if directory:
+                filepath = os.path.join(directory, calibration_file)
+            else:
+                filepath = calibration_file
+        
+        if not os.path.exists(filepath):
             return None
             
         try:
-            with open(calibration_file, 'rb') as f:
+            with open(filepath, 'rb') as f:
                 calibration_data = pickle.load(f)
                 
             # Verificar se é um arquivo de calibração válido

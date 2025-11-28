@@ -186,8 +186,10 @@ class Application:
             log_warning("Hardware de aquisição não disponível")
             self.window.show_status_message("Hardware de aquisição não disponível")
         
-        # Carregar configuração da pasta de calibração
+        # Carregar configurações de diretórios
         config = DataStore.load_config()
+        
+        # Carregar diretório de calibração
         calib_folder = config.get('calibration_directory')
         if not calib_folder:
             # If not set, use default path from user request
@@ -195,8 +197,12 @@ class Application:
             # Let's save it back to config
             config['calibration_directory'] = calib_folder
             DataStore.save_config(config)
-
         self.window.acquisition_panel.set_calibration_folder(calib_folder)
+        
+        # Carregar diretório de salvamento de dados
+        save_dir = config.get('save_directory')
+        if save_dir:
+            self.window.acquisition_panel.set_save_directory(save_dir)
 
         # Carregar lista de arquivos
         self.file_controller.refresh_file_list()
@@ -240,6 +246,12 @@ class Application:
         
         # Obter metadados
         metadata = self.window.metadata_panel.get_metadata()
+        
+        # Adicionar diretório de salvamento do painel de aquisição se configurado
+        # (sobrescreve o do painel de metadados se existir)
+        save_dir = self.window.acquisition_panel.get_save_directory()
+        if save_dir:
+            metadata['save_directory'] = save_dir
         
         # Iniciar aquisição
         self.acquisition_controller.start_acquisition(params, metadata)
