@@ -681,32 +681,59 @@ class Application:
         self.diagnose_filtered_data(data)
         
         try:
-            # Mostrar sinal filtrado na aba correspondente
-            if 't' in data and 'filtered_demodulated' in data and 'bandpass_params' in data:
-                log_debug(f"on_bandpass_filter_applied: Tamanho do sinal filtrado: {len(data['filtered_demodulated'])}")
-                self.window.analysis_panel.show_filtered(
-                    data['t'], 
-                    data['filtered_demodulated'],
-                    data['bandpass_params']
-                )
-                
-                # Calcular e mostrar espectro do sinal filtrado
-                try:
-                    log_debug("Calculando espectro do sinal filtrado")
-                    freq_axis, magnitudes, peaks = self.processing_controller.calculate_spectrum(use_filtered=True)
-                    self.window.analysis_panel.show_spectrum(freq_axis, magnitudes, peaks, use_filtered=True)
-                except Exception as e:
-                    log_error(f"Erro ao calcular espectro do sinal filtrado: {str(e)}")
-            else:
-                log_warning(f"on_bandpass_filter_applied: Dados incompletos para exibir sinal filtrado")
-                if 't' not in data:
-                    log_warning("  - Vetor de tempo não encontrado")
-                if 'filtered_demodulated' not in data:
-                    log_warning("  - Sinal filtrado não encontrado")
-                if 'bandpass_params' not in data:
-                    log_warning("  - Parâmetros do filtro não encontrados")
+            # Verificar se o filtro está ativado
+            filter_enabled = data.get('bandpass_params', {}).get('enabled', False)
             
-            self.window.show_status_message("Filtro passa-banda aplicado aos dados")
+            if 't' in data:
+                # SEMPRE manter a aba demodulado com o sinal original (sem filtro)
+                if 'demodulated' in data:
+                    log_debug("on_bandpass_filter_applied: Mantendo sinal original na aba demodulado")
+                    self.window.analysis_panel.show_demodulated(data['t'], data['demodulated'])
+                
+                if filter_enabled and 'filtered_demodulated' in data:
+                    # Quando o filtro está ativado, mostrar o sinal filtrado apenas na aba de sinal filtrado
+                    log_debug(f"on_bandpass_filter_applied: Mostrando sinal filtrado na aba de sinal filtrado")
+                    log_debug(f"on_bandpass_filter_applied: Tamanho do sinal filtrado: {len(data['filtered_demodulated'])}")
+                    
+                    # Mostrar na aba de sinal filtrado
+                    self.window.analysis_panel.show_filtered(
+                        data['t'], 
+                        data['filtered_demodulated'],
+                        data['bandpass_params']
+                    )
+                    
+                    # Calcular e mostrar espectro do sinal filtrado
+                    try:
+                        log_debug("Calculando espectro do sinal filtrado")
+                        freq_axis, magnitudes, peaks = self.processing_controller.calculate_spectrum(use_filtered=True)
+                        self.window.analysis_panel.show_spectrum(freq_axis, magnitudes, peaks, use_filtered=True)
+                    except Exception as e:
+                        log_error(f"Erro ao calcular espectro do sinal filtrado: {str(e)}")
+                    
+                elif not filter_enabled:
+                    # Quando o filtro está desativado, limpar a aba de sinal filtrado
+                    log_debug("on_bandpass_filter_applied: Filtro desativado, limpando aba de sinal filtrado")
+                    self.window.analysis_panel.filtered_canvas.axes.clear()
+                    self.window.analysis_panel.filtered_canvas.axes.text(0.5, 0.5, 'Filtro passa-banda desativado', 
+                                                                         ha='center', va='center', transform=self.window.analysis_panel.filtered_canvas.axes.transAxes)
+                    self.window.analysis_panel.filtered_canvas.draw()
+                    
+                    # Calcular e mostrar espectro do sinal original
+                    try:
+                        log_debug("Calculando espectro do sinal original")
+                        freq_axis, magnitudes, peaks = self.processing_controller.calculate_spectrum(use_filtered=False)
+                        self.window.analysis_panel.show_spectrum(freq_axis, magnitudes, peaks, use_filtered=False)
+                    except Exception as e:
+                        log_error(f"Erro ao calcular espectro do sinal original: {str(e)}")
+                else:
+                    log_warning(f"on_bandpass_filter_applied: Dados incompletos para exibir sinal filtrado")
+                    if 'filtered_demodulated' not in data:
+                        log_warning("  - Sinal filtrado não encontrado")
+            else:
+                log_warning("on_bandpass_filter_applied: Vetor de tempo não encontrado")
+            
+            status_msg = "Filtro passa-banda aplicado aos dados" if filter_enabled else "Filtro passa-banda desativado"
+            self.window.show_status_message(status_msg)
                 
         except Exception as e:
             log_error(f"Erro ao aplicar filtro passa-banda: {str(e)}")

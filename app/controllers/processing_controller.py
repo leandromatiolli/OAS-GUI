@@ -47,8 +47,8 @@ class ProcessingController(QObject):
         
         # Configuração do filtro passa-banda
         self.use_bandpass_filter = False
-        self.bandpass_low_freq = 50.0    # Hz
-        self.bandpass_high_freq = 5000.0  # Hz
+        self.bandpass_low_freq = 20.0    # Hz
+        self.bandpass_high_freq = 300000.0  # Hz (300 kHz)
         self.bandpass_order = 4
         self.filtered_demodulated = None
         
@@ -234,13 +234,18 @@ class ProcessingController(QObject):
         self.bandpass_order = order
         
         # Aplicar filtro se temos dados demodulados
-        if self.demodulated_data is not None and 'demodulated' in self.demodulated_data:
+        if enabled and self.demodulated_data is not None and 'demodulated' in self.demodulated_data:
             log_debug("set_bandpass_filter: Aplicando filtro aos dados demodulados")
             self.apply_bandpass_filter()
+        elif not enabled:
+            # Se o filtro está sendo desativado, ainda precisamos atualizar a interface
+            log_debug("set_bandpass_filter: Desativando filtro")
+            self.apply_bandpass_filter()  # Isso vai limpar o sinal filtrado
         else:
             log_warning("set_bandpass_filter: Sem dados demodulados para aplicar o filtro")
             self.filtered_demodulated = None
-            self.processingProgress.emit("Demodule os dados primeiro antes de aplicar o filtro passa-banda")
+            if enabled:
+                self.processingProgress.emit("Demodule os dados primeiro antes de aplicar o filtro passa-banda")
     
     def apply_moving_average(self):
         """

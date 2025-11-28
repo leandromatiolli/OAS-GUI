@@ -121,14 +121,14 @@ class AnalysisPanel(QWidget):
         
         self.bandpass_checkbox = QCheckBox("Ativar")
         self.low_freq_spinbox = QDoubleSpinBox()
-        self.low_freq_spinbox.setRange(0.1, 100000.0)
-        self.low_freq_spinbox.setValue(50.0)
+        self.low_freq_spinbox.setRange(0.1, 1000000.0)
+        self.low_freq_spinbox.setValue(20.0)
         self.low_freq_spinbox.setSuffix(" Hz")
         self.low_freq_spinbox.setEnabled(False)
         
         self.high_freq_spinbox = QDoubleSpinBox()
-        self.high_freq_spinbox.setRange(0.1, 100000.0)
-        self.high_freq_spinbox.setValue(5000.0)
+        self.high_freq_spinbox.setRange(0.1, 1000000.0)
+        self.high_freq_spinbox.setValue(300000.0)
         self.high_freq_spinbox.setSuffix(" Hz")
         self.high_freq_spinbox.setEnabled(False)
         
@@ -325,12 +325,22 @@ class AnalysisPanel(QWidget):
         self.order_spinbox.setEnabled(is_checked)
         self.apply_filter_button.setEnabled(is_checked)
         
-        # Mostrar mensagem na barra de status
+        # Validar frequências antes de aplicar
         if is_checked:
             low_freq = self.low_freq_spinbox.value()
             high_freq = self.high_freq_spinbox.value()
             order = self.order_spinbox.value()
-            log_info(f"Filtro passa-banda configurado ({low_freq:.1f}Hz-{high_freq:.1f}Hz, ordem {order})")
+            
+            if low_freq >= high_freq:
+                log_warning(f"Frequências inválidas: {low_freq:.1f}Hz >= {high_freq:.1f}Hz")
+                QMessageBox.warning(self, "Frequências Inválidas", 
+                                  f"A frequência mínima ({low_freq:.1f} Hz) deve ser menor que a máxima ({high_freq:.1f} Hz).")
+                self.bandpass_checkbox.setChecked(False)
+                return
+            
+            log_info(f"Filtro passa-banda ativado ({low_freq:.1f}Hz-{high_freq:.1f}Hz, ordem {order})")
+            # Aplicar filtro automaticamente quando ativar
+            self.bandpassFilterChanged.emit(True, low_freq, high_freq, order)
         else:
             log_info("Filtro passa-banda desativado")
             # Quando o filtro é desativado, emitir sinal com enabled=False para restaurar o sinal original
@@ -341,15 +351,6 @@ class AnalysisPanel(QWidget):
                 self.order_spinbox.value()
             )
         
-        # NÃO emitir o sinal até que o botão seja clicado quando estiver ativando
-        # if is_checked:
-        #     self.bandpassFilterChanged.emit(
-        #         is_checked, 
-        #         self.low_freq_spinbox.value(),
-        #         self.high_freq_spinbox.value(),
-        #         self.order_spinbox.value()
-        #     )
-        
     def on_bandpass_params_changed(self):
         """Manipula a mudança nos parâmetros do filtro passa-banda"""
         if self.bandpass_checkbox.isChecked():
@@ -357,10 +358,15 @@ class AnalysisPanel(QWidget):
             high_freq = self.high_freq_spinbox.value()
             order = self.order_spinbox.value()
             
+            # Validar frequências
+            if low_freq >= high_freq:
+                log_warning(f"Frequências inválidas: {low_freq:.1f}Hz >= {high_freq:.1f}Hz")
+                return
+            
             log_info(f"Parâmetros do filtro passa-banda alterados: {low_freq:.1f}Hz-{high_freq:.1f}Hz, ordem {order}")
             
-            # NÃO emitir o sinal até que o botão seja clicado
-            # self.bandpassFilterChanged.emit(True, low_freq, high_freq, order)
+            # Aplicar filtro automaticamente quando os parâmetros mudarem
+            self.bandpassFilterChanged.emit(True, low_freq, high_freq, order)
             
     def update_file_list(self, files):
         """
@@ -637,21 +643,7 @@ class AnalysisPanel(QWidget):
             self.filtered_canvas.draw()
             log_debug("show_filtered: Canvas atualizado")
             
-            # Habilitar botão para salvar dados filtrados
-            self.save_filtered_button.setEnabled(True)
-            
-            # Mudar para a aba de sinal filtrado
-            log_debug("show_filtered: Alterando para a aba de sinal filtrado (índice 3)")
-            self.analysis_tabs.setCurrentIndex(3)
-            
             log_debug("Sinal filtrado plotado com sucesso")
-            
-            # Verificação final para garantir que a aba está correta
-            if self.analysis_tabs.currentIndex() != 3:
-                log_warning("show_filtered: Falha ao mudar para a aba de sinal filtrado!")
-                # Forçar novamente após um pequeno atraso
-                from PyQt5.QtCore import QTimer
-                QTimer.singleShot(100, lambda: self.analysis_tabs.setCurrentIndex(3))
             
         except Exception as e:
             log_error(f"Erro ao plotar sinal filtrado: {str(e)}")
@@ -660,8 +652,6 @@ class AnalysisPanel(QWidget):
                 self.show_message(f"Erro ao plotar sinal filtrado: {str(e)}", self.filtered_canvas)
             except:
                 pass
-            # Desabilitar botão em caso de erro
-            self.save_filtered_button.setEnabled(False)
         
     def show_spectrum(self, freq_axis, magnitudes, peaks=None, use_filtered=False):
         """
@@ -720,8 +710,22 @@ class AnalysisPanel(QWidget):
 
     def on_apply_filter_clicked(self):
         """Método para aplicar o filtro passa-banda manualmente"""
-        log_info("Aplicando filtro passa-banda manualmente")
-        self.bandpassFilterChanged.emit(True, self.low_freq_spinbox.value(), self.high_freq_spinbox.value(), self.order_spinbox.value()) 
+        if not self.bandpass_checkbox.isChecked():
+            log_warning("Tentativa de aplicar filtro com checkbox desmarcado")
+            return
+            
+        low_freq = self.low_freq_spinbox.value()
+        high_freq = self.high_freq_spinbox.value()
+        order = self.order_spinbox.value()
+        
+        # Validar frequências
+        if low_freq >= high_freq:
+            QMessageBox.warning(self, "Frequências Inválidas", 
+                              f"A frequência mínima ({low_freq:.1f} Hz) deve ser menor que a máxima ({high_freq:.1f} Hz).")
+            return
+        
+        log_info(f"Aplicando filtro passa-banda manualmente: {low_freq:.1f}Hz-{high_freq:.1f}Hz, ordem {order}")
+        self.bandpassFilterChanged.emit(True, low_freq, high_freq, order) 
 
 
 
@@ -833,8 +837,8 @@ class AnalysisPanel(QWidget):
         """Reseta as configurações do filtro passa-banda"""
         log_debug("reset_bandpass_filter: Resetando configurações do filtro passa-banda")
         self.bandpass_checkbox.setChecked(False)
-        self.low_freq_spinbox.setValue(50.0)
-        self.high_freq_spinbox.setValue(5000.0)
+        self.low_freq_spinbox.setValue(20.0)
+        self.high_freq_spinbox.setValue(300000.0)
         self.order_spinbox.setValue(4)
         self.low_freq_spinbox.setEnabled(False)
         self.high_freq_spinbox.setEnabled(False)
