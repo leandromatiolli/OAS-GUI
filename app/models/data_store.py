@@ -398,18 +398,31 @@ class DataStore:
         # Determinar nome do arquivo
         calibration_file = filename if filename else DataStore.DEFAULT_CALIBRATION_FILE
         
-        # Se o filename já é um caminho completo, usar diretamente
-        if os.path.isabs(calibration_file) or os.path.dirname(calibration_file):
+        # Se o filename já é um caminho completo (absoluto ou relativo com diretório), usar diretamente
+        if os.path.isabs(calibration_file):
+            filepath = calibration_file
+        elif os.path.dirname(calibration_file) and os.path.dirname(calibration_file) != '.':
+            # Tem um diretório no caminho (mesmo que relativo)
             filepath = calibration_file
         else:
+            # Apenas nome do arquivo, construir caminho completo
             # Obter diretório de calibração das configurações
             directory = DataStore.load_config().get('calibration_directory')
             if directory:
                 filepath = os.path.join(directory, calibration_file)
             else:
-                filepath = calibration_file
+                # Tentar diretório de salvamento como fallback
+                directory = DataStore.load_config().get('save_directory')
+                if directory:
+                    filepath = os.path.join(directory, calibration_file)
+                else:
+                    filepath = calibration_file
+        
+        # Normalizar o caminho para lidar com caminhos relativos e absolutos
+        filepath = os.path.normpath(filepath)
         
         if not os.path.exists(filepath):
+            print(f"Arquivo de calibração não encontrado: {filepath}")
             return None
             
         try:
@@ -417,15 +430,28 @@ class DataStore:
                 calibration_data = pickle.load(f)
                 
             # Verificar se é um arquivo de calibração válido
-            if not calibration_data.get('is_calibration', False) or 'ellipse_params' not in calibration_data:
+            if not isinstance(calibration_data, dict):
+                print(f"Arquivo de calibração não é um dicionário válido: {filepath}")
+                return None
+                
+            if not calibration_data.get('is_calibration', False):
+                print(f"Arquivo não é marcado como calibração: {filepath}")
+                return None
+                
+            if 'ellipse_params' not in calibration_data:
+                print(f"Arquivo de calibração não contém parâmetros da elipse: {filepath}")
                 return None
 
             # Garantir que os parâmetros da elipse sejam numéricos
             if 'ellipse_params' in calibration_data:
                 calibration_data['ellipse_params'] = DataStore._ensure_ellipse_params_numeric(calibration_data['ellipse_params'])
 
+            print(f"Calibração carregada com sucesso: {filepath}")
             return calibration_data
-        except Exception:
+        except Exception as e:
+            print(f"Erro ao carregar arquivo de calibração {filepath}: {str(e)}")
+            import traceback
+            traceback.print_exc()
             return None
     
     @staticmethod
@@ -454,20 +480,26 @@ class DataStore:
         # Obter diretório de calibração das configurações
         config = DataStore.load_config()
         calib_dir = config.get('calibration_directory')
-
+        
         # Se não houver diretório configurado, não procurar por arquivos.
         if not calib_dir or not os.path.isdir(calib_dir):
             return []
 
-        # Procurar arquivos de calibração com padrão calibracao_*.pkl no diretório
-        search_path = os.path.join(calib_dir, "calibracao_*.pkl")
-        calibration_files.extend(glob.glob(search_path))
+        # Procurar TODOS os arquivos .pkl no diretório e verificar se são calibrações válidas
+        search_path = os.path.join(calib_dir, "*.pkl")
+        all_pkl_files = glob.glob(search_path)
         
-        # Incluir o arquivo padrão de calibração se existir no diretório
-        default_calib_path = os.path.join(calib_dir, DataStore.DEFAULT_CALIBRATION_FILE)
-        if os.path.exists(default_calib_path):
-            if default_calib_path not in calibration_files:
-                calibration_files.append(default_calib_path)
+        # Verificar cada arquivo para ver se é uma calibração válida
+        for pkl_file in all_pkl_files:
+            try:
+                # Tentar carregar e verificar se é uma calibração válida
+                with open(pkl_file, 'rb') as f:
+                    data = pickle.load(f)
+                    if isinstance(data, dict) and data.get('is_calibration', False) and 'ellipse_params' in data:
+                        calibration_files.append(pkl_file)
+            except Exception:
+                # Se não conseguir carregar ou não for calibração válida, ignorar
+                continue
         
         # Ordenar por data de modificação (mais recente primeiro)
         if calibration_files:

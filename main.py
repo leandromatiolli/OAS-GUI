@@ -285,8 +285,32 @@ class Application:
             log_info("Calibração processada com sucesso")
             self.window.show_status_message("Calibração concluída com sucesso")
             
+            # Obter o caminho completo do arquivo de calibração salvo
+            saved_calibration_file = None
+            if calibration_file:
+                # Construir caminho completo
+                config = DataStore.load_config()
+                calib_dir = config.get('calibration_directory')
+                if calib_dir:
+                    saved_calibration_file = os.path.join(calib_dir, calibration_file)
+                else:
+                    save_dir = config.get('save_directory')
+                    if save_dir:
+                        saved_calibration_file = os.path.join(save_dir, calibration_file)
+                    else:
+                        saved_calibration_file = calibration_file
+                
+                # Normalizar caminho
+                if saved_calibration_file:
+                    saved_calibration_file = os.path.normpath(saved_calibration_file)
+            
             # Atualizar lista de calibrações e status
             self.file_controller.refresh_calibration_list()
+            
+            # Selecionar e carregar a calibração recém-salva
+            if saved_calibration_file and os.path.exists(saved_calibration_file):
+                log_info(f"Selecionando calibração recém-salva: {saved_calibration_file}")
+                self.file_controller.set_current_calibration(saved_calibration_file)
             
             # Mudar para a aba de análise
             self.window.switch_to_tab(2)
