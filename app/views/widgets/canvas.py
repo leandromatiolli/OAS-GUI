@@ -134,7 +134,7 @@ class MplCanvas(FigureCanvas):
         
     def plot_spectrum(self, freq_axis, magnitudes, peaks=None, log_scale=False,
                     xlabel='Frequência (Hz)', ylabel='Amplitude (dB)', 
-                    title='Espectro de Frequência'):
+                    title='Espectro de Frequência', y_log=False, magnitudes_in_db=True):
         """
         Plota o espectro de frequência de um sinal
         
@@ -149,28 +149,54 @@ class MplCanvas(FigureCanvas):
         """
         self.axes.clear()
         
-        # Plotar espectro
-        if log_scale:
-            self.axes.semilogx(freq_axis, magnitudes)
+        # Preparar dados do eixo Y considerando o tipo de escala
+        import numpy as _np
+        mag = _np.asarray(magnitudes)
+        # Se desejamos log em Y e os dados estão em dB, converter para amplitude linear
+        if y_log and magnitudes_in_db:
+            # Converter dB para amplitude linear: A = 10^(dB/20)
+            mag_plot = _np.power(10.0, mag / 20.0)
+            y_is_db = False
         else:
-            self.axes.plot(freq_axis, magnitudes)
+            mag_plot = mag
+            y_is_db = magnitudes_in_db
+
+        # Evitar zeros/negativos em escala log
+        if y_log:
+            mag_plot = _np.maximum(mag_plot, 1e-12)
+
+        # Plotar espectro com as escalas desejadas
+        if log_scale and y_log:
+            self.axes.loglog(freq_axis, mag_plot)
+        elif log_scale and not y_log:
+            self.axes.semilogx(freq_axis, mag_plot)
+        elif not log_scale and y_log:
+            self.axes.semilogy(freq_axis, mag_plot)
+        else:
+            self.axes.plot(freq_axis, mag_plot)
         
         # Destacar picos se fornecidos
         if peaks:
             for freq, mag in peaks:
+                # Converter magnitude do pico caso Y esteja em escala log com dados em dB
+                peak_mag_plot = mag
+                if y_log and magnitudes_in_db:
+                    peak_mag_plot = max(1e-12, 10.0 ** (mag / 20.0))
+
                 # Adicionar linha vertical no pico
                 self.axes.axvline(x=freq, color='r', linestyle='--', alpha=0.7)
-                
-                # Adicionar rótulo do pico com frequência em kHz para melhor legibilidade
-                self.axes.text(freq, mag+3, f"{freq/1000:.1f} kHz", 
-                           fontsize=8, ha='center', va='bottom',
-                           bbox=dict(facecolor='white', alpha=0.7, pad=1))
-                
+
+                # Texto do pico (usar dB se disponível)
+                peak_label_mag = f"{mag:.1f} dB" if y_is_db or magnitudes_in_db else f"{peak_mag_plot:.3g}"
+                self.axes.text(freq, peak_mag_plot, f"{freq/1000:.1f} kHz\n{peak_label_mag}",
+                               fontsize=8, ha='center', va='bottom',
+                               bbox=dict(facecolor='white', alpha=0.7, pad=1))
+
                 # Marcar o ponto do pico
-                self.axes.plot(freq, mag, 'ro', markersize=5)
+                self.axes.plot(freq, peak_mag_plot, 'ro', markersize=5)
         
         self.axes.set_xlabel(xlabel)
-        self.axes.set_ylabel(ylabel)
+        self.axes.set_ylabel(ylabel if not (y_log and magnitudes_in_db) else 'Amplitude (log)')
         self.axes.set_title(title)
         self.axes.grid(True, which='both', linestyle='--', alpha=0.7)
         

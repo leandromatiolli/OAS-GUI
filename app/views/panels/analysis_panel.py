@@ -688,16 +688,19 @@ class AnalysisPanel(QWidget):
             if self.moving_avg_checkbox.isChecked():
                 titulo += f' (com Média Móvel: {self.window_size_spinbox.value()})'
             
-            # Plotar espectro principal
+            # Plotar espectro principal em log-log preferencialmente
             self.spectrum_canvas.plot_spectrum(
                 freq_axis, magnitudes, peaks=peaks,
-                title=titulo
+                title=titulo, log_scale=True, y_log=True, magnitudes_in_db=True
             )
             
-            # Adicionar visualização com escala logarítmica
+            # Adicionar visualização secundária também em log-log
             inset_ax = self.spectrum_canvas.draw_inset()
-            inset_ax.semilogx(freq_axis, magnitudes)
-            inset_ax.set_title("Escala log", fontsize=8)
+            try:
+                inset_ax.loglog(freq_axis, np.maximum(10**(np.asarray(magnitudes)/20.0), 1e-12))
+            except Exception:
+                inset_ax.semilogx(freq_axis, magnitudes)
+            inset_ax.set_title("Log-Log", fontsize=8)
             inset_ax.grid(True, which='both', linestyle='--', alpha=0.6)
             
             # Marcar os mesmos picos na visualização em escala logarítmica

@@ -3,15 +3,27 @@ Módulo que encapsula a comunicação com o Red Pitaya
 """
 import numpy as np
 from typing import Dict, List, Tuple, Optional, Union, Any
+import logging
+import sys
+import os
+
+# Configurar logger para este módulo
+logger = logging.getLogger(__name__)
+
+# Adicionar diretório raiz ao path para encontrar os módulos de aquisição
+# Os módulos redpitaya_scpi, mkf e OAS_Acquire_Continuous estão na raiz do projeto
+_root_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+if _root_dir not in sys.path:
+    sys.path.insert(0, _root_dir)
 
 # Importar bibliotecas para comunicação com RedPitaya
 try:
     import redpitaya_scpi as scpi
     from OAS_Acquire_Continuous import bring_up_scpi_server, acquire_continuous_data, save_data
     HARDWARE_AVAILABLE = True
-except ImportError:
+except ImportError as e:
     HARDWARE_AVAILABLE = False
-    print("Módulos de aquisição não encontrados. Funcionalidade de aquisição será desabilitada.")
+    logger.warning(f"Módulos de aquisição não encontrados. Funcionalidade de aquisição será desabilitada. Erro: {e}")
 
 class RedPitayaClient:
     """Cliente para comunicação com o hardware Red Pitaya"""

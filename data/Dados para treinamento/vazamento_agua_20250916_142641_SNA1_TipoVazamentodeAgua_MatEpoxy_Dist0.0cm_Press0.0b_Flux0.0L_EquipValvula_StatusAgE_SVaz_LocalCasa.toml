@@ -1,9 +1,9 @@
 [acquisition_info]
-timestamp = "20250916_124513"
+timestamp = "20250916_142641"
 sample_frequency = 125000000.0
 decimation = 64
 effective_sample_rate = 1953125.0
-acquisition_time = 0.536870912
+acquisition_time = 4.294967296
 channels = [ 1, 2,]
 
 [hardware_info]
@@ -18,38 +18,39 @@ calibration_file_used = ""
 calibration_timestamp_used = ""
 
 [test_metadata]
-sensor_sn = "01"
-test_type = "Descarga Elétrica"
+sensor_sn = "A1"
+test_type = "Vazamento de Água"
 material = "Epoxy"
-location = "MKFotonica Labs"
-pressure = 9.0
+location = "Casa"
+pressure = 0.0
 pressure_unit = "bar"
-flow = 1.0
+flow = 0.0
 flow_unit = "L/min"
-distance = 250.0
+distance = 0.0
 distance_unit = "cm"
 equipment_type = "Válvula"
 equipment_status = [ "Água Estática", "Sem Vazamento",]
-comments = "teste 1"
-timestamp = "20250916_124513"
-timestamp_iso = "2025-09-16T12:44:39.185161+00:00"
+comments = "Teste de vazamento no relógio de água de casa. "
+timestamp = "20250916_142641"
+timestamp_iso = "2025-09-16T14:26:19.923314+00:00"
 save_directory = "data/Dados para treinamento"
 
 [file_info]
-data_shape = [ 2, 1048576,]
+data_shape = [ 2, 8388608,]
 data_type = "int16"
-file_size_bytes = 12583279
+file_size_bytes = 100663663
 
 [custom_variables]
-espessura = "65"
-espessura_unit = "mm"
-temperatura = "50"
-temperatura_unit = "C"
+0 = ""
+0_unit = ""
 is_calibration = false
 
+[setup_info]
+setup_photos = []
+
 [calibration_info.ellipse_params]
-center_x = 2880.9574231683187
-center_y = 2996.256317723338
-width = 0.9844865798950195
-height = 2856.3379322389883
-angle = 0.49538043202303667
+center_x = 2931.882842696157
+center_y = 2990.7570160471123
+width = 1.0063716173171997
+height = 2915.04837629829
+angle = 0.47780264540362594

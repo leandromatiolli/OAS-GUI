@@ -1,0 +1,58 @@
+[acquisition_info]
+timestamp = "20251128_161429"
+sample_frequency = 125000000.0
+decimation = 64
+effective_sample_rate = 1953125.0
+acquisition_time = 4.294967296
+channels = [ 1, 2,]
+
+[hardware_info]
+redpitaya_model = "STEMlab 125-14"
+firmware_version = "1.04"
+ip_address = ""
+
+[calibration_info]
+calibration_file = ""
+calibration_timestamp = ""
+calibration_file_used = ""
+calibration_timestamp_used = ""
+
+[test_metadata]
+sensor_sn = "S_50m"
+test_type = "Descarga Elétrica"
+material = "Epoxy"
+location = "IEE"
+pressure = 0.0
+pressure_unit = "bar"
+flow = 0.0
+flow_unit = "L/min"
+distance = 0.0
+distance_unit = "cm"
+equipment_type = "Transformador"
+equipment_status = []
+comments = "Teste feito ainda na unicamp para teste inicial"
+timestamp = "20251128_161429"
+timestamp_iso = "2025-11-28T16:14:18.381577+00:00"
+save_directory = "data/Dados para treinamento"
+
+[file_info]
+data_shape = [ 2, 8388608,]
+data_type = "int16"
+file_size_bytes = 100663664
+
+[custom_variables]
+corrente = "0.01"
+corrente_unit = "mA"
+"tensão" = "10000"
+"tensão_unit" = "V"
+is_calibration = false
+
+[setup_info]
+setup_photos = []
+
+[calibration_info.ellipse_params]
+center_x = 3831.098388671875
+center_y = 3038.03564453125
+width = 1.2947239875793457
+height = 3829.089111328125
+angle = 0.5254392623901367

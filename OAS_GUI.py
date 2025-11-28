@@ -14,6 +14,17 @@ import pickle
 from datetime import datetime
 from app.utils.time_utils import get_formatted_internet_timestamp
 from scipy import signal
+import logging
+import sys
+import os
+
+# Configurar logger
+logger = logging.getLogger(__name__)
+
+# Adicionar diretório raiz ao path para encontrar os módulos de aquisição
+_root_dir = os.path.dirname(os.path.abspath(__file__))
+if _root_dir not in sys.path:
+    sys.path.insert(0, _root_dir)
 
 # Importar nossas funções dos outros módulos
 try:
@@ -21,9 +32,9 @@ try:
     import redpitaya_scpi as scpi
     from OAS_Acquire_Continuous import bring_up_scpi_server, acquire_continuous_data, save_data
     ACQUISITION_AVAILABLE = True
-except ImportError:
+except ImportError as e:
     ACQUISITION_AVAILABLE = False
-    print("Módulos de aquisição não encontrados. Funcionalidade de aquisição será desabilitada.")
+    logger.warning(f"Módulos de aquisição não encontrados. Funcionalidade de aquisição será desabilitada. Erro: {e}")
 
 class MplCanvas(FigureCanvas):
     def __init__(self, parent=None, width=5, height=4, dpi=100):

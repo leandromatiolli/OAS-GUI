@@ -5,5 +5,7 @@ PyQt5>=5.15.0
 PyQt5-sip>=12.8.0
 pyserial>=3.5
 ntplib>=0.4.0
+toml>=0.10.0
+requests>=2.25.0
 # Opcional (para comunicação com RedPitaya)
 # redpitaya-scpi>=0.3.0

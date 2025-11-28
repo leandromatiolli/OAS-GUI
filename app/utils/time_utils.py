@@ -6,6 +6,10 @@ import time
 from datetime import datetime, timezone, timedelta
 import socket
 from typing import Optional, Tuple
+import logging
+
+# Configurar logger para este módulo
+logger = logging.getLogger(__name__)
 
 class InternetTimeSync:
     """Classe para sincronização de tempo com servidores NTP"""
@@ -31,6 +35,22 @@ class InternetTimeSync:
         self.timeout = timeout
         self._last_sync_time = None
         self._time_offset = 0
+        # Base de tempo (inicializada uma única vez)
+        self._base_utc = None
+        self._monotonic_base = None
+
+    def initialize_base_time(self) -> datetime:
+        """
+        Obtém a hora da internet uma única vez (no início) e guarda como referência.
+        Se falhar, usa a hora local do sistema como referência.
+        """
+        internet_time = self.get_internet_time()
+        if internet_time is None:
+            internet_time = datetime.now(timezone.utc)
+        # Definir base e relógio monotônico
+        self._base_utc = internet_time
+        self._monotonic_base = time.monotonic()
+        return self._base_utc
     
     def get_internet_time(self) -> Optional[datetime]:
         """
@@ -60,33 +80,26 @@ class InternetTimeSync:
                     return internet_time
                     
             except (ntplib.NTPException, socket.timeout, socket.gaierror, OSError) as e:
-                print(f"Erro ao conectar com {server}: {str(e)}")
+                # Log apenas em nível debug para evitar poluição do console
+                logger.debug(f"Erro ao conectar com {server}: {str(e)}")
                 continue
         
-        print("Aviso: Não foi possível obter tempo da internet. Usando tempo local.")
+        logger.warning("Não foi possível obter tempo da internet. Usando tempo local.")
         return None
     
     def get_synced_timestamp(self) -> datetime:
         """
-        Obtém timestamp sincronizado com a internet
+        Obtém timestamp a partir da base inicial (internet/local) e um relógio monotônico.
         
         Returns:
             datetime com timestamp preciso
         """
-        # Tentar obter tempo da internet
-        internet_time = self.get_internet_time()
-        
-        if internet_time:
-            return internet_time
-        
-        # Se falhar, usar tempo local com offset calculado anteriormente
-        if self._last_sync_time and (time.time() - self._last_sync_time) < 3600:  # 1 hora
-            # Aplicar offset se disponível e recente
-            local_time = datetime.now(timezone.utc)
-            return local_time + timezone.timedelta(seconds=self._time_offset)
-        
-        # Fallback para tempo local
-        return datetime.now(timezone.utc)
+        # Inicializar base se necessário
+        if self._base_utc is None or self._monotonic_base is None:
+            self.initialize_base_time()
+        # Calcular tempo corrente como base + delta_monotônico
+        elapsed = time.monotonic() - self._monotonic_base
+        return self._base_utc + timedelta(seconds=elapsed)
     
     def get_formatted_timestamp(self, format_str: str = "%Y-%m-%d %H:%M:%S") -> str:
         """

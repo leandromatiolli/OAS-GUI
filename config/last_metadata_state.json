@@ -1,27 +1,26 @@
 {
-    "sensor_sn": "01",
+    "sensor_sn": "S_50m",
     "test_type": "Descarga Elétrica",
     "material": "Epoxy",
-    "location": "MKFotonica Labs",
-    "pressure": 9.0,
-    "flow": 1.0,
-    "distance": 250.0,
-    "equipment_type": "Válvula",
-    "equipment_status": [
-        "Água Estática",
-        "Sem Vazamento"
-    ],
-    "comments": "teste 1",
+    "location": "IEE",
+    "pressure": 0.0,
+    "flow": 0.0,
+    "distance": 0.0,
+    "equipment_type": "Transformador",
+    "equipment_status": [],
+    "comments": "Teste feito ainda na unicamp para teste inicial",
     "custom_labels": [
         {
-            "nome": "espessura",
-            "valor": "65",
-            "unidade": "mm"
+            "nome": "corrente",
+            "valor": "0.01",
+            "unidade": "mA"
         },
         {
-            "nome": "temperatura",
-            "valor": "50",
-            "unidade": "C"
+            "nome": "tensão",
+            "valor": "10000",
+            "unidade": "V"
         }
-    ]
+    ],
+    "save_directory": "data/Dados para treinamento",
+    "setup_photos": []
 }

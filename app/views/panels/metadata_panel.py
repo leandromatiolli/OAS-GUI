@@ -85,10 +85,22 @@ class MetadataPanel(QWidget):
         self.last_state_file = "config/last_metadata_state.json"
         self.variable_widgets: List[VariableInputWidget] = []
         self.setup_ui()
+        # Timer de auto-salvamento (debounce)
+        self._autosave_timer = QTimer(self)
+        self._autosave_timer.setSingleShot(True)
+        self._autosave_timer.setInterval(600)
+        self._autosave_timer.timeout.connect(self.save_last_state)
+        # Conectar sinais para auto-salvar quando campos mudarem
+        self._connect_autosave_signals()
         self.load_options()
         self.load_last_state()
         
-        # Configurar timer para atualizar timestamp
+        # Inicializar base de tempo uma única vez e atualizar a partir dela
+        from app.utils.time_utils import time_sync
+        try:
+            time_sync.initialize_base_time()
+        except Exception:
+            pass
         self.timestamp_timer = QTimer()
         self.timestamp_timer.timeout.connect(self.update_timestamp)
         self.timestamp_timer.start(1000)  # Atualizar a cada segundo
@@ -259,6 +271,13 @@ class MetadataPanel(QWidget):
         
         self.variable_widgets.append(variable_widget)
         self.variables_container_layout.addWidget(variable_widget)
+        # Conectar sinais de edição para auto-salvar
+        try:
+            variable_widget.name_edit.textChanged.connect(self.schedule_auto_save)
+            variable_widget.value_edit.textChanged.connect(self.schedule_auto_save)
+            variable_widget.unit_edit.textChanged.connect(self.schedule_auto_save)
+        except Exception:
+            pass
         
     def remove_variable_widget(self, widget):
         """Remove um widget de variável"""
@@ -353,6 +372,12 @@ class MetadataPanel(QWidget):
                         cb.setChecked(cb.text() in checked_status)
                 if 'comments' in state:
                     self.comments_edit.setPlainText(state['comments'])
+                if 'save_directory' in state and isinstance(state['save_directory'], str) and state['save_directory']:
+                    self.save_directory = state['save_directory']
+                    self.save_dir_button.setText(self.save_directory)
+                if 'setup_photos' in state and isinstance(state['setup_photos'], list):
+                    self.setup_photos = state['setup_photos']
+                    self.setup_photos_label.setText(f"{len(self.setup_photos)} foto(s) selecionada(s)")
                 if 'custom_labels' in state:
                     # Carregar variáveis personalizadas do estado salvo
                     custom_labels = state['custom_labels']
@@ -390,13 +415,40 @@ class MetadataPanel(QWidget):
                 'equipment_type': self.equipment_type_combo.currentText(),
                 'equipment_status': checked_status,
                 'comments': self.comments_edit.toPlainText(),
-                'custom_labels': self.get_variables_data() # Changed to get_variables_data
+                'custom_labels': self.get_variables_data(),
+                'save_directory': getattr(self, 'save_directory', ''),
+                'setup_photos': getattr(self, 'setup_photos', [])
             }
             
             with open(self.last_state_file, 'w', encoding='utf-8') as f:
                 json.dump(state, f, indent=4, ensure_ascii=False)
         except Exception as e:
             print(f"Erro ao salvar último estado: {str(e)}")
+    
+    def _connect_autosave_signals(self):
+        """Conecta sinais dos widgets para auto-salvar ao alterar valores"""
+        try:
+            self.sensor_sn_edit.textChanged.connect(self.schedule_auto_save)
+            self.test_type_combo.currentIndexChanged.connect(self.schedule_auto_save)
+            self.material_combo.currentIndexChanged.connect(self.schedule_auto_save)
+            self.location_edit.textChanged.connect(self.schedule_auto_save)
+            self.pressure_spin.valueChanged.connect(self.schedule_auto_save)
+            self.flow_spin.valueChanged.connect(self.schedule_auto_save)
+            self.distance_spin.valueChanged.connect(self.schedule_auto_save)
+            self.equipment_type_combo.currentIndexChanged.connect(self.schedule_auto_save)
+            self.comments_edit.textChanged.connect(self.schedule_auto_save)
+            for cb in self.status_checkboxes:
+                cb.toggled.connect(self.schedule_auto_save)
+        except Exception:
+            pass
+    
+    def schedule_auto_save(self):
+        """Agenda um auto-salvamento com debounce"""
+        try:
+            self._autosave_timer.start()
+        except Exception:
+            # Fallback: salvar diretamente se timer não estiver disponível
+            self.save_last_state()
         
     def load_setup_photos(self):
         """Abre um diálogo para selecionar fotos do setup"""
@@ -421,6 +473,8 @@ class MetadataPanel(QWidget):
             config = DataStore.load_config()
             config['save_directory'] = dir_path
             DataStore.save_config(config)
+            # Persistir também no último estado
+            self.save_last_state()
         
     def get_metadata(self) -> Dict[str, Any]:
         """
